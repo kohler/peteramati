@@ -201,6 +201,9 @@ class Pset {
     public $diff_base;
     /** @var list<DiffConfig> */
     public $diffs = [];
+    /** @var bool */
+    public $has_diff_base = false;
+    /** @var null|string|list<string> */
     public $ignore;
     private $_file_ignore_regex;
     /** @var int */
@@ -524,6 +527,12 @@ class Pset {
         } else if ($diffs) {
             throw new PsetConfigException("`diffs` format error", "diffs");
         }
+        foreach ($this->diffs as $diff) {
+            if ($diff->base !== null) {
+                $this->has_diff_base = true;
+                break;
+            }
+        }
         if (($ignore = $p->ignore ?? null)) {
             $this->ignore = self::cstr_or_str_list($p, "ignore");
         }
@@ -587,6 +596,19 @@ class Pset {
         }
     }
 
+
+    /** @return ?Pset */
+    function predecessor() {
+        $seen = false;
+        foreach ($this->conf->psets_newest_first() as $p) {
+            if ($p === $this) {
+                $seen = true;
+            } else if ($seen && $p->category === $this->category) {
+                return $p;
+            }
+        }
+        return null;
+    }
 
     /** @return bool */
     function visible_student() {
@@ -1033,6 +1055,9 @@ class Pset {
         $this->_file_diffinfo = [];
         $this->_all_diffs[] = $dc;
         $dc->subposition = count($this->_all_diffs) - 1;
+        if ($dc->base !== null) {
+            $this->has_diff_base = true;
+        }
     }
 
 
@@ -1585,6 +1610,8 @@ class DiffConfig {
     public $tabwidth;
     /** @var bool */
     public $nonshared = false;
+    /** @var ?string */
+    public $base;
 
     /** @param object $d
      * @param ?string $match
@@ -1629,6 +1656,9 @@ class DiffConfig {
         }
         $this->language = Pset::cstr($loc, $d, "language");
         $this->tabwidth = Pset::cint($loc, $d, "tabwidth");
+        if (isset($d->base)) {
+            $this->base = is_int($d->base) ? $d->base : Pset::cstr($loc, $d, "base");
+        }
     }
 
     /** @param string $filename
@@ -1674,6 +1704,7 @@ class DiffConfig {
                 $a->priority_default = $b->priority_default;
                 $a->collapse_default = $b->collapse_default ?? $a->collapse_default;
             }
+            $a->base = $b->base ?? $a->base;
             return $a;
         }
     }

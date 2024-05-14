@@ -433,20 +433,11 @@ class PsetRequest {
             }
 
             // if no current grader, highlight previous grader
-            if (!$gpc) {
-                $seen_pset = false;
-                $older_pset = null;
-                foreach ($this->conf->psets_newest_first() as $xpset) {
-                    if ($xpset === $this->pset) {
-                        $seen_pset = true;
-                    } else if ($seen_pset && $xpset->category === $this->pset->category) {
-                        $xinfo = PsetView::make($xpset, $this->user, $this->viewer);
-                        if (($xcid = $xinfo->gradercid())
-                            && ($pcm = ($this->conf->pc_members_and_admins())[$xcid] ?? null)) {
-                            $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
-                        }
-                        break;
-                    }
+            if (!$gpc && ($pred_pset = $this->pset->predecessor())) {
+                $xinfo = PsetView::make($pred_pset, $this->user, $this->viewer);
+                if (($xcid = $xinfo->gradercid())
+                    && ($pcm = ($this->conf->pc_members_and_admins())[$xcid] ?? null)) {
+                    $sel[$pcm->email] .= " [✱" . htmlspecialchars($xpset->title) . "]";
                 }
             }
 
@@ -899,7 +890,7 @@ class PsetRequest {
             // collect diff and sort line notes
             $lnorder = $this->info->visible_line_notes();
             if ($this->info->commit()) {
-                $diff = $this->info->diff($this->info->diff_base_commit(), $this->info->commit(),
+                $diff = $this->info->base_diff($this->info->commit(),
                     $lnorder, ["wdiff" => !!$this->info->commit_jnote("wdiff")]);
             } else {
                 $diff = [];

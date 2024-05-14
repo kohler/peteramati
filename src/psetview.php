@@ -492,20 +492,32 @@ class PsetView {
         }
     }
 
+    /** @param null|int|string $base
+     * @return ?CommitRecord */
+    function commit_in_base($base) {
+        if ($base === null || $base === "handout") {
+            return $this->base_handout_commit();
+        }
+        if ($base === "previous") {
+            $prevp = $this->pset->predecessor();
+        } else if (is_int($base)) {
+            $prevp = $this->conf->pset_by_id($base);
+        } else {
+            $prevp = $this->conf->pset_by_key($base);
+        }
+        if (!$prevp
+            || $this->user->link(LINK_REPO, $prevp->id) !== $this->repo->repoid) {
+            return null;
+        }
+        $prevv = PsetView::make($prevp, $this->user, $this->viewer);
+        return $prevv->grading_commit();
+    }
+
     /** @return CommitRecord */
     function diff_base_commit() {
         $c = $this->base_handout_commit();
         if ($this->pset->diff_base !== null) {
-            if (is_int($this->pset->diff_base)) {
-                $prevp = $this->conf->pset_by_id($this->pset->diff_base);
-            } else {
-                $prevp = $this->conf->pset_by_key($this->pset->diff_base);
-            }
-            if ($prevp
-                && $this->user->link(LINK_REPO, $prevp->id) === $this->repo->repoid) {
-                $prevv = PsetView::make($prevp, $this->user, $this->viewer);
-                $c = $prevv->grading_commit() ?? $c;
-            }
+            $c = $this->commit_in_base($this->pset->diff_base) ?? $c;
         }
         return $c;
     }
@@ -2249,9 +2261,8 @@ class PsetView {
         }
     }
 
-    /** @return array<string,DiffInfo> */
-    function diff(CommitRecord $commita, CommitRecord $commitb,
-                  LineNotesOrder $lnorder = null, $args = []) {
+    /** @param array &$args */
+    private function _prepare_diff_args(?LineNotesOrder $lnorder, &$args) {
         if ($args["no_local_diffconfig"] ?? false) {
             $this->pset->set_local_diffconfig_source(null);
         } else if ($this->pset->set_local_diffconfig_source($this)) {
@@ -2265,6 +2276,16 @@ class PsetView {
                 $this->_add_local_diffconfigs($diffs, 101.0);
             }
         }
+
+        assert(!isset($args["needfiles"]));
+        if ($lnorder) {
+            $args["needfiles"] = $lnorder->fileorder();
+        }
+    }
+
+    /** param array $args
+     * @return array<string,DiffInfo> */
+    private function _read_diff(CommitRecord $commita, CommitRecord $commitb, $args) {
         // both repos must be in the same directory; assume handout
         // is only potential problem
         if ($this->pset->is_handout($commita) !== $this->pset->is_handout($commitb)) {
@@ -2272,10 +2293,6 @@ class PsetView {
         }
 
         // obtain diff
-        assert(!isset($args["needfiles"]));
-        if ($lnorder) {
-            $args["needfiles"] = $lnorder->fileorder();
-        }
         $diff = $this->repo->diff($this->pset, $commita, $commitb, $args);
 
         // update `emptydiff_at`
@@ -2288,6 +2305,13 @@ class PsetView {
             $this->conf->ql("update RepositoryGrade set emptydiff_at=? where repoid=? and branchid=? and pset=?", $lhc->commitat, $this->repo->repoid, $this->branchid, $this->pset->id);
         }
 
+        return $diff;
+    }
+
+    /** @param array<string,DiffInfo> $diff
+     * @param array $args
+     * @return array<string,DiffInfo> */
+    private function _complete_diff($diff, ?LineNotesOrder $lnorder, $args) {
         // expand diff to include all grade landmarks
         if ($this->pset->has_grade_landmark
             && $this->pc_view) {
@@ -2345,6 +2369,67 @@ class PsetView {
             }
         }
         return $ndiff;
+    }
+
+    /** @return array<string,DiffInfo> */
+    function base_diff(CommitRecord $commitb,
+                       LineNotesOrder $lnorder = null,
+                       $args = []) {
+        $commita = $this->diff_base_commit();
+        if (!$this->pset->has_diff_base) {
+            return $this->diff($commita, $commitb, $lnorder, $args);
+        }
+
+        // collect bases that differ from pset-wide base
+        $onlyfiles = Repository::fix_diff_files($args["onlyfiles"] ?? null);
+        $bases = $cbyhash = $fbyhash = [];
+        foreach ($this->repo->ls_files($commitb->hash) as $fn) {
+            if ($onlyfiles !== null
+                && !isset($onlyfiles[$fn])) {
+                continue;
+            }
+            $diffc = $this->pset->find_diffconfig($fn);
+            if ($diffc === null
+                || $diffc->base === null
+                || $diffc->base === $this->pset->diff_base) {
+                continue;
+            }
+            if (!array_key_exists($diffc->base, $bases)) {
+                $c = $this->commit_in_base($diffc->base);
+                if ($c !== null && $c !== $commita) {
+                    $bases[$diffc->base] = $c;
+                    $cbyhash[$c->hash] = $c;
+                } else {
+                    $bases[$diffc->base] = null;
+                }
+            }
+            if (($c = $bases[$diffc->base]) !== null) {
+                $fbyhash[$c->hash][] = $fn;
+            }
+        }
+
+        // merge diff on pset-wide base with diffs on file bases
+        $this->_prepare_diff_args($lnorder, $args);
+        $diff = $this->_read_diff($commita, $commitb, $args);
+        if (!empty($fbyhash)) {
+            foreach ($fbyhash as $hash => $flist) {
+                foreach ($flist as $fn) {
+                    unset($diff[$fn]);
+                }
+                $args["onlyfiles"] = $flist;
+                $diff = array_merge($diff, $this->_read_diff($cbyhash[$hash], $commitb, $args));
+            }
+            usort($diff, "DiffInfo::compare");
+        }
+        return $this->_complete_diff($diff, $lnorder, $args);
+    }
+
+    /** @return array<string,DiffInfo> */
+    function diff(CommitRecord $commita, CommitRecord $commitb,
+                  LineNotesOrder $lnorder = null, $args = []) {
+        $this->_prepare_diff_args($lnorder, $args);
+        $diff = $this->_read_diff($commita, $commitb, $args);
+        return $this->_complete_diff($diff, $lnorder, $args);
     }
 
     private function diff_line_code($t) {
