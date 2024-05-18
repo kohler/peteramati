@@ -245,7 +245,7 @@ class RepoFetch_Batch {
         $this->conf->qe("update Repository set snapat=?, snaphash=?,
             heads=?, working=?, snapcheckat=?
             where repoid=?",
-            Conf::$now, $snaphash,
+            Conf::$now, $snaphash ?? $this->repo->snaphash,
             join(" ", $newhashes), Conf::$now, Conf::$now,
             $this->repo->repoid);
         if ($this->verbose) {
@@ -349,7 +349,8 @@ class RepoFetch_Batch {
         }
 
         // force head list
-        if ($this->force) {
+        if ($this->force
+            || ($this->repo->snaphash === null && $this->repo->snapat)) {
             $this->recheck_heads();
         }
         return 0;
