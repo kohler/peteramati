@@ -94,7 +94,7 @@ class RepoFetch_Batch {
     private function gitruninfo($command) {
         $gi = $this->repo->gitruninfo($command);
         if ($this->verbose || !$gi->ok) {
-            $suffix = $gi->ok ? " -> OK\n" : " -> status {$gi->status}\n";
+            $suffix = $gi->ok ? " → OK\n" : " → status {$gi->status}\n";
             if ($gi->stderr !== "") {
                 $suffix .= $gi->stderr . (str_ends_with($gi->stderr, "\n") ? "" : "\n");
             }

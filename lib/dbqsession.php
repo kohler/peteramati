@@ -44,26 +44,7 @@ class DbQsession extends Qsession {
 
     /** @return non-empty-string */
     static function random_sid() {
-        $convtab = "0123456789abcdefghijklmnopqrstuv";
-        $slen = 32;
-        $nbits = 5;
-        $mask = (1 << $nbits) - 1;
-        $b = random_bytes((int) ($slen * 8 / $nbits) + 4);
-        $bi = 0;
-        $t = "";
-        $w = 0;
-        $have = 0;
-        while (strlen($t) !== $slen) {
-            if ($have < $nbits) {
-                $w |= ord($b[$bi]) << $have;
-                $have += 8;
-                ++$bi;
-            }
-            $t .= $convtab[$w & $mask];
-            $w >>= $nbits;
-            $have -= $nbits;
-        }
-        return $t;
+        return random_alnum_chars(32, 32);
     }
 
     /** @return string */

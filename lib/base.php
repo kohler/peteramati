@@ -438,6 +438,35 @@ function is_base64url_string($text) {
     return preg_match('/\A[-_A-Za-z0-9]*\z/', $text);
 }
 
+/** @param int $length
+ * @param int $base
+ * @return string */
+function random_alnum_chars($length, $base = 36) {
+    assert(is_int($base) && $base >= 2 && $base <= 36);
+    $alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+    $chperw = (int) floor(32 * M_LN2 / log($base));
+    $w = $wbound = $base ** $chperw;
+    $expand = 0x100000000 / $wbound;
+    $i = 0;
+    $words = [];
+    $s = "";
+    while (strlen($s) !== $length) {
+        if ($w < $wbound && $i < $chperw) {
+            $s .= $alphabet[$w % $base];
+            $w = (int) ($w / $base);
+            ++$i;
+        } else {
+            if (empty($words)) {
+                $wantch = (int) ceil(ceil(($length - strlen($s)) / $chperw) * $expand);
+                $words = array_values(unpack("L*", random_bytes($wantch * 4)));
+            }
+            $w = array_pop($words);
+            $i = 0;
+        }
+    }
+    return $s;
+}
+
 
 /** @param string $uri
  * @return string */
