@@ -185,7 +185,7 @@ class Repository {
                 set_time_limit(30);
             }
             $this->ensure_repodir();
-            $this->reposite->gitfetch($this->repoid, $this->cacheid, $foreground);
+            $this->reposite->gitfetch($this, $this->cacheid, $foreground);
             if ($foreground) {
                 $this->_commits = $this->_commit_lists = $this->_commit_lists_cc = [];
                 $this->_branches = null;
@@ -310,18 +310,35 @@ class Repository {
     }
 
 
-    /** @return string */
-    function ensure_repodir() {
-        $subdir = "/repo/repo{$this->cacheid}";
-        $repodir = SiteLoader::$root . $subdir;
+    /** @param string $cacheid
+     * @return string */
+    static function repodir_at(Conf $conf, $cacheid) {
+        return SiteLoader::$root . "/repo/repo" . $cacheid;
+    }
+
+    /** @param string $cacheid
+     * @return string */
+    static function ensure_repodir_at(Conf $conf, $cacheid) {
+        $repodir = self::repodir_at($conf, $cacheid);
         if (!file_exists("{$repodir}/.git/config")) {
-            if (!mk_site_subdir($subdir, 02770)) {
+            if (!mk_site_subdir($repodir, 02770)) {
                 return "";
             }
-            shell_exec("cd {$repodir} && git init --shared -b main");
+            shell_exec("cd {$repodir} && git init --bare --shared -b main");
         }
         return $repodir;
     }
+
+    /** @return string */
+    function repodir() {
+        return self::repodir_at($this->conf, $this->cacheid);
+    }
+
+    /** @return string */
+    function ensure_repodir() {
+        return self::ensure_repodir_at($this->conf, $this->cacheid);
+    }
+
 
     /** @return string */
     function reponame() {
@@ -334,19 +351,28 @@ class Repository {
         return "repo{$this->repoid}/{$branch}";
     }
 
+
+    /** @param list<string> $command
+     * @param string $cwd
+     * @param array{firstline?:int,linecount?:int,stdin?:string} $args
+     * @return Subprocess */
+    static function gitrun_subprocess(Conf $conf, $command, $cwd, $args = []) {
+        if ($command[0] === "git") {
+            $command[0] = $conf->opt("gitCommand") ?? "git";
+            array_splice($command, 1, 0, ["-c", "safe.directory=*"]); // XXX
+        }
+        return Subprocess::run($command, $cwd, $args);
+    }
+
     /** @param list<string> $command
      * @param array{firstline?:int,linecount?:int,cwd?:?string} $args
      * @return Subprocess */
     function gitruninfo($command, $args = []) {
-        if ($command[0] === "git") {
-            $command[0] = $this->conf->opt("gitCommand") ?? "git";
-            array_splice($command, 1, 0, ["-c", "safe.directory=*"]); // XXX
-        }
         $cwd = $args["cwd"] ?? $this->ensure_repodir();
         if (!$cwd) {
             throw new Error("Cannot safely create repository directory");
         }
-        return Subprocess::run($command, $cwd, $args);
+        return self::gitrun_subprocess($this->conf, $command, $cwd, $args);
     }
 
     /** @param list<string> $command
@@ -366,13 +392,11 @@ class Repository {
     /** @return list<string> */
     function branches() {
         if ($this->_branches === null) {
-            $this->_branches = [];
-            $dir = $this->ensure_repodir() . "/.git/refs/remotes/repo{$this->repoid}/";
-            foreach (glob("{$dir}*") as $x) {
-                $br = substr($x, strlen($dir));
-                if ($br !== "" && $br[0] !== "." && $br !== "HEAD") {
-                    $this->_branches[] = $br;
-                }
+            preg_match_all('/ refs\/remotes\/' . preg_quote($this->reponame()) . '\/(.*)$/m',
+                           $this->conf->repodir_refs($this->cacheid), $m);
+            $this->_branches = $m[1] ?? [];
+            if (($i = array_search("HEAD", $this->_branches)) !== false) {
+                array_splice($this->_branches, $i, 1);
             }
         }
         return $this->_branches;
@@ -672,14 +696,11 @@ class Repository {
         // snapshots
         if ($this->_heads_loaded === 2) {
             $this->_heads_loaded = 3;
-            $pfx = $this->ensure_repodir() . "/.git/refs/tags/repo{$this->repoid}.snap";
-            foreach (glob("{$pfx}*") as $snapfile) {
-                if (($x = file_get_contents($snapfile)) !== false
-                    && ($x = rtrim($x)) !== ""
-                    && strlen($x) >= 40
-                    && ctype_xdigit($x)
-                    && !isset($this->_commits[$x])) {
-                    $this->head_commits(".h/{$x}", $x);
+            preg_match_all('/^([0-9a-f]+) refs\/tags\/' . preg_quote($this->reponame()) . '\.snap/m',
+                           $this->conf->repodir_refs($this->cacheid), $m);
+            foreach ($m[1] as $hash) {
+                if (strlen($hash) >= 40 && !isset($this->_commits[$hash])) {
+                    $this->head_commits(".h/{$hash}", $hash);
                 }
             }
         }
@@ -830,10 +851,9 @@ class Repository {
             $addcommand[] = $f;
         }
 
-        $repodir = SiteLoader::$root . "/repo/repo{$this->cacheid}";
         if (!$this->gitrunok($addcommand, ["cwd" => $tmpdir])
             || !$this->gitrunok(["git", "commit", "-m", "Truncated version of {$hash} for pset {$pset->key}"], ["cwd" => $tmpdir])
-            || !$this->gitrunok(["git", "push", "-f", $repodir, "main:refs/tags/trunc{$pset->id}_{$hash}"], ["cwd" => $tmpdir])) {
+            || !$this->gitrunok(["git", "push", "-f", $this->repodir(), "main:refs/tags/trunc{$pset->id}_{$hash}"], ["cwd" => $tmpdir])) {
             return null;
         }
 

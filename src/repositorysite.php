@@ -71,11 +71,11 @@ class RepositorySite {
         return ["REPOGITURL" => null, "REPOBASE" => null];
     }
 
-    /** @param int $repoid
+    /** @param Repository $repo
      * @param string $cacheid
      * @param bool $foreground
      * @return bool */
-    function gitfetch($repoid, $cacheid, $foreground) {
+    function gitfetch($repo, $cacheid, $foreground) {
         return false;
     }
     /** @return -1|0|1 */

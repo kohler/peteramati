@@ -152,7 +152,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
                         $missing_repos[] = $repoid;
                     }
                     $bid = $u->branchid($pset);
-                    $this->_rb_uids["$pset->id,$repoid,$bid"][] = $u->contactId;
+                    $this->_rb_uids["{$pset->id},{$repoid},{$bid}"][] = $u->contactId;
                 }
             }
             if (!empty($missing_repos)) {
@@ -421,7 +421,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         assert(!$this->pset->gitless);
         if (($repoid = $user->link(LINK_REPO, $this->_psetid))) {
             $branchid = $user->branchid($this->pset);
-            $sharers = array_diff($this->_rb_uids["$this->_psetid,$repoid,$branchid"],
+            $sharers = array_diff($this->_rb_uids["{$this->_psetid},{$repoid},{$branchid}"],
                                   [$user->contactId]);
             if (!empty($sharers)) {
                 $sharers = array_diff($sharers, $user->links(LINK_PARTNER, $this->_psetid));

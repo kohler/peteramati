@@ -262,7 +262,12 @@ class GitHub_RepositorySite extends RepositorySite {
 
     function message_defs(Contact $user) {
         $base = $user->is_anonymous ? "[anonymous]" : $this->base;
-        return ["REPOURL" => "https://github.com/$base", "REPOGITURL" => "git@github.com:$base", "REPOBASE" => $base, "GITHUB" => 1];
+        return [
+            "REPOURL" => "https://github.com/{$base}",
+            "REPOGITURL" => "git@github.com:{$base}",
+            "REPOBASE" => $base,
+            "GITHUB" => 1
+        ];
     }
     /** @param string $name
      * @return ?string */
@@ -270,7 +275,7 @@ class GitHub_RepositorySite extends RepositorySite {
         return Messages::$main->expand_html($name, $this->message_defs($user));
     }
 
-    function gitfetch($repoid, $cacheid, $foreground) {
+    function gitfetch($repo, $cacheid, $foreground) {
         if (!$this->conf->opt("githubOAuthClientId")
             || !($token = $this->conf->opt("githubOAuthToken"))
             || $token === Conf::INVALID_TOKEN) {
@@ -279,10 +284,10 @@ class GitHub_RepositorySite extends RepositorySite {
         $arg = $foreground ? [] : ["--bg"];
         $php = $this->conf->opt("phpCommand") ?? "php";
         $sp = Subprocess::run([
-            $php, "batch/repofetch.php", "-r", $repoid, "-C", $cacheid, ...$arg
+            $php, "batch/repofetch.php", "-r", $repo->repoid, "-C", $cacheid, ...$arg
         ], SiteLoader::$root);
         if (!$sp->ok) {
-            error_log("`php batch/repofetch.php -r {$repoid}` failed: {$sp->status}, {$sp->stderr}");
+            error_log("`php batch/repofetch.php -r {$repo->repoid}` failed: {$sp->status}, {$sp->stderr}");
         }
         return true;
     }

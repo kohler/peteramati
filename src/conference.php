@@ -168,8 +168,11 @@ class Conf {
     private $_handout_commits = [];
     /** @var array<int,?CommitRecord> */
     private $_handout_latest_commit = [];
+    /** @var array<string,string> */
+    private $_repodir_refs = [];
     private $_api_map;
     private $_repository_site_classes;
+    /** @var array<int,string> */
     private $_branch_map;
     const USERNAME_GITHUB = 1;
     const USERNAME_EMAIL = 2;
@@ -839,9 +842,9 @@ class Conf {
     function query_error_handler($dblink, $query) {
         $landmark = caller_landmark(1, "/^(?:Dbl::|Conf::q|call_user_func)/");
         if (PHP_SAPI == "cli") {
-            fwrite(STDERR, "$landmark: database error: $dblink->error in $query\n");
+            fwrite(STDERR, "{$landmark}: database error: {$dblink->error} in {$query}\n");
         } else {
-            error_log("$landmark: database error: $dblink->error in $query");
+            error_log("{$landmark}: database error: {$dblink->error} in {$query}");
             self::msg_error("<p>" . htmlspecialchars($landmark) . ": database error: " . htmlspecialchars($this->dblink->error) . " in " . Ht::pre_text_wrap($query) . "</p>");
         }
     }
@@ -2458,6 +2461,7 @@ class Conf {
     }
 
 
+    /** @return ?Repository */
     function handout_repo(Pset $pset, Repository $inrepo = null) {
         $url = $pset->handout_repo_url;
         if (!$url) {
@@ -2479,13 +2483,13 @@ class Conf {
             if (!$hset) {
                 $save = $hset = (object) [];
             }
-            if (!($hme = $hset->{"$hrepoid"} ?? null)) {
-                $save = $hme = $hset->{"$hrepoid"} = (object) array();
+            if (!($hme = $hset->{(string) $hrepoid} ?? null)) {
+                $save = $hme = $hset->{(string) $hrepoid} = (object) [];
             }
-            if ((int) ($hme->{"$cacheid"} ?? 0) + 300 < Conf::$now
+            if ((int) ($hme->{$cacheid} ?? 0) + 300 < Conf::$now
                 && !$this->opt("disableRemote")) {
-                $save = $hme->{"$cacheid"} = Conf::$now;
-                $hrepo->reposite->gitfetch($hrepo->repoid, $cacheid, false);
+                $save = $hme->{$cacheid} = Conf::$now;
+                $hrepo->reposite->gitfetch($hrepo, $cacheid, false);
             }
             if ($save) {
                 $this->save_setting("handoutrepos", 1, $hset);
@@ -2576,6 +2580,7 @@ class Conf {
     }
 
 
+    /** @return array<int,string> */
     private function branch_map() {
         if ($this->_branch_map === null) {
             $this->_branch_map = [0 => "master", 1 => "main"];
@@ -2588,6 +2593,7 @@ class Conf {
         return $this->_branch_map;
     }
 
+    /** @return ?string */
     function branch($branchid) {
         if (($branchid ?? 0) === 0) {
             return "master";
@@ -2624,6 +2630,18 @@ class Conf {
             }
             return $key;
         }
+    }
+
+
+    /** @param string $cacheid
+     * @return string */
+    function repodir_refs($cacheid) {
+        if (!isset($this->_repodir_refs[$cacheid])) {
+            $repodir = Repository::repodir_at($this, $cacheid);
+            $sp = Repository::gitrun_subprocess($this, ["git", "show-ref"], $repodir);
+            $this->_repodir_refs[$cacheid] = $sp->ok ? $sp->stdout : "";
+        }
+        return $this->_repodir_refs[$cacheid];
     }
 
 

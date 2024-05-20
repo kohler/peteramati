@@ -1134,10 +1134,8 @@ class QueueItem {
             throw new RunnerException("Can’t initialize user repo in jail.");
         }
 
-        $root = SiteLoader::$root;
-        $repodir = "{$root}/repo/repo{$repo->cacheid}";
-
         // need a branch to check out a specific commit
+        $repodir = $repo->repodir();
         $branch = "jailcheckout_" . Conf::$now;
         if ($this->run_and_log(["git", "branch", $branch, $hash], $repodir)) {
             throw new RunnerException("Can’t create branch for checkout.");
