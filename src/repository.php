@@ -398,6 +398,11 @@ class Repository {
             $this->conf->qe("update Repository set rflags=rflags|1 where repoid=?", $this->repoid);
             $this->rflags |= 1;
         }
+        if (($this->rflags & 2) === 0
+            && UpgradeRepository::upgrade_runs($this)) {
+            $this->conf->qe("update Repository set rflags=rflags|2 where repoid=?", $this->repoid);
+            $this->rflags |= 2;
+        }
     }
 
 

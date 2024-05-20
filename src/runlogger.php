@@ -37,7 +37,8 @@ class RunLogger {
      * @return string */
     function log_file($suffix) {
         $root = SiteLoader::$root;
-        return "{$root}/log/run{$this->repo->cacheid}.pset{$this->pset->id}/repo{$this->repo->repoid}.pset{$this->pset->id}{$suffix}";
+        $id = ($this->repo->rflags & 2) !== 0 ? $this->repo->repogid : $this->repo->repoid;
+        return "{$root}/log/run{$this->repo->cacheid}.pset{$this->pset->id}/repo{$id}.pset{$this->pset->id}{$suffix}";
     }
 
     // log_file(".pid")           PID of active runner

@@ -162,11 +162,12 @@ class UpdateSchema {
             $repoid = (int) $row[1];
             $branchid = (int) $row[2];
             $branch = $branchid ? $branches[$branchid] : "master";
-            if (!isset($repos["$pset,$repoid"])) {
+            $key = "{$pset},{$repoid}";
+            if (!isset($repos[$key])) {
                 $qstager("update RepositoryGrade set branchid=? where repoid=? and pset=?", $branchid, $repoid, $pset);
-                $repos["$pset,$repoid"] = $branch;
+                $repos[$key] = $branch;
             } else {
-                error_log("RepositoryGrade[$pset,$repoid] conflict: branch " . $branch . " vs. " . $repos["$pset,$repoid"]);
+                error_log("RepositoryGrade[{$key}] conflict: branch {$branch} vs. " . $repos[$key]);
             }
         }
         $qstager(null);

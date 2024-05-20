@@ -42,4 +42,17 @@ class UpgradeRepository {
         }
         return true;
     }
+
+    /** @return bool */
+    static function upgrade_runs(Repository $repo) {
+        $logroot = SiteLoader::$root . "/log";
+        foreach (glob("{$logroot}/run{$repo->cacheid}.pset*") as $dir) {
+            $have = "{$dir}/repo{$repo->repoid}";
+            $want = "{$dir}/repo{$repo->repogid}";
+            foreach (glob("{$have}.*") as $f) {
+                rename($f, $want . substr($f, strlen($have)));
+            }
+        }
+        return true;
+    }
 }
