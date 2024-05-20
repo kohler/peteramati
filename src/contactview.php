@@ -327,7 +327,7 @@ class ContactView {
             $value .= ' type="button">Copy URL to clipboard</button>';
         }
         if ($repo && $info->viewer->privChair) {
-            $value .= " <small style=\"padding-left:1em;font-size:60%\">group " . $repo->cacheid . ", repo" . $repo->repoid . "</small>";
+            $value .= " <small style=\"padding-left:1em;font-size:60%\">{$repo->repoid}/{$repo->repogid}</small>";
         }
 
         // check repo

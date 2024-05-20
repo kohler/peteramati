@@ -328,6 +328,54 @@ class UpdateSchema {
         return true;
     }
 
+    private function v174_repogid() {
+        $bygid = [];
+        $byrepoid = [];
+        $ok = true;
+
+        $result = $this->conf->ql_ok("select repoid, cacheid from Repository");
+        while (($row = $result->fetch_row())) {
+            if ($row[1] === null
+                || strlen($row[1]) !== 1
+                || $row[1] < "0"
+                || ($row[1] > "9" && $row[1] < "a")
+                || $row[1] > "f") {
+                error_log("repo{$row[0]} has unexpected cacheid `{$row[1]}`");
+                $ok = false;
+                break;
+            }
+
+            for ($i = 0; $i < 100; ++$i) {
+                $repogid = $row[1] . random_alnum_chars(6, 36);
+                if (!isset($bygid[$repogid])
+                    && !Repository::repogid_repodir_known($this->conf, $repogid)
+                    && !ctype_xdigit($repogid)) {
+                    $bygid[$repogid] = true;
+                    $byrepoid[(int) $row[0]] = $repogid;
+                    break;
+                }
+            }
+            if ($i >= 100) {
+                error_log("unexpected failure generating repogid");
+                $ok = false;
+                break;
+            }
+        }
+        $result->close();
+
+        if ($ok) {
+            $qstager = Dbl::make_multi_ql_stager($this->conf->dblink);
+            foreach ($byrepoid as $repoid => $gid) {
+                $qstager("update Repository set repogid=? where repoid=?",
+                         $gid, $repoid);
+            }
+            $qstager(null);
+        }
+
+        return $ok
+            && $this->conf->ql_ok("alter table Repository add unique key `repogid` (`repogid`)");
+    }
+
     function run() {
         $conf = $this->conf;
         // avoid error message about timezone, set to $Opt
@@ -961,6 +1009,15 @@ class UpdateSchema {
   KEY `expires_at` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci")) {
             $conf->update_schema_version(172);
+        }
+        if ($conf->sversion === 172
+            && $conf->ql_ok("alter table Repository add `rflags` int(11) NOT NULL DEFAULT 0")
+            && $conf->ql_ok("alter table Repository add `repogid` varbinary(40) DEFAULT NULL")) {
+            $conf->update_schema_version(173);
+        }
+        if ($conf->sversion === 173
+            && $this->v174_repogid()) {
+            $conf->update_schema_version(174);
         }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");

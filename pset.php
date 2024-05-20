@@ -43,6 +43,9 @@ class PsetRequest {
 
         // info, commit
         $this->info = PsetView::make($this->pset, $this->user, $viewer, $qreq->newcommit ?? $qreq->commit, true);
+        if ($this->info->repo) {
+            $this->info->repo->upgrade();
+        }
         if (($qreq->newcommit ?? $qreq->commit) && !$this->info->hash()) {
             if ($this->info->repo) {
                 $this->conf->errorMsg("Commit " . htmlspecialchars($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");

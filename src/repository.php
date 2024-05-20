@@ -1,6 +1,6 @@
 <?php
 // repository.php -- Peteramati helper class representing repositories
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class Repository {
@@ -15,6 +15,10 @@ class Repository {
     public $reposite;
     /** @var string */
     public $cacheid;
+    /** @var int */
+    public $rflags;
+    /** @var string */
+    public $repogid;
     /** @var -1|0|1 */
     public $open;
     /** @var int */
@@ -70,6 +74,7 @@ class Repository {
 
     private function db_load() {
         $this->repoid = (int) $this->repoid;
+        $this->rflags = (int) $this->rflags;
         $this->open = (int) $this->open;
         $this->opencheckat = (int) $this->opencheckat;
         if ($this->snapat !== null) {
@@ -105,11 +110,58 @@ class Repository {
         if ($repo) {
             return $repo;
         }
-        $repo_hash = substr(sha1($url), 10, 1);
-        $now = time();
-        $result = $conf->qe("insert into Repository set url=?, cacheid=?, working=?, open=?, opencheckat=?", $url, $repo_hash, $now, -1, 0);
-        return $result ? self::by_id($conf->dblink->insert_id, $conf) : null;
+
+        // otherwise, pick a random repogid (try 24 times)
+        for ($i = 0; $i < 24; ++$i) {
+            if (!($repogid = self::random_repogid())
+                || self::repogid_repodir_known($conf, $repogid)) {
+                continue;
+            }
+
+            $result = $conf->qe("insert into Repository
+                    set url=?, cacheid=?, repogid=?,
+                    working=?, open=?, opencheckat=?",
+                $url, substr($repogid, 0, 1), $repogid,
+                time(), -1, 0);
+            if ($result->affected_rows > 0) {
+                return self::by_id($result->insert_id, $conf);
+            }
+        }
+
+        return null;
     }
+
+
+    /** @return ?string */
+    static function random_repogid() {
+        for ($i = 0; $i < 50; ++$i) {
+            // compute random repoid: [0-9a-f][0-9a-z]{7}, but not all hex
+            $s = random_alnum_chars(8, 36);
+            // normalize first character to [0-9a-f]
+            $c = ord($s[0]);
+            if ($c >= 119 /* w */) {
+                continue;
+            }
+            if ($c >= 103 /* g */) {
+                $c = $c >= 113 /* q */ ? 97 + $c - 113 : 48 + $c - 103;
+            }
+            // check for hex
+            $repogid = chr($c) . substr($s, 1);
+            if (!ctype_xdigit($repogid)) {
+                return $repogid;
+            }
+        }
+        return null;
+    }
+
+    /** @param string $repogid
+     * @return bool */
+    static function repogid_repodir_known(Conf $conf, $repogid) {
+        $repodir = self::repodir_at($conf, substr($repogid, 0, 1));
+        return file_exists("{$repodir}/.git/config")
+            && (self::gitrun_subprocess($conf, ["git", "remote", "get-url", "repo{$repogid}"], $repodir))->ok;
+    }
+
 
     /** param string $url
      * @return Repository */
@@ -340,15 +392,32 @@ class Repository {
     }
 
 
+    function upgrade() {
+        if (($this->rflags & 1) === 0
+            && UpgradeRepository::upgrade_refs($this, $this->cacheid)) {
+            $this->conf->qe("update Repository set rflags=rflags|1 where repoid=?", $this->repoid);
+            $this->rflags |= 1;
+        }
+    }
+
+
     /** @return string */
     function reponame() {
-        return "repo{$this->repoid}";
+        if (($this->rflags & 1) !== 0) {
+            return "repo{$this->repogid}";
+        } else {
+            return "repo{$this->repoid}";
+        }
     }
 
     /** @param string $branch
      * @return string */
     function repobranchname($branch) {
-        return "repo{$this->repoid}/{$branch}";
+        if (($this->rflags & 1) !== 0) {
+            return "repo{$this->repogid}/{$branch}";
+        } else {
+            return "repo{$this->repoid}/{$branch}";
+        }
     }
 
 

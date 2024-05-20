@@ -269,7 +269,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 172) {
+        if ($this->sversion < 174) {
             $old_nerrors = Dbl::$nerrors;
             (new UpdateSchema($this))->run();
             Dbl::$nerrors = $old_nerrors;
@@ -2593,7 +2593,8 @@ class Conf {
         return $this->_branch_map;
     }
 
-    /** @return ?string */
+    /** @param ?int $branchid
+     * @return ?string */
     function branch($branchid) {
         if (($branchid ?? 0) === 0) {
             return "master";

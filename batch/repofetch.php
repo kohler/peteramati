@@ -20,6 +20,8 @@ class RepoFetch_Batch {
     private $cacheid;
     /** @var bool */
     public $done = false;
+    /** @var bool */
+    public $upgrade = false;
     /** @var ?Repository */
     private $repo;
     /** @var list<Repository> */
@@ -47,10 +49,17 @@ class RepoFetch_Batch {
         return new RepoFetch_Batch($conf, $repo);
     }
 
-    /** @param int $repoid
+    /** @param int|string $key
      * @return ?RepoFetch_Batch */
-    static function make_repo(Conf $conf, $repoid) {
-        $result = $conf->qe("select * from Repository r where repoid=?", $repoid);
+    static function make_repo(Conf $conf, $key) {
+        if (is_string($key) && ctype_digit($key)) {
+            $key = intval($key);
+        }
+        if (is_int($key)) {
+            $result = $conf->qe("select * from Repository where repoid=?", $key);
+        } else {
+            $result = $conf->qe("select * from Repository where repogid=?", $key);
+        }
         $repo = Repository::fetch($result, $conf);
         Dbl::free($result);
         return $repo ? new RepoFetch_Batch($conf, $repo) : null;
@@ -287,6 +296,9 @@ class RepoFetch_Batch {
     /** @return int */
     private function run_repo(Repository $repo) {
         $this->repo = $repo;
+        if ($this->upgrade) {
+            $repo->upgrade();
+        }
         if ($this->cacheid !== null) {
             $this->repo->override_cacheid($this->cacheid);
         }
@@ -356,15 +368,18 @@ class RepoFetch_Batch {
     /** @return RepoFetch_Batch */
     static function make_args(Conf $conf, $argv) {
         $getopt = (new Getopt)->long(
-            "r:,repo:,repository: {n}",
-            "cacheid:,C:",
-            "u:,user:",
-            "refresh",
-            "f,force",
-            "V,verbose",
-            "bg,background",
-            "help"
+            "r:,repo:,repository: =REPOID Fetch repository REPOID",
+            "u:,user: =USER Fetch repositories for USER",
+            "refresh Fetch least-recently-updated repository",
+            "d:,cacheid: =CACHEID Use repodir CACHEID",
+            "f,force Always update fetch heads",
+            "upgrade Upgrade internal repository format",
+            "V,verbose Be more verbose",
+            "bg,background Run in the background",
+            "help !"
         )->helpopt("help")
+         ->description("Fetch a configured remote.
+Usage: php batch/repofetch.php [-r REPOID | -u USER | --refresh]")
          ->maxarg(1);
         $arg = $getopt->parse($argv);
         $is_user = isset($arg["u"]) ? 1 : 0;
@@ -376,7 +391,7 @@ class RepoFetch_Batch {
             } else if (count($arg["_"]) === 1
                        && ctype_digit($arg["_"][0])) {
                 $is_repo = 1;
-                $arg["r"] = intval($arg["_"][0]);
+                $arg["r"] = $arg["_"][0];
             } else {
                 throw new CommandLineException("Too many arguments", $getopt);
             }
@@ -401,6 +416,7 @@ class RepoFetch_Batch {
         $self->force = isset($arg["f"]);
         $self->verbose = isset($arg["V"]);
         $self->cacheid = $arg["cacheid"] ?? null;
+        $self->upgrade = isset($arg["upgrade"]);
         if (isset($arg["bg"]) && pcntl_fork() > 0) {
             exit(0);
         }
