@@ -24,16 +24,6 @@ function admin_home_messages($conf) {
             $m[] = "PHP’s systemwide <code>session.gc_maxlifetime</code> setting, which is {$gc_lifetime} seconds, is less than Peteramati’s preferred session expiration time, which is {$co_lifetime} seconds.  You should update <code>session.gc_maxlifetime</code> in the <code>php.ini</code> file or users may be booted off the system earlier than you expect.";
         }
     }
-    if (!function_exists("imagecreate")) {
-        $m[] = $errmarker . "This PHP installation lacks support for the GD library, so HotCRP cannot generate score charts (as backup for browsers that don’t support &lt;canvas&gt;). You should update your PHP installation. For example, on Ubuntu Linux, install the <code>php5-gd</code> package.";
-    }
-    $result = $conf->qe("show variables like 'max_allowed_packet'");
-    $max_file_size = ini_get_bytes("upload_max_filesize");
-    if (($row = $result->fetch_row())
-        && $row[1] < $max_file_size
-        && !($conf->opt["dbNoPapers"] ?? false)) {
-        $m[] = $errmarker . "MySQL’s <code>max_allowed_packet</code> setting, which is " . htmlspecialchars($row[1]) . "&nbsp;bytes, is less than the PHP upload file limit, which is $max_file_size&nbsp;bytes.  You should update <code>max_allowed_packet</code> in the system-wide <code>my.cnf</code> file or the system may not be able to handle large papers.";
-    }
     // Conference names
     if ($conf->opt["shortNameDefaulted"] ?? false) {
         $m[] = "<a href=\"" . $conf->hoturl("settings", "group=msg") . "\">Set the conference abbreviation</a> to a short name for your conference, such as “OSDI ’14”.";
