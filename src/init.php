@@ -221,7 +221,7 @@ function load_pset_info() {
                 $x = Json::decode_landmarks($data, $fname);
                 object_replace_recursive($locinfo, $x);
             }
-            // - read location  information
+            // - read location information
             $locp = $locinfo->{$exception->key};
             if ($locp && isset($locp->group) && is_string($locp->group)) {
                 $g = "_defaults_" . $locp->group;

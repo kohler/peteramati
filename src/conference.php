@@ -1626,7 +1626,7 @@ class Conf {
     function hoturl($page, $param = null, $flags = 0) {
         global $Me;
         $qreq = Qrequest::$main_request;
-        $nav = $qreq->navigation();
+        $nav = $qreq ? $qreq->navigation() : Navigation::get();
         $amp = ($flags & self::HOTURL_RAW ? "&" : "&amp;");
         if (str_starts_with($page, "=")) {
             $page = substr($page, 1);
@@ -2011,7 +2011,7 @@ class Conf {
             "user" => []
         ];
         $qreq = Qrequest::$main_request;
-        if ($qreq->qsid()) {
+        if ($qreq && $qreq->qsid()) {
             $siteinfo["postvalue"] = $qreq->post_value();
         }
         if (($x = $this->opt("sessionDomain"))) {
@@ -2128,7 +2128,7 @@ class Conf {
         if (($x = $this->opt("maintenance"))) {
             echo Ht::msg(is_string($x) ? $x : "<strong>The site is down for maintenance.</strong> Please check back later.", 2);
         }
-        if (($msgs = $qreq->csession("msgs")) && !empty($msgs)) {
+        if ($qreq && ($msgs = $qreq->csession("msgs")) && !empty($msgs)) {
             $qreq->unset_csession("msgs");
             foreach ($msgs as $m) {
                 $this->msg($m[0], $m[1]);

@@ -138,7 +138,14 @@ class Multiconference {
         if (PHP_SAPI === "cli") {
             fwrite(STDERR, join("\n", $errors) . "\n");
             exit(1);
-        } else if (Navigation::page() === "api" || ($_GET["ajax"] ?? null)) {
+        }
+
+        $qreq = Qrequest::$main_request ?? Qrequest::make_minimal();
+        if (!$qreq->conf) {
+            $qreq->set_conf(Conf::$main ?? new Conf($Opt, false));
+        }
+
+        if ($qreq->page() === "api" || ($_GET["ajax"] ?? null)) {
             $ctype = ($_GET["text"] ?? null) ? "text/plain" : "application/json";
             header("HTTP/1.1 404 Not Found");
             header("Content-Type: $ctype; charset=utf-8");
@@ -148,17 +155,14 @@ class Multiconference {
                 echo "{\"error\":\"unconfigured installation\"}\n";
             }
         } else {
-            if (!Conf::$main) {
-                Conf::set_main_instance(new Conf($Opt, false));
-            }
             Contact::set_main_user(null);
             header("HTTP/1.1 404 Not Found");
-            Conf::$main->header("HotCRP Error", "", ["action_bar" => false]);
+            $qreq->conf()->header("HotCRP Error", "", ["action_bar" => false]);
             foreach ($errors as $i => &$e) {
                 $e = ($i ? "<div class=\"hint\">" : "<p>") . htmlspecialchars($e) . ($i ? "</div>" : "</p>");
             }
             echo join("", $errors);
-            Conf::$main->footer();
+            $qreq->conf()->footer();
         }
         exit;
     }
