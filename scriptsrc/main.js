@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { sprintf, strftime, text_eq } from "./utils.js";
+import { sprintf, strftime, text_eq, string_utf8_index } from "./utils.js";
 import {
     hasClass, addClass, removeClass, toggleClass, classList,
     handle_ui, $e
@@ -1352,5 +1352,6 @@ window.$pa = {
     render_text_page: render_text.on_page,
     runmany: pa_runmany,
     gradesheet_store: GradeSheet.store,
-    text_eq: text_eq
+    text_eq: text_eq,
+    string_utf8_index: string_utf8_index
 };
