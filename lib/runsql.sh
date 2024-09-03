@@ -21,9 +21,10 @@ usage () {
 export FLAGS=
 mode=
 makeuser=
-makeusercols=
-makeuservals=
+makeusersettings=
 makeuserpassword=true
+updateuser=false
+dryrun=false
 pwuser=
 pwvalue=
 cmdlinequery=
@@ -43,12 +44,17 @@ while [ $# -gt 0 ]; do
     --create-user)
         test "$#" -gt 1 -a -z "$mode" || usage
         makeuser="$2"; mode=makeuser; shift;;
+    --update-user)
+        test "$#" -gt 1 -a -z "$mode" || usage
+        makeuser="$2"; mode=makeuser; updateuser=true; shift;;
     --show-opt=*|--show-option=*)
         test -z "$mode" || usage
         optname="`echo "+$1" | sed 's/^[^=]*=//'`"; mode=showopt;;
     --show-opt|--show-option)
         test "$#" -gt 1 -a -z "$mode" || usage
         optname="$2"; shift; mode=showopt;;
+    --dry-run)
+        dryrun=true;;
     --json-dbopt)
         test -z "$mode" || usage
         mode=json_dbopt;;
@@ -73,8 +79,8 @@ while [ $# -gt 0 ]; do
             collen=`echo "$colname" | wc -c`
             collen=`expr $collen + 1`
             colvalue=`echo "$1" | tail -c +$collen`
-            makeusercols="$makeusercols,$colname"
-            makeuservals="$makeuservals,'`echo "$colvalue" | sql_quote`'"
+            if test -n "$makeusersettings"; then makeusersettings="$makeusersettings, "; fi
+            makeusersettings="$makeusersettings$colname='`echo "$colvalue" | sql_quote`'"
             test "$colname" = password && makeuserpassword=false
         elif [ "$mode" = "" ]; then
             mode=cmdlinequery
@@ -138,11 +144,15 @@ elif test "$mode" = showopt; then
         if test -n "$optopt"; then eval "echo $optopt"; else eval "echo $opt"; fi
     fi
 elif test "$mode" = makeuser; then
-    if $makeuserpassword; then
-        makeusercols="$makeusercols,password"
-        makeuservals="$makeuservals,''"
+    if $dryrun; then command="cat"; else command="$MYSQL $myargs -N $FLAGS $dbname"; fi
+    emailsetting="email='`echo "$makeuser" | sql_quote`'"
+    if $updateuser; then
+        echo "insert into ContactInfo set $emailsetting, password='' on duplicate key update roles=roles; update ContactInfo set $makeusersettings where $emailsetting" | eval "$command"
+    else
+        if test -n "$makeusersettings"; then makeusersettings=", $makeusersettings"; fi
+        if $makeuserpassword; then makeusersettings="$makeusersettings, password=''"; fi
+        echo "insert into ContactInfo set $emailsetting$makeusersettings" | eval "$command"
     fi
-    echo "insert into ContactInfo (email$makeusercols) values ('`echo "$makeuser" | sql_quote`'$makeuservals)" | eval "$MYSQL $myargs -N $FLAGS $dbname"
 elif test "$mode" = cmdlinequery; then
     if test -n "$PASSWORDFILE"; then ( sleep 0.3; rm -f $PASSWORDFILE ) & fi
     echo "$cmdlinequery" | eval "$MYSQL $myargs $FLAGS $dbname"
