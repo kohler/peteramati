@@ -24,7 +24,7 @@ class RunLogger {
     function mkdirs() {
         $logdir = $this->log_dir();
         return is_dir($logdir)
-            || mk_site_subdir(substr($logdir, strlen(SiteLoader::$root)), 02770);
+            || mk_site_subdir($logdir, 02770);
     }
 
     /** @return string */

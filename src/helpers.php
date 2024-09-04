@@ -378,22 +378,23 @@ function tempdir($mode = 0700) {
     return false;
 }
 
-/** @param string $subdir
+/** @param string $dir
  * @param int $mode
  * @return bool */
-function mk_site_subdir($subdir, $mode) {
-    $pos = 0;
+function mk_site_subdir($dir, $mode) {
+    assert(str_starts_with($dir, SiteLoader::$root . "/"));
+    $start = $pos = strlen(SiteLoader::$root);
     do {
         $oldpos = $pos;
-        assert($subdir[$pos] === "/");
-        $pos = strpos($subdir, "/", $pos + 1) ? : strlen($subdir);
-        $path = SiteLoader::$root . substr($subdir, 0, $pos);
+        assert($dir[$pos] === "/");
+        $pos = strpos($dir, "/", $pos + 1) ? : strlen($dir);
+        $path = SiteLoader::$root . substr($dir, $start, $pos - $start);
         if (!is_dir($path)) {
             if (!mkdir($path, $mode)) {
                 return false;
             }
             chmod($path, $mode);
-            if ($oldpos === 0) {
+            if ($oldpos === $start) {
                 $s = file_get_contents(SiteLoader::$root . "/src/.htaccess");
                 if ($s === false
                     || file_put_contents("{$path}/.htaccess", $s) !== strlen($s)) {
@@ -401,7 +402,7 @@ function mk_site_subdir($subdir, $mode) {
                 }
             }
         }
-    } while ($pos < strlen($subdir));
+    } while ($pos < strlen($dir));
     return true;
 }
 
