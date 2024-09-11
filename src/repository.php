@@ -47,14 +47,12 @@ class Repository {
     public $_truncated_psetdir = [];
     /** @var array<string,CommitRecord> */
     private $_commits = [];
-    /** @var array<string,array<string,CommitRecord>> */
+    /** @var array<string,CommitList> */
     private $_commit_lists = [];
     /** @var ?list<string> */
     private $_branches;
     /** @var int */
     private $_heads_loaded = 0;
-    /** @var array<string,bool> */
-    private $_commit_lists_cc = [];
     /** @var int */
     private $_refresh_count = 0;
     /** @var ?string */
@@ -237,7 +235,7 @@ class Repository {
             $this->ensure_repodir();
             $this->reposite->gitfetch($this, $this->cacheid, $foreground);
             if ($foreground) {
-                $this->_commits = $this->_commit_lists = $this->_commit_lists_cc = [];
+                $this->_commits = $this->_commit_lists = [];
                 $this->_branches = null;
                 $this->_heads_loaded = 0;
                 ++$this->_refresh_count;
@@ -516,10 +514,15 @@ class Repository {
         $cr->directory = $dir;
     }
 
-    /** @param array<string,CommitRecord> &$list
-     * @param string $head */
-    private function load_trivial_merges_from_head(&$list, $head) {
-        $s = $this->gitrun(["git", "log", "--cc", "--name-only", "--format=%x00%H", $head]);
+    /** @param string $branch */
+    private function check_merges($branch) {
+        $list = $this->commit_list(null, $branch);
+        if ($list->merges_checked) {
+            return;
+        }
+        $list->merges_checked = true;
+
+        $s = $this->gitrun(["git", "log", "--cc", "--name-only", "--format=%x00%H", $this->repobranchname($branch)]);
         $p = 0;
         $l = strlen($s);
         $cr = $newcr = null;
@@ -563,12 +566,13 @@ class Repository {
 
     /** @param string $key
      * @param string $head
-     * @return array<string,CommitRecord> */
-    private function head_commits($key, $head) {
+     * @return CommitList */
+    private function head_commit_list($key, $head) {
         // check cache
         if (isset($this->_commit_lists[$key])) {
             return $this->_commit_lists[$key];
         }
+        $list = $this->_commit_lists[$key] = new CommitList;
 
         // read log
         $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head]);
@@ -581,7 +585,6 @@ class Repository {
         $p = 0;
         $l = strlen($s);
         $cr = $newcr = null;
-        $list = [];
         while ($p < $l && $s[$p] === "\0") {
             $p0 = $p + 1;
             if (($p = strpos($s, "\0", $p0)) === false) {
@@ -604,12 +607,12 @@ class Repository {
                     } else if (($cr = $this->_commits[$hash] ?? null)) {
                         // assume already completely populated
                         $newcr = null;
-                        $list[$hash] = $cr;
+                        $list->commits[$hash] = $cr;
                     } else {
                         $subject = substr($s, $sp2 + 1, $nl1 - ($sp2 + 1));
                         /** @phan-suppress-next-line PhanTypeMismatchArgument */
                         $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
-                        $this->_commits[$hash] = $cr = $list[$hash] = $newcr;
+                        $this->_commits[$hash] = $list->commits[$hash] = $cr = $newcr;
                         if (strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false) {
                             $cr->_flags |= CommitRecord::CRF_IS_MERGE;
                         }
@@ -621,22 +624,69 @@ class Repository {
             }
         }
 
-        // update cache
-        $this->_commit_lists[$key] = $list;
         return $list;
     }
 
     /** @param string $branch
-     * @return array<string,CommitRecord> */
-    private function expanded_head_commits($branch) {
+     * @return CommitList */
+    private function expanded_head_commit_list($branch) {
         $key = ".x/{$branch}";
         if (isset($this->_commit_lists[$key])) {
             return $this->_commit_lists[$key];
         }
+        $this->_commit_lists[$key] = $list = new CommitList;
 
-        $list = $this->head_commits($branch, $this->repobranchname($branch));
+        $list->merge($this->head_commit_list($branch, $this->repobranchname($branch)));
         foreach ($this->extra_heads() as $xhead) {
-            $list = $list + $this->head_commits(".h/{$xhead}", $xhead);
+            $list->merge($this->head_commit_list(".h/{$xhead}", $xhead));
+        }
+        return $list;
+    }
+
+    /** @param ?Pset $pset
+     * @param ?string $branch
+     * @param bool $expanded
+     * @return CommitList */
+    function commit_list($pset, $branch, $expanded = false) {
+        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
+
+        // simple cases first
+        if (!$pset
+            || $pset->directory_noslash === ""
+            || ($this->_truncated_psetdir[$pset->psetid] ?? false)) {
+            // simplest case: just this branch
+            if (!$expanded || strlen($this->heads ?? "") <= 40) {
+                return $this->head_commit_list($branch, $this->repobranchname($branch));
+            }
+
+            // expand branch with heads
+            return $this->expanded_head_commit_list($branch);
+        }
+
+        // restrict to directory
+        $dir = $pset->directory_noslash;
+        $test_file = $pset->test_file;
+        assert(strpos($dir, "/") === false);
+        $key = ".d/{$dir}/" . ($expanded ? ".x/" : "") . $branch;
+        if (isset($this->_commit_lists[$key])) {
+            return $this->_commit_lists[$key];
+        }
+        $list = new CommitList;
+
+        foreach ($this->commit_list(null, $branch, $expanded) as $cr) {
+            if ($cr->__touches_directory($dir)) {
+                $list->commits[$cr->hash] = $cr;
+            } else if (empty($list->commits)
+                       && $test_file !== null
+                       && !$list->suspicious_directory
+                       && $cr->__touches_directory($test_file)) {
+                $list->suspicious_directory = true;
+            }
+        }
+
+        if (empty($list->commits) && $list->suspicious_directory) {
+            $this->_truncated_psetdir[$pset->psetid] = true;
+            return $this->commit_list(null, $branch, $expanded);
         }
 
         $this->_commit_lists[$key] = $list;
@@ -648,69 +698,25 @@ class Repository {
      * @param bool $expanded
      * @return array<string,CommitRecord> */
     function commits($pset, $branch, $expanded = false) {
-        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
-
-        // simple cases first
-        if (!$pset
-            || $pset->directory_noslash === ""
-            || ($this->_truncated_psetdir[$pset->psetid] ?? false)) {
-            // simplest case: just this branch
-            if (!$expanded || strlen($this->heads ?? "") <= 40) {
-                return $this->head_commits($branch, $this->repobranchname($branch));
-            }
-
-            // expand branch with heads
-            return $this->expanded_head_commits($branch);
-        }
-
-        // restrict to directory
-        $dir = $pset->directory_noslash;
-        assert(strpos($dir, "/") === false);
-        $key = ".d/{$dir}/" . ($expanded ? ".x/" : "") . $branch;
-        if (isset($this->_commit_lists[$key])) {
-            return $this->_commit_lists[$key];
-        }
-
-        $list = [];
-        foreach ($this->commits(null, $branch, $expanded) as $cr) {
-            if ($cr->directory === $dir
-                || (is_array($cr->directory) && in_array($dir, $cr->directory))) {
-                $list[$cr->hash] = $cr;
-            }
-        }
-
-        if (empty($list) && isset($pset->test_file)) {
-            $truncated = !!$this->ls_files($this->repobranchname($branch), $pset->test_file);
-            $this->_truncated_psetdir[$pset->psetid] = $truncated;
-            if ($truncated) {
-                return $this->commits(null, $branch, $expanded);
-            }
-        }
-
-        $this->_commit_lists[$key] = $list;
-        return $list;
+        return $this->commit_list($pset, $branch, $expanded)->commits;
     }
 
     /** @param ?string $branch
      * @return ?CommitRecord */
-    function latest_commit(Pset $pset = null, $branch = null) {
-        foreach ($this->commits($pset, $branch) as $c) {
-            return $c;
-        }
-        return null;
+    function latest_commit(?Pset $pset = null, $branch = null) {
+        return $this->commit_list($pset, $branch)->latest();
     }
 
     /** @param ?string $branch
      * @return ?CommitRecord */
-    function latest_nontrivial_commit(Pset $pset = null, $branch = null) {
+    function latest_nontrivial_commit(?Pset $pset = null, $branch = null) {
         $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
-        $trivial_merges_known = !!($this->_commit_lists_cc[$branch] ?? false);
+        $checked_merges = false;
 
-        foreach ($this->commits($pset, $branch) as $c) {
-            if ($c->is_merge() && !$trivial_merges_known) {
-                $cx = $this->commits(null, $branch);
-                $this->load_trivial_merges_from_head($cx, $this->repobranchname($branch));
-                $trivial_merges_known = $this->_commit_lists_cc[$branch] = true;
+        foreach ($this->commit_list($pset, $branch) as $c) {
+            if ($c->is_merge() && !$checked_merges) {
+                $this->check_merges($branch);
+                $checked_merges = true;
             }
             if (!$c->is_trivial_merge()) {
                 return $c;
@@ -754,7 +760,7 @@ class Repository {
     function connected_commit($hashpart, ?Pset $pset = null, $branch = null) {
         // ensure there's some commits
         if (empty($this->_commits)) {
-            $this->commits($pset, $branch);
+            $this->commit_list($pset, $branch);
         }
         // exact commits don’t need access to full commit lists
         $exact = strlen($hashpart) >= 40;
@@ -765,8 +771,7 @@ class Repository {
         if ($this->_heads_loaded === 0) {
             $this->_heads_loaded = 1;
             foreach ($this->branches() as $br) {
-                if (!isset($this->_commit_lists[$br]))
-                    $this->head_commits($br, $this->repobranchname($br));
+                $this->head_commit_list($br, $this->repobranchname($br));
             }
             if (array_key_exists($hashpart, $this->_commits)) {
                 return $this->_commits[$hashpart];
@@ -777,7 +782,7 @@ class Repository {
             $this->_heads_loaded = 2;
             foreach ($this->extra_heads() as $x) {
                 if (!isset($this->_commits[$x]))
-                    $this->head_commits(".h/{$x}", $x);
+                    $this->head_commit_list(".h/{$x}", $x);
             }
             if (array_key_exists($hashpart, $this->_commits)) {
                 return $this->_commits[$hashpart];
@@ -790,7 +795,7 @@ class Repository {
                            $this->conf->repodir_refs($this->cacheid), $m);
             foreach ($m[1] as $hash) {
                 if (strlen($hash) >= 40 && !isset($this->_commits[$hash])) {
-                    $this->head_commits(".h/{$hash}", $hash);
+                    $this->head_commit_list(".h/{$hash}", $hash);
                 }
             }
         }

@@ -248,12 +248,12 @@ class PsetView {
     }
 
 
-    /** @return array<string,CommitRecord> */
+    /** @return CommitList */
     function recent_commits() {
         if ($this->repo) {
-            return $this->repo->commits($this->pset, $this->branch, true);
+            return $this->repo->commit_list($this->pset, $this->branch, true);
         } else {
-            return [];
+            return new CommitList;
         }
     }
 

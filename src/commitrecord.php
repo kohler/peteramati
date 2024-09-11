@@ -50,6 +50,12 @@ class CommitRecord implements JsonSerializable {
             return in_array($dir, $this->directory);
         }
     }
+    /** @param string $dir_noslash
+     * @return bool */
+    function __touches_directory($dir_noslash) {
+        return $this->directory === $dir_noslash
+            || (is_array($this->directory) && in_array($dir_noslash, $this->directory));
+    }
     /** @return bool */
     function is_merge() {
         return ($this->_flags & self::CRF_IS_MERGE) !== 0;

@@ -510,6 +510,17 @@ class PsetRequest {
     }
 
 
+    /** @param CommitRecord $k
+     * @return string */
+    private function format_commit($k) {
+        $x = UnicodeHelper::utf8_prefix($k->subject, 72);
+        if (strlen($x) !== strlen($k->subject)) {
+            $x .= "...";
+        }
+        $t = date("Y-m-d H:i", $k->commitat);
+        return substr($k->hash, 0, 7) . " [{$t}] " . htmlspecialchars($x);
+    }
+
     private function echo_commit() {
         $conf = $this->conf;
         $pset = $this->pset;
@@ -520,9 +531,6 @@ class PsetRequest {
 
         // current commit and commit selector
         $rc = $this->info->recent_commits();
-        if (($k = $this->info->commit())) {
-            $rc[$k->hash] = $k;
-        }
         $sel = $bhashes = [];
         $curhead = $grouphead = null;
         foreach ($rc as $k) {
@@ -540,13 +548,13 @@ class PsetRequest {
                 $curhead = $grouphead = $k->fromhead;
             }
             $curhead = $k->fromhead;
-            // actual option
-            $x = UnicodeHelper::utf8_prefix($k->subject, 72);
-            if (strlen($x) !== strlen($k->subject)) {
-                $x .= "...";
-            }
-            $t = date("Y-m-d H:i", $k->commitat);
-            $sel[$k->hash] = substr($k->hash, 0, 7) . " [{$t}] " . htmlspecialchars($x);
+            $sel[$k->hash] = $this->format_commit($k);
+            $bhashes[] = hex2bin($k->hash);
+        }
+        if (($k = $this->info->commit())
+            && !isset($sel[$k->hash])) {
+            $sel["from.{$k->hash}"] = null;
+            $sel[$k->hash] = $this->format_commit($k);
             $bhashes[] = hex2bin($k->hash);
         }
 
@@ -636,6 +644,9 @@ class PsetRequest {
             $remarks[] = [true, "This is not "
                           . "<a class=\"qh\" href=\"" . $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]) . "\">the latest commit</a>"
                           . " <span class=\"n\">(<a class=\"qh\" href=\"" . $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]) . "\">see diff</a>)</span>."];
+        }
+        if ($rc->suspicious_directory) {
+            $remarks[] = [true, "This commit list only shows commits that affect the " . htmlspecialchars($pset->directory_noslash) . " subdirectory. There may be more recent pset files checked in to the parent directory by mistake."];
         }
         $lhd = $this->info->late_hours_data();
         if ($lhd
@@ -877,7 +888,7 @@ class PsetRequest {
             $this->echo_grader();
             $this->echo_all_grades();
 
-        } else if ($this->info->repo && $this->info->recent_commits()) {
+        } else if ($this->info->repo && $this->info->recent_commits()->nonempty()) {
             $this->echo_grade_cdf();
             $this->echo_commit();
 
