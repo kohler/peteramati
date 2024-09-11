@@ -313,7 +313,7 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     /** @return -1|0|1 */
-    function validate_working(Contact $user, MessageSet $ms = null) {
+    function validate_working(Contact $user, ?MessageSet $ms = null) {
         $status = RepositorySite::run_remote_oauth($this->conf,
             $this->conf->opt("githubOAuthClientId"),
             $this->conf->opt("githubOAuthToken"),
@@ -341,8 +341,8 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     /** @return -1|0|1 */
-    function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
-                                MessageSet $ms = null) {
+    function validate_ownership(Repository $repo, Contact $user, ?Contact $partner = null,
+                                ?MessageSet $ms = null) {
         if (!$user->github_username
             || !($owner_name = $this->owner_name())) {
             return -1;

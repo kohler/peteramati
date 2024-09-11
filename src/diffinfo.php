@@ -70,7 +70,7 @@ class DiffInfo implements Iterator {
     ];
 
     /** @param string $filename */
-    function __construct($filename, DiffConfig $diffconfig = null) {
+    function __construct($filename, ?DiffConfig $diffconfig = null) {
         $this->filename = $filename;
         $ismd = str_ends_with($filename, ".md");
         if ($diffconfig) {
@@ -91,7 +91,7 @@ class DiffInfo implements Iterator {
         }
     }
 
-    function set_repoa(Repository $repoa, Pset $pset = null, $hasha, $filenamea,
+    function set_repoa(Repository $repoa, ?Pset $pset = null, $hasha, $filenamea,
                        $hasha_hrepo = null) {
         $this->_repoa = $repoa;
         $this->_pset = $pset;

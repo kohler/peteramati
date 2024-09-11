@@ -122,7 +122,7 @@ class Contact {
     static private $active_forceShow = false;
 
 
-    function __construct($trueuser = null, Conf $conf = null) {
+    function __construct($trueuser = null, ?Conf $conf = null) {
         global $Conf;
         $this->conf = $conf ?? $Conf;
         if ($trueuser) {
@@ -279,7 +279,7 @@ class Contact {
         $this->username = $this->github_username;
     }
 
-    static function set_main_user(Contact $user = null) {
+    static function set_main_user(?Contact $user) {
         global $Me;
         Contact::$main_user = $Me = $user;
     }
@@ -871,7 +871,7 @@ class Contact {
 
     /** @param int $pset
      * @return ?Repository */
-    function repo($pset, Repository $repo = null) {
+    function repo($pset, ?Repository $repo = null) {
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->repos)) {
             $this->repos[$pset] = null;
@@ -906,7 +906,7 @@ class Contact {
 
     /** @param int $pset
      * @return ?Contact */
-    function partner($pset, Contact $partner = null) {
+    function partner($pset, ?Contact $partner = null) {
         $pset = is_object($pset) ? $pset->id : $pset;
         if (!array_key_exists($pset, $this->partners)) {
             $this->partners[$pset] = null;
@@ -935,7 +935,7 @@ class Contact {
     }
 
     /** @return ?GradeExport */
-    private function ensure_gcache(Pset $pset, $flags, GradeEntry $ge = null) {
+    private function ensure_gcache(Pset $pset, $flags, ?GradeEntry $ge = null) {
         $flagbase = PsetView::GRADEJSON_NO_LATE_HOURS | PsetView::GRADEJSON_NO_FORMULAS;
         assert(($flags & $flagbase) === $flags);
 
@@ -1589,17 +1589,17 @@ class Contact {
     }
 
     /** @return bool */
-    function can_view_grader(Pset $pset, Contact $user = null) {
+    function can_view_grader(Pset $pset, ?Contact $user = null) {
         return $this->isPC;
     }
 
     /** @return bool */
-    function can_set_grader(Pset $pset, Contact $user = null) {
+    function can_set_grader(Pset $pset, ?Contact $user = null) {
         return $this->isPC;
     }
 
     /** @return bool */
-    function can_view_comments(Pset $pset, PsetView $info = null) {
+    function can_view_comments(Pset $pset, ?PsetView $info = null) {
         return $this->can_view_pset($pset)
             && ($this->isPC || !$pset->hide_comments)
             && (!$info
@@ -1645,7 +1645,7 @@ class Contact {
         }
     }
 
-    function user_linkpart(Contact $user = null, $is_anonymous = false) {
+    function user_linkpart(?Contact $user = null, $is_anonymous = false) {
         $user = $user ?? $this;
         if ($this->isPC && ($user->is_anonymous || (!$user->isPC && $is_anonymous))) {
             return $user->anon_username;
@@ -1656,7 +1656,7 @@ class Contact {
         }
     }
 
-    function user_idpart(Contact $user = null) {
+    function user_idpart(?Contact $user = null) {
         $user = $user ?? $this;
         if ($this->isPC) {
             return $user->github_username ? : $user->huid;

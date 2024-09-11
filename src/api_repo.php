@@ -185,7 +185,7 @@ class Repo_API {
             return ["ok" => false, "error" => "Invalid request."];
         }
         $repo = $api->repo;
-        if ($api->pset->is_handout($api->commit)) {
+        if ($api->commit->is_handout($api->pset)) {
             $repo = $api->pset->handout_repo($api->repo);
         }
         $args = [];

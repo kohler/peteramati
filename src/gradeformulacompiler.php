@@ -329,7 +329,7 @@ class GradeFormulaCompiler {
      * @param ?GradeEntry $context
      * @param ?string $ident
      * @return ?GradeFormula */
-    function parse($s, GradeEntry $context = null, $ident = null) {
+    function parse($s, ?GradeEntry $context = null, $ident = null) {
         if ($s === null) {
             return null;
         }

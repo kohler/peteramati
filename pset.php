@@ -529,7 +529,7 @@ class PsetRequest {
             // visually separate older heads
             if ($curhead !== null
                 && $curhead !== $k->fromhead
-                && !$pset->is_handout($k)) {
+                && !$k->is_handout($pset)) {
                 if (!$grouphead) {
                     $sel["from.{$k->fromhead}"] = (object) [
                         "type" => "optgroup", "label" => "Other snapshots"

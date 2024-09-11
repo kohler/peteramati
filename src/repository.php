@@ -63,9 +63,7 @@ class Repository {
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
 
-    function __construct(Conf $conf = null) {
-        global $Conf;
-        $conf = $conf ?? $Conf;
+    function __construct(Conf $conf) {
         $this->conf = $conf;
         if (isset($this->repoid)) {
             $this->db_load();
@@ -287,7 +285,7 @@ class Repository {
     static private $working_cache = [];
 
     /** @return -1|0|1 */
-    function validate_working(Contact $user, MessageSet $ms = null) {
+    function validate_working(Contact $user, ?MessageSet $ms = null) {
         if (isset(self::$working_cache[$this->url])) {
             return self::$working_cache[$this->url];
         } else if (self::$validate_time_used >= self::VALIDATE_TOTAL_TIMEOUT) {
@@ -300,7 +298,7 @@ class Repository {
     }
 
     /** @return bool */
-    function check_working(Contact $user, MessageSet $ms = null) {
+    function check_working(Contact $user, ?MessageSet $ms = null) {
         $working = $this->working;
         if ($working === 0) {
             $working = $this->validate_working($user, $ms);
@@ -323,12 +321,12 @@ class Repository {
     }
 
     /** @return -1|0|1 */
-    function validate_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
+    function validate_ownership(Contact $user, ?Contact $partner = null, ?MessageSet $ms = null) {
         return $this->reposite->validate_ownership($this, $user, $partner, $ms);
     }
 
     /** @return -1|0|1 */
-    function check_ownership(Contact $user, Contact $partner = null, MessageSet $ms = null) {
+    function check_ownership(Contact $user, ?Contact $partner = null, ?MessageSet $ms = null) {
         $when = 0;
         $ownership = -1;
         $always = $this->reposite->validate_ownership_always();
@@ -537,7 +535,9 @@ class Repository {
                     while ($nl1 < $p && $s[$nl1] === "\n") {
                         ++$nl1;
                     }
-                    $cr->_is_trivial_merge = $nl1 === $p;
+                    if ($nl1 === $p) {
+                        $cr->_flags |= CommitRecord::CRF_IS_TRIVIAL_MERGE;
+                    }
                 }
             }
         }
@@ -610,7 +610,9 @@ class Repository {
                         /** @phan-suppress-next-line PhanTypeMismatchArgument */
                         $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
                         $this->_commits[$hash] = $cr = $list[$hash] = $newcr;
-                        $cr->_is_merge = strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false;
+                        if (strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false) {
+                            $cr->_flags |= CommitRecord::CRF_IS_MERGE;
+                        }
                     }
                     if ($newcr) {
                         self::set_directory($cr, $s, $nl2, $p);
@@ -620,6 +622,23 @@ class Repository {
         }
 
         // update cache
+        $this->_commit_lists[$key] = $list;
+        return $list;
+    }
+
+    /** @param string $branch
+     * @return array<string,CommitRecord> */
+    private function expanded_head_commits($branch) {
+        $key = ".x/{$branch}";
+        if (isset($this->_commit_lists[$key])) {
+            return $this->_commit_lists[$key];
+        }
+
+        $list = $this->head_commits($branch, $this->repobranchname($branch));
+        foreach ($this->extra_heads() as $xhead) {
+            $list = $list + $this->head_commits(".h/{$xhead}", $xhead);
+        }
+
         $this->_commit_lists[$key] = $list;
         return $list;
     }
@@ -641,38 +660,35 @@ class Repository {
             }
 
             // expand branch with heads
-            $key = ".x/{$branch}";
-            if (!isset($this->_commit_lists[$key])) {
-                $list = $this->head_commits($branch, $this->repobranchname($branch));
-                foreach ($this->extra_heads() as $xhead) {
-                    $list = $list + $this->head_commits(".h/{$xhead}", $xhead);
-                }
-                $this->_commit_lists[$key] = $list;
-            }
-            return $this->_commit_lists[$key];
+            return $this->expanded_head_commits($branch);
         }
 
         // restrict to directory
         $dir = $pset->directory_noslash;
         assert(strpos($dir, "/") === false);
         $key = ".d/{$dir}/" . ($expanded ? ".x/" : "") . $branch;
-        if (!isset($this->_commit_lists[$key])) {
-            $list = [];
-            foreach ($this->commits(null, $branch, $expanded) as $cr) {
-                if ($cr->directory === $dir
-                    || (is_array($cr->directory) && in_array($dir, $cr->directory))) {
-                    $list[$cr->hash] = $cr;
-                }
+        if (isset($this->_commit_lists[$key])) {
+            return $this->_commit_lists[$key];
+        }
+
+        $list = [];
+        foreach ($this->commits(null, $branch, $expanded) as $cr) {
+            if ($cr->directory === $dir
+                || (is_array($cr->directory) && in_array($dir, $cr->directory))) {
+                $list[$cr->hash] = $cr;
             }
-            if (empty($list)
-                && isset($pset->test_file)
-                && ($this->_truncated_psetdir[$pset->psetid] =
-                    !!$this->ls_files($this->repobranchname($branch), $pset->test_file))) {
+        }
+
+        if (empty($list) && isset($pset->test_file)) {
+            $truncated = !!$this->ls_files($this->repobranchname($branch), $pset->test_file);
+            $this->_truncated_psetdir[$pset->psetid] = $truncated;
+            if ($truncated) {
                 return $this->commits(null, $branch, $expanded);
             }
-            $this->_commit_lists[$key] = $list;
         }
-        return $this->_commit_lists[$key];
+
+        $this->_commit_lists[$key] = $list;
+        return $list;
     }
 
     /** @param ?string $branch
@@ -691,12 +707,12 @@ class Repository {
         $trivial_merges_known = !!($this->_commit_lists_cc[$branch] ?? false);
 
         foreach ($this->commits($pset, $branch) as $c) {
-            if ($c->_is_merge && !$trivial_merges_known) {
+            if ($c->is_merge() && !$trivial_merges_known) {
                 $cx = $this->commits(null, $branch);
                 $this->load_trivial_merges_from_head($cx, $this->repobranchname($branch));
                 $trivial_merges_known = $this->_commit_lists_cc[$branch] = true;
             }
-            if (!$c->_is_trivial_merge) {
+            if (!$c->is_trivial_merge()) {
                 return $c;
             }
         }
@@ -735,7 +751,7 @@ class Repository {
     /** @param string $hashpart
      * @param ?string $branch
      * @return ?CommitRecord */
-    function connected_commit($hashpart, Pset $pset = null, $branch = null) {
+    function connected_commit($hashpart, ?Pset $pset = null, $branch = null) {
         // ensure there's some commits
         if (empty($this->_commits)) {
             $this->commits($pset, $branch);
@@ -1048,18 +1064,18 @@ class Repository {
 
         $hasha = $commita->hash;
         if ($truncpfx
-            && $pset->is_handout($commita)
-            && !$pset->is_handout($commitb)) {
+            && $commita->is_handout($pset)
+            && !$commitb->is_handout($pset)) {
             $hasha = $this->truncated_hash($pset, $hasha);
         }
         $hashb = $commitb->hash;
         if ($truncpfx
-            && $pset->is_handout($commitb)
-            && !$pset->is_handout($commita)) {
+            && $commitb->is_handout($pset)
+            && !$commita->is_handout($pset)) {
             $hashb = $this->truncated_hash($pset, $hashb);
         }
 
-        $ignore_diffconfig = $pset->is_handout($commita) && $pset->is_handout($commitb);
+        $ignore_diffconfig = $commita->is_handout($pset) && $commitb->is_handout($pset);
         $no_full = $options["no_full"] ?? false;
         $no_user_collapse = $options["no_user_collapse"] ?? false;
         $needfiles = self::fix_diff_files($options["needfiles"] ?? null);
@@ -1112,7 +1128,7 @@ class Repository {
                 }
                 // create diff record
                 $di = new DiffInfo($file, $diffconfig);
-                $di->set_repoa($this, $pset, $hasha, $line, $pset->is_handout($commita));
+                $di->set_repoa($this, $pset, $hasha, $line, $commita->is_handout($pset));
                 $di->set_wdiff($wdiff);
                 // decide whether file is collapsed
                 if ($no_user_collapse
@@ -1172,7 +1188,7 @@ class Repository {
                 $file = $g->landmark_file;
                 if ($file && !isset($diffs[$file])) {
                     $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $pset->is_handout($commita));
+                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $commitb->is_handout($pset));
                     $di->set_wdiff($wdiff);
                     $di->finish();
                 }

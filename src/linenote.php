@@ -87,7 +87,7 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
 
 
     /** @return string */
-    function render_line_link_html(Pset $pset = null) {
+    function render_line_link_html(?Pset $pset = null) {
         $f = $this->file;
         if ($pset && str_starts_with($f, $pset->directory_slash)) {
             $f = substr($f, strlen($pset->directory_slash));

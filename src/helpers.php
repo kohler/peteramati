@@ -244,7 +244,7 @@ class JsonResult {
             $this->content = $values;
         }
     }
-    static function make($json, Contact $user = null, $arg2 = null) {
+    static function make($json, ?Contact $user = null, $arg2 = null) {
         if (is_int($json)) {
             $json = new JsonResult($json, $arg2);
         } else if (!is_object($json) || !($json instanceof JsonResult)) {

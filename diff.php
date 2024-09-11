@@ -68,7 +68,7 @@ ContactView::echo_heading($User, $Me);
 
 $infoj = $Info->info_json();
 $infoj["base_commit"] = $commita->hash;
-$infoj["base_handout"] = $Pset->is_handout($commita);
+$infoj["base_handout"] = $commita->is_handout($Pset);
 echo '<div class="pa-psetinfo" data-pa-pset="', htmlspecialchars($Info->pset->urlkey),
     '" data-pa-base-commit="', htmlspecialchars($commita->hash),
     '" data-pa-commit="', htmlspecialchars($commitb->hash),
@@ -89,7 +89,7 @@ echo "<table class=\"mb-4\"><tr><td><h2>diff</h2></td><td style=\"padding-left:1
     "</big></div></td></tr></table>";
 
 // collect diff and sort line notes
-$lnorder = $Pset->is_handout($commitb) ? $Info->empty_line_notes() : $Info->visible_line_notes();
+$lnorder = $commitb->is_handout($Pset) ? $Info->empty_line_notes() : $Info->visible_line_notes();
 
 // print line notes
 $notelinks = [];
@@ -103,7 +103,7 @@ if (!empty($notelinks)) {
 }
 
 $diff = $Info->diff($commita, $commitb, $lnorder, [
-    "no_full" => !$Pset->is_handout($commita) || $Pset->is_handout($commitb),
+    "no_full" => !$commita->is_handout($Pset) || $commitb->is_handout($Pset),
     "no_user_collapse" => true
 ]);
 if ($diff) {

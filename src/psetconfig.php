@@ -651,7 +651,7 @@ class Pset {
 
 
     /** @return ?Repository */
-    function handout_repo(Repository $inrepo = null) {
+    function handout_repo(?Repository $inrepo = null) {
         return $this->conf->handout_repo($this, $inrepo);
     }
 
@@ -676,13 +676,10 @@ class Pset {
     }
 
     /** @param CommitRecord $commit
-     * @return bool */
+     * @return bool
+     * @deprecated */
     function is_handout($commit) {
-        if ($commit->_is_handout_pset !== $this) {
-            $commit->_is_handout_pset = $this;
-            $commit->_is_handout = !!$this->handout_commit($commit->hash);
-        }
-        return $commit->_is_handout;
+        return $commit->is_handout($this);
     }
 
 
@@ -1664,7 +1661,7 @@ class DiffConfig {
     /** @param string $filename
      * @return ?DiffConfig
      * @suppress PhanAccessReadOnlyProperty */
-    static function combine($filename, DiffConfig $a = null, DiffConfig $b = null) {
+    static function combine($filename, ?DiffConfig $a = null, ?DiffConfig $b = null) {
         if (!$a && !$b) {
             return null;
         } else if (!$a || !$b) {

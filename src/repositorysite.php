@@ -11,7 +11,7 @@ class RepositorySite {
     static public $sitemap = ["github" => "GitHub_RepositorySite"];
 
     /** @return bool */
-    static function is_primary(Repository $repo = null) {
+    static function is_primary(?Repository $repo = null) {
         return $repo === null
             || $repo->reposite->siteclass === $repo->conf->repository_site_classes()[0];
     }
@@ -83,7 +83,7 @@ class RepositorySite {
         return -1;
     }
     /** @return -1|0|1 */
-    function validate_working(Contact $user, MessageSet $ms = null) {
+    function validate_working(Contact $user, ?MessageSet $ms = null) {
         return -1;
     }
     /** @return bool */
@@ -91,8 +91,8 @@ class RepositorySite {
         return true;
     }
     /** @return -1|0|1 */
-    function validate_ownership(Repository $repo, Contact $user, Contact $partner = null,
-                                MessageSet $ms = null) {
+    function validate_ownership(Repository $repo, Contact $user, ?Contact $partner = null,
+                                ?MessageSet $ms = null) {
         return -1;
     }
 

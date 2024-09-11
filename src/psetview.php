@@ -2288,7 +2288,7 @@ class PsetView {
     private function _read_diff(CommitRecord $commita, CommitRecord $commitb, $args) {
         // both repos must be in the same directory; assume handout
         // is only potential problem
-        if ($this->pset->is_handout($commita) !== $this->pset->is_handout($commitb)) {
+        if ($commita->is_handout($this->pset) !== $commitb->is_handout($this->pset)) {
             $this->conf->handout_repo($this->pset, $this->repo);
         }
 
@@ -2373,7 +2373,7 @@ class PsetView {
 
     /** @return array<string,DiffInfo> */
     function base_diff(CommitRecord $commitb,
-                       LineNotesOrder $lnorder = null,
+                       ?LineNotesOrder $lnorder = null,
                        $args = []) {
         $commita = $this->diff_base_commit();
         if (!$this->pset->has_diff_base) {
@@ -2426,7 +2426,7 @@ class PsetView {
 
     /** @return array<string,DiffInfo> */
     function diff(CommitRecord $commita, CommitRecord $commitb,
-                  LineNotesOrder $lnorder = null, $args = []) {
+                  ?LineNotesOrder $lnorder = null, $args = []) {
         $this->_prepare_diff_args($lnorder, $args);
         $diff = $this->_read_diff($commita, $commitb, $args);
         return $this->_complete_diff($diff, $lnorder, $args);

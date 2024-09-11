@@ -23,7 +23,7 @@ class APIData {
 
     const ERRORCODE_RUNCONFLICT = 1001;
 
-    function __construct(Contact $user, Pset $pset = null, Repository $repo = null) {
+    function __construct(Contact $user, ?Pset $pset = null, ?Repository $repo = null) {
         $this->conf = $user->conf;
         $this->user = $user;
         $this->pset = $pset;
@@ -1596,7 +1596,7 @@ class Conf {
         return $this->_active_list;
     }
 
-    function set_active_list(SessionList $list = null) {
+    function set_active_list(?SessionList $list = null) {
         assert($this->_active_list === false);
         $this->_active_list = $list;
     }
@@ -1758,7 +1758,7 @@ class Conf {
         "forceShow" => true, "sort" => true, "t" => true, "group" => true
     ];
 
-    function selfurl(Qrequest $qreq = null, $params = null, $flags = 0) {
+    function selfurl(?Qrequest $qreq = null, $params = null, $flags = 0) {
         $qreq = $qreq ?? Qrequest::$main_request;
         $params = $params ?? [];
 
@@ -2462,7 +2462,7 @@ class Conf {
 
 
     /** @return ?Repository */
-    function handout_repo(Pset $pset, Repository $inrepo = null) {
+    function handout_repo(Pset $pset, ?Repository $inrepo = null) {
         $url = $pset->handout_repo_url;
         if (!$url) {
             return null;

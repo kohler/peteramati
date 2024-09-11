@@ -29,7 +29,7 @@ class RepoFetch_Batch {
     /** @var string */
     public $reponame = "<none>";
 
-    function __construct(Conf $conf, Repository $repo = null) {
+    function __construct(Conf $conf, ?Repository $repo = null) {
         $this->conf = $conf;
         if ($repo) {
             $this->repos[] = $repo;

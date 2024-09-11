@@ -1,6 +1,6 @@
 <?php
 // commitrecord.php -- Peteramati helper class representing commits
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class CommitRecord implements JsonSerializable {
@@ -14,15 +14,16 @@ class CommitRecord implements JsonSerializable {
     public $fromhead;
     /** @var null|string|list<string> */
     public $directory;
-    /** @var ?bool */
-    public $_is_handout;
+    /** @var int */
+    public $_flags = 0;
     /** @var ?Pset */
     public $_is_handout_pset;
-    /** @var ?bool */
-    public $_is_merge;
-    /** @var ?bool */
-    public $_is_trivial_merge;
+
     const HANDOUTHEAD = "*handout*";
+    const CRF_IS_HANDOUT = 1;
+    const CRF_IS_MERGE = 2;
+    const CRF_IS_TRIVIAL_MERGE = 4;
+
     /** @param int $commitat
      * @param non-empty-string $hash
      * @param string $subject
@@ -49,6 +50,27 @@ class CommitRecord implements JsonSerializable {
             return in_array($dir, $this->directory);
         }
     }
+    /** @return bool */
+    function is_merge() {
+        return ($this->_flags & self::CRF_IS_MERGE) !== 0;
+    }
+    /** @return bool */
+    function is_trivial_merge() {
+        return ($this->_flags & self::CRF_IS_TRIVIAL_MERGE) !== 0;
+    }
+    /** @param Pset $pset
+     * @return bool */
+    function is_handout($pset) {
+        if ($this->_is_handout_pset !== $pset) {
+            $this->_is_handout_pset = $pset;
+            if ($pset->handout_commit($this->hash)) {
+                $this->_flags |= self::CRF_IS_HANDOUT;
+            } else {
+                $this->_flags &= ~self::CRF_IS_HANDOUT;
+            }
+        }
+        return ($this->_flags & self::CRF_IS_HANDOUT) !== 0;
+    }
     function jsonSerialize(): string {
         return $this->hash;
     }
@@ -57,20 +79,19 @@ class CommitRecord implements JsonSerializable {
     static function canonicalize_hashpart($hashpart) {
         if ($hashpart === null || $hashpart === "") {
             return null;
+        }
+        $hashpart = strtolower($hashpart);
+        // NB all special hashparts are not ctype_xdigit
+        if ($hashpart === "handout" || $hashpart === "base") {
+            return "handout";
+        } else if ($hashpart === "latest" || $hashpart === "head") {
+            return "latest";
+        } else if ($hashpart === "grading" || $hashpart === "grade") {
+            return "grading";
+        } else if (strlen($hashpart) >= 5 && ctype_xdigit($hashpart)) {
+            return $hashpart;
         } else {
-            $hashpart = strtolower($hashpart);
-            // NB all special hashparts are not ctype_xdigit
-            if ($hashpart === "handout" || $hashpart === "base") {
-                return "handout";
-            } else if ($hashpart === "latest" || $hashpart === "head") {
-                return "latest";
-            } else if ($hashpart === "grading" || $hashpart === "grade") {
-                return "grading";
-            } else if (strlen($hashpart) >= 5 && ctype_xdigit($hashpart)) {
-                return $hashpart;
-            } else {
-                return null;
-            }
+            return null;
         }
     }
 }
