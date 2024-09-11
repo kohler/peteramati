@@ -642,11 +642,17 @@ class PsetRequest {
         }
         if (!$this->info->is_lateish_commit()) {
             $remarks[] = [true, "This is not "
-                          . "<a class=\"qh\" href=\"" . $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]) . "\">the latest commit</a>"
-                          . " <span class=\"n\">(<a class=\"qh\" href=\"" . $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]) . "\">see diff</a>)</span>."];
+                . Ht::link("the latest commit", $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]), ["class" => "qh"])
+                . " <span class=\"n\">("
+                . Ht::link("see diff", $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]), ["class" => "qh"])
+                . ")</span>."];
         }
         if ($rc->suspicious_directory) {
-            $remarks[] = [true, "This list only shows commits that affect the " . htmlspecialchars($pset->directory_noslash) . " subdirectory, which is where all your files should go. You may have checked in pset files to the parent directory by mistake."];
+            $remarks[] = [true, "This list only shows commits that affect "
+                . Ht::maybe_link("the " . htmlspecialchars($pset->directory_noslash) . " subdirectory", $this->info->repo->https_branch_tree_url($this->info->branch(), $pset->directory_noslash), ["class" => "qh"])
+                . ", which is where your pset files belong. You may have checked in files to "
+                . Ht::maybe_link("the parent directory", $this->info->repo->https_branch_tree_url($this->info->branch(), ""), ["class" => "qh"])
+                . " by mistake."];
         }
         $lhd = $this->info->late_hours_data();
         if ($lhd

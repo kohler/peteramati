@@ -481,6 +481,11 @@ class Ht {
         }
     }
 
+    /** @return string */
+    static function maybe_link($html, $href, $js = null) {
+        return $href === null ? $html : self::link($html, $href, $js);
+    }
+
     /** @param string $html
      * @return string */
     static function link_urls($html) {

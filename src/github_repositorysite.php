@@ -1,6 +1,6 @@
 <?php
 // github_repositorysite.php -- Peteramati GitHub Classroom repositories
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class GitHubResponse implements JsonSerializable {
@@ -40,7 +40,7 @@ class GitHubResponse implements JsonSerializable {
             }
         }
         $header .= "User-Agent: kohler/peteramati\r\n"
-            . "Content-Type: $content_type\r\n"
+            . "Content-Type: {$content_type}\r\n"
             . "Content-Length: " . strlen($content) . "\r\n";
         $htopt = [
             "timeout" => (float) $conf->validate_timeout,
@@ -239,6 +239,19 @@ class GitHub_RepositorySite extends RepositorySite {
     /** @return string */
     function friendly_url() {
         return $this->base ? : $this->url;
+    }
+    /** @param string $branch
+     * @param string $subdir
+     * @return ?string */
+    function https_branch_tree_url($branch, $subdir) {
+        if (!Repository::validate_branch($branch)
+            || strpos($branch, "/") !== false) {
+            return null;
+        }
+        if ($subdir !== "") {
+            $subdir = str_replace("%2F", "/", rawurlencode($subdir)) . "/";
+        }
+        return "https://github.com/{$this->base}/tree/" . rawurlencode($branch) . "/{$subdir}";
     }
     /** @return list<string> */
     function credentialed_git_command() {

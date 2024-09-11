@@ -201,6 +201,13 @@ class Repository {
         }
     }
 
+    /** @param string $branch
+     * @param string $subdir
+     * @return ?string */
+    function https_branch_tree_url($branch, $subdir) {
+        return $this->reposite->https_branch_tree_url($branch, $subdir);
+    }
+
     /** @return list<string> */
     function credentialed_git_command() {
         return $this->reposite->credentialed_git_command();
@@ -1232,7 +1239,7 @@ class Repository {
     /** @param string $branch
      * @return bool */
     static function validate_branch($branch) {
-        return preg_match('/\A(?=[^^:~?*\\[\\\\\\000-\\040\\177]+\z)(?!@\z|.*@\{|[.\/]|.*\/[.\/]|.*[\.\/]\z|.*\.\.|.*\.lock\z|.*\.lock\/)/', $branch);
+        return preg_match('/\A(?=[^^:~?*\\[\\\\\\000-\\040\\177]+\z)(?!@\z|.*@\{|[.\/]|.*\/[.\/]|.*[\.\/]\z|.*\.\.|.*\.lock\z|.*\.lock\/|refs\/|[0-9a-fA-F]{40}\z)/', $branch);
     }
 }
 

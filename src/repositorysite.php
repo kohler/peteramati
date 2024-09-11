@@ -1,6 +1,6 @@
 <?php
-// repository.php -- Peteramati superclass representing repository sites
-// Peteramati is Copyright (c) 2013-2019 Eddie Kohler
+// repositorysite.php -- Peteramati superclass representing repository sites
+// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class RepositorySite {
@@ -33,13 +33,15 @@ class RepositorySite {
     /** @param string $url
      * @return string */
     static function make_https_url($url, Conf $conf) {
-        if (preg_match('_\A(?:https?://|git://|ssh://(?:git@)?|git@|)([^/:]+(?::\d+)?)(?::/*|/+)(.*?)(?:\.git|)\z_i', $url, $m))
+        if (preg_match('/\A(?:https?:\/\/|git:\/\/|ssh:\/\/(?:git@)?|git@|)([^\/:]+(?::\d+)?)(?::\/*|\/+)(.*?)(?:\.git|)\z/i', $url, $m)) {
             return "https://" . $m[1] . "/" . $m[2];
+        }
         return $url;
     }
     static function echo_username_forms(Contact $user) {
-        foreach (self::site_classes($user->conf) as $i => $k)
+        foreach (self::site_classes($user->conf) as $i => $k) {
             $k::echo_username_form($user, $i == 0);
+        }
     }
 
     function friendly_siteclass() {
@@ -61,6 +63,12 @@ class RepositorySite {
     /** @return string */
     function friendly_url() {
         return $this->url;
+    }
+    /** @param string $branch
+     * @param string $subdir
+     * @return ?string */
+    function https_branch_tree_url($branch, $subdir) {
+        return null;
     }
     /** @return list<string> */
     function credentialed_git_command() {
@@ -128,8 +136,8 @@ class RepositorySite {
         } else if (!$clientid || !$token || $token === Conf::INVALID_TOKEN) {
             return self::chair_error("Missing OAuth client ID and/or token.");
         }
-        putenv("GIT_USERNAME=$clientid");
-        putenv("GIT_PASSWORD=$token");
+        putenv("GIT_USERNAME={$clientid}");
+        putenv("GIT_PASSWORD={$token}");
         $command = SiteLoader::$root . "/jail/pa-timeout " . $conf->validate_timeout
             . " git -c credential.helper= -c " . escapeshellarg("credential.helper=!f() { echo username=\$GIT_USERNAME; echo password=\$GIT_PASSWORD; }; f")
             . " " . $gitcommand;
