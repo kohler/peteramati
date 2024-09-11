@@ -56,7 +56,7 @@ class ResetPassword_Page {
         $Me = new Contact;
 
         $password_class = "";
-        if (isset($_POST["go"]) && check_post()) {
+        if (isset($_POST["go"]) && $this->qreq->valid_token()) {
             $_POST["password"] = trim($_POST["password"] ?? "");
             $_POST["password2"] = trim($_POST["password2"] ?? "");
             if ($_POST["password"] == "") {
