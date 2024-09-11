@@ -646,7 +646,7 @@ class PsetRequest {
                           . " <span class=\"n\">(<a class=\"qh\" href=\"" . $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]) . "\">see diff</a>)</span>."];
         }
         if ($rc->suspicious_directory) {
-            $remarks[] = [true, "This commit list only shows commits that affect the " . htmlspecialchars($pset->directory_noslash) . " subdirectory. There may be more recent pset files checked in to the parent directory by mistake."];
+            $remarks[] = [true, "This list only shows commits that affect the " . htmlspecialchars($pset->directory_noslash) . " subdirectory, which is where all your files should go. You may have checked in pset files to the parent directory by mistake."];
         }
         $lhd = $this->info->late_hours_data();
         if ($lhd
