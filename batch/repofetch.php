@@ -307,7 +307,7 @@ class RepoFetch_Batch {
             throw new CommandLineException("Cannot create repository");
         }
         if ($this->verbose) {
-            fwrite(STDERR, "* repo{$this->repo->repoid}, repo/repo{$this->repo->cacheid} {$this->repo->url}\n");
+            fwrite(STDERR, "* repo{$this->repo->repoid}, {$repodir} {$this->repo->url}\n");
         }
 
         // configure remote
@@ -328,9 +328,9 @@ class RepoFetch_Batch {
         }
 
         // remove unwritable FETCH_HEAD
-        if (file_exists("{$repodir}/.git/FETCH_HEAD")
-            && !is_writable("{$repodir}/.git/FETCH_HEAD")) {
-            unlink("{$repodir}/.git/FETCH_HEAD");
+        if (file_exists("{$repodir}/FETCH_HEAD")
+            && !is_writable("{$repodir}/FETCH_HEAD")) {
+            unlink("{$repodir}/FETCH_HEAD");
         }
 
         // fetch

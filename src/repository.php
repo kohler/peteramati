@@ -372,7 +372,7 @@ class Repository {
      * @return string */
     static function ensure_repodir_at(Conf $conf, $cacheid) {
         $repodir = self::repodir_at($conf, $cacheid);
-        if (!file_exists("{$repodir}/.git/config")) {
+        if (!file_exists("{$repodir}/config")) {
             if (!mk_site_subdir($repodir, 02770)) {
                 return "";
             }
