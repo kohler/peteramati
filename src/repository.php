@@ -158,7 +158,7 @@ class Repository {
      * @return bool */
     static function repogid_repodir_known(Conf $conf, $repogid) {
         $repodir = self::repodir_at($conf, substr($repogid, 0, 1));
-        return file_exists("{$repodir}/.git/config")
+        return file_exists("{$repodir}/config")
             && (self::gitrun_subprocess($conf, ["git", "remote", "get-url", "repo{$repogid}"], $repodir))->ok;
     }
 
