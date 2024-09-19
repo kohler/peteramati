@@ -1242,7 +1242,8 @@ function pa_render_pset_table(ptconf) {
             if (s.dropped) {
                 s.boringness = 2;
             } else if (s.emptydiff
-                       || (!s.grade_commit && !s.commit && !ptconf.gitless_grades)) {
+                       || (!s.grade_commit && !s.commit && !ptconf.gitless_grades)
+                       || s.do_not_grade) {
                 s.boringness = 1;
             } else {
                 s.boringness = 0;
