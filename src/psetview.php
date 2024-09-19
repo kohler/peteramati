@@ -46,6 +46,8 @@ class PsetView {
     private $_hash;
     /** @var false|null|CommitRecord */
     private $_derived_handout_commit = false;
+    /** @var ?CommitRecord */
+    private $_recent_connected_commit;
     /** @var bool */
     private $_is_sset = false;
 
@@ -248,25 +250,34 @@ class PsetView {
 
     /** @return CommitList */
     function recent_commits() {
-        if ($this->repo) {
-            return $this->repo->commit_list($this->pset, $this->branch, true);
-        } else {
+        if (!$this->repo) {
             return new CommitList;
         }
+        return $this->repo->commit_list($this->pset, $this->branch, true);
     }
 
     /** @return ?CommitRecord */
     function connected_commit($hashpart) {
-        if ($this->repo) {
-            return $this->repo->connected_commit($hashpart, $this->pset, $this->branch);
-        } else {
+        if (!$this->repo) {
             return null;
         }
+        if ($this->_recent_connected_commit
+            && $this->_recent_connected_commit->hash === $hashpart) {
+            return $this->_recent_connected_commit;
+        }
+        $c = $this->repo->connected_commit($hashpart, $this->pset, $this->branch);
+        if ($c) {
+            $this->_recent_connected_commit = $c;
+        }
+        return $c;
     }
 
     /** @return ?CommitRecord */
     function latest_commit() {
-        return $this->repo ? $this->repo->latest_commit($this->pset, $this->branch) : null;
+        if (!$this->repo) {
+            return null;
+        }
+        return $this->repo->latest_commit($this->pset, $this->branch);
     }
 
     /** @return ?non-empty-string */

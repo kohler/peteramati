@@ -60,6 +60,8 @@ class Repository {
 
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
+    /** @var bool */
+    static public $verbose = false;
 
     function __construct(Conf $conf) {
         $this->conf = $conf;
@@ -429,6 +431,15 @@ class Repository {
     }
 
 
+    static function verbose_log($text) {
+        if (PHP_SAPI === "cli") {
+            fwrite(STDERR, $text . "\n");
+        } else {
+            error_log($text);
+        }
+    }
+
+
     /** @param list<string> $command
      * @param string $cwd
      * @param array{firstline?:int,linecount?:int,stdin?:string} $args
@@ -437,6 +448,9 @@ class Repository {
         if ($command[0] === "git") {
             $command[0] = $conf->opt("gitCommand") ?? "git";
             array_splice($command, 1, 0, ["-c", "safe.directory=*"]); // XXX
+        }
+        if (self::$verbose) {
+            self::verbose_log(json_encode($command) . " @{$cwd}");
         }
         return Subprocess::run($command, $cwd, $args);
     }

@@ -2481,15 +2481,22 @@ class Conf {
             $this->_handout_repos[$url] = $hrepo;
         }
         if ($hrepo) {
-            $hrepoid = $hrepo->repoid;
+            $hrepogid = (string) $hrepo->repogid;
             $cacheid = $inrepo ? $inrepo->cacheid : $hrepo->cacheid;
             $hset = $this->setting_json("handoutrepos");
             $save = false;
             if (!$hset) {
                 $save = $hset = (object) [];
             }
-            if (!($hme = $hset->{(string) $hrepoid} ?? null)) {
-                $save = $hme = $hset->{(string) $hrepoid} = (object) [];
+            if (($hme = $hset->{$hrepogid} ?? null) === null) {
+                $nhset = (object) [];
+                foreach ((array) $hset as $k => $v) {
+                    if (!is_int($k) && !ctype_xdigit($k)) {
+                        $nhset->$k = $v;
+                    }
+                }
+                $hset = $nhset;
+                $save = $hme = $hset->{$hrepogid} = (object) [];
             }
             if ((int) ($hme->{$cacheid} ?? 0) + 300 < Conf::$now
                 && !$this->opt("disableRemote")) {

@@ -416,7 +416,10 @@ Usage: php batch/repofetch.php [-r REPOID | -u USER | --refresh]")
         }
         $self->force = isset($arg["f"]);
         $self->verbose = isset($arg["V"]);
-        $self->cacheid = $arg["cacheid"] ?? null;
+        if ($self->verbose) {
+            Repository::$verbose = true;
+        }
+        $self->cacheid = $arg["d"] ?? null;
         $self->upgrade = isset($arg["upgrade"]);
         if (isset($arg["bg"]) && pcntl_fork() > 0) {
             exit(0);
