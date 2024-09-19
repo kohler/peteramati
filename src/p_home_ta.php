@@ -252,6 +252,9 @@ class Home_TA_Page {
             } else if (($h = $info->hash()) !== null) {
                 $j["commit"] = $h;
             }
+            if ($info->is_do_not_grade()) {
+                $j["do_not_grade"] = true;
+            }
             if ($h && $info->empty_diff_likely()) {
                 $j["emptydiff"] = true;
             }

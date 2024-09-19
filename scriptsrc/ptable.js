@@ -903,7 +903,10 @@ const gcoldef = {
             if (s.grade_commit
                 && s.grade_commit === s.commit
                 && this.ptconf.flagged_commits) {
-                t += '✱';
+                t += 'G⃝';
+            }
+            if (s.do_not_grade) {
+                t += ' ⃠';
             }
             if (s.has_notes) {
                 t += '♪';
@@ -1260,7 +1263,7 @@ function pa_render_pset_table(ptconf) {
                 ngrades_expected = -2;
             }
             has_late_hours = has_late_hours || !!s.late_hours;
-            any_visible = any_visible || s.scores_visible_pinned;
+            any_visible = any_visible || s.scores_visible_pinned || s.do_not_grade;
         }
         const need_ngrades = ngrades_expected === -2;
 
