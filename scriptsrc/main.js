@@ -1047,8 +1047,9 @@ function pa_runmany(chain) {
             }
         });
         f.setAttribute("data-pa-runmany-unload", "");
-        addClass(f, "has-hotlist");
-        f.addEventListener("pa-hotlist", make_hotlist);
+        const runner = document.getElementById("run-" + f.elements.run.value);
+        addClass(runner, "has-hotlist");
+        runner.addEventListener("pa-hotlist", make_hotlist);
     }
     function make_hotlist(event) {
         const j = [];

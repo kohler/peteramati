@@ -90,16 +90,16 @@ function set_prevnext(info, sitehref) {
 
 function set_cookie(info, sitehref) {
     info = list_digest_resolve(info);
-    var digest = list_digest_create(info);
+    let digest = list_digest_create(info);
     if (sitehref && /(?:^|\/)pset(?:|\.php)\//.test(sitehref)) {
         digest += set_prevnext(info, sitehref);
     }
     cookie_set_at = new Date().getTime();
-    var p = "; Max-Age=20", m;
+    let cookie = `hotlist-info-${cookie_set_at}=${encodeURIComponent(digest)}${siteinfo.cookie_params}; Max-Age=20`, m;
     if (siteinfo.site_relative && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base()))) {
-        p += "; Path=" + m[1];
+        cookie += "; Path=" + m[1];
     }
-    document.cookie = "hotlist-info-".concat(cookie_set_at, "=", encodeURIComponent(digest), siteinfo.cookie_params, p);
+    document.cookie = cookie;
 }
 
 function is_listable(sitehref) {
