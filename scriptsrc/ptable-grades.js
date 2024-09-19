@@ -401,52 +401,53 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
             }, 0);
         }
     }
+    function gdialog_fill_settings(gs) {
+        const itype = gdialog_su.length === 1 ? "radio" : "checkbox";
+        gs.append($e("fieldset", null,
+            $e("legend", null, "Grade visibility"),
+            $e("div", "multicol-3",
+                $checkbox({name: "gvis", value: "true", type: itype, "class": "uic pa-gvis"}, "Visible"),
+                $checkbox({name: "gvis", value: "false", type: itype, "class": "uic pa-gvis"}, "Hidden"),
+                $checkbox({name: "gvis", value: "null", type: itype, "class": "uic pa-gvis"}, "Default (" + (ptconf.scores_visible ? "visible" : "hidden") + ")")),
+            $save_action("save-gvis")));
+
+        const gradertable = $e("div", "checki mt-1 multicol-3");
+        for (let i = 0; i !== siteinfo.pc.__order__.length; ++i) {
+            const cid = siteinfo.pc.__order__[i], pc = siteinfo.pc[cid];
+            gradertable.append($checkbox({name: "grader" + cid, value: "1", type: "checkbox", "class": "uic js-range-click pa-grader", "data-range-type": "grader"}, pc.name, $e("span", "ct small dim")));
+        }
+        gs.append($e("fieldset", "mt-3",
+            $e("legend", null, "Grader"),
+            $checkbox({name: "gradertype", value: "clear", type: "radio", "class": "uic"}, "Clear"),
+            $checkbox({name: "gradertype", value: "set", type: "radio", "class": "uic"}, "Set grader"),
+            gradertable,
+            $save_action("save-grader")));
+
+        if (!ptconf.gitless) {
+            gs.append($e("fieldset", "mt-3",
+                $e("legend", null, "Repository"),
+                $checkbox({name: "clearrepo", value: 1, type: "checkbox", "class": "uic"}, "Clear repository"),
+                ptconf.has_older_repo ? $checkbox({name: "adoptoldrepo", value: 1, type: "checkbox", "class": "uic"}, "Adopt previous repository") : null,
+                $save_action("save-repo")));
+        }
+
+        if (siteinfo.user.is_admin) {
+            gs.append($e("fieldset", "mt-3",
+                $e("legend", null, "Enrollment"),
+                $e("div", "multicol-2",
+                    $checkbox({name: "dropped", value: "false", type: itype, "class": "uic pa-dropped"}, "Enrolled"),
+                    $checkbox({name: "dropped", value: "true", type: itype, "class": "uic pa-dropped"}, "Dropped")),
+                $save_action("save-dropped")));
+        }
+
+        $(gs).on("click", "button", gdialog_settings_submit);
+        $(gs).on("click", ".pa-grader", gdialog_settings_grader_click);
+        $(gs).on("click", ".pa-gvis", gdialog_settings_gvis_click);
+        $(gs).on("click", ".pa-dropped", gdialog_settings_dropped_click);
+    }
     function gdialog_mode_settings() {
         const gs = $gdialog.find(".pa-gdialog-settings")[0], f = gs.closest("form");
-        if (!gs.firstChild) {
-            const itype = gdialog_su.length === 1 ? "radio" : "checkbox";
-            gs.append($e("fieldset", null,
-                $e("legend", null, "Grade visibility"),
-                $e("div", "multicol-3",
-                    $checkbox({name: "gvis", value: "true", type: itype, "class": "uic pa-gvis"}, "Visible"),
-                    $checkbox({name: "gvis", value: "false", type: itype, "class": "uic pa-gvis"}, "Hidden"),
-                    $checkbox({name: "gvis", value: "null", type: itype, "class": "uic pa-gvis"}, "Default (" + (ptconf.scores_visible ? "visible" : "hidden") + ")")),
-                $save_action("save-gvis")));
-
-            const gradertable = $e("div", "checki mt-1 multicol-3");
-            for (let i = 0; i !== siteinfo.pc.__order__.length; ++i) {
-                const cid = siteinfo.pc.__order__[i], pc = siteinfo.pc[cid];
-                gradertable.append($checkbox({name: "grader" + cid, value: "1", type: "checkbox", "class": "uic js-range-click pa-grader", "data-range-type": "grader"}, pc.name, $e("span", "ct small dim")));
-            }
-            gs.append($e("fieldset", "mt-3",
-                $e("legend", null, "Grader"),
-                $checkbox({name: "gradertype", value: "clear", type: "radio", "class": "uic"}, "Clear"),
-                $checkbox({name: "gradertype", value: "set", type: "radio", "class": "uic"}, "Set grader"),
-                gradertable,
-                $save_action("save-grader")));
-
-            if (!ptconf.gitless) {
-                gs.append($e("fieldset", "mt-3",
-                    $e("legend", null, "Repository"),
-                    $checkbox({name: "clearrepo", value: 1, type: "checkbox", "class": "uic"}, "Clear repository"),
-                    ptconf.has_older_repo ? $checkbox({name: "adoptoldrepo", value: 1, type: "checkbox", "class": "uic"}, "Adopt previous repository") : null,
-                    $save_action("save-repo")));
-            }
-
-            if (siteinfo.user.is_admin) {
-                gs.append($e("fieldset", "mt-3",
-                    $e("legend", null, "Enrollment"),
-                    $e("div", "multicol-2",
-                        $checkbox({name: "dropped", value: "false", type: itype, "class": "uic pa-dropped"}, "Enrolled"),
-                        $checkbox({name: "dropped", value: "true", type: itype, "class": "uic pa-dropped"}, "Dropped")),
-                    $save_action("save-dropped")));
-            }
-
-            $(gs).on("click", "button", gdialog_settings_submit);
-            $(gs).on("click", ".pa-grader", gdialog_settings_grader_click);
-            $(gs).on("click", ".pa-gvis", gdialog_settings_gvis_click);
-            $(gs).on("click", ".pa-dropped", gdialog_settings_dropped_click);
-        }
+        gs.firstChild || gdialog_fill_settings(gs);
 
         const gvis = {}, ggr = {}, ggra = {}, gdropped = {};
         for (let su of gdialog_su) {

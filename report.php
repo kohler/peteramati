@@ -25,6 +25,8 @@ class Report_Page {
     public $filename;
     /** @var list<string> */
     public $fields;
+    /** @var bool */
+    public $want_history = false;
 
     function __construct(Pset $pset, Qrequest $qreq, Contact $viewer) {
         $this->conf = $viewer->conf;
@@ -42,7 +44,11 @@ class Report_Page {
         if (!$this->fields) {
             if ($this->report === "git" && !$pset->gitless) {
                 $this->filename = "git";
-                $this->fields = ["last", "first", "email", "user", "huid", "year", "repo", "hash"];
+                $this->fields = ["last", "first", "email", "user", "huid", "year", "repo", "hash", "isgrade", "commitat"];
+            } else if ($this->report === "githistory" && !$pset->gitless) {
+                $this->filename = "githistory";
+                $this->fields = ["user", "repo", "commitat", "hash", "isgrade", "subject"];
+                $this->want_history = true;
             } else if ($this->report === "default") {
                 $this->filename = "grades";
                 $this->fields = ["last", "first", "email", "user", "huid", "year", "total", "late_hours"];
@@ -51,6 +57,60 @@ class Report_Page {
                 }
             }
         }
+    }
+
+    private function add_row(PsetView $info, CsvGenerator $csv, $fobj) {
+        $x = [];
+        foreach ($fobj as $f) {
+            if ($f instanceof GradeEntry) {
+                if (($v = $info->grade_value($f)) !== null) {
+                    $x[$f->key] = $f->unparse_value($v);
+                }
+            } else if (is_array($f)) {
+                $x[$f[0]] = $f[1]->evaluate($info->user);
+            } else if ($f === "first") {
+                if (!$info->user->is_anonymous) {
+                    $x[$f] = $info->user->firstName;
+                }
+            } else if ($f === "last") {
+                if (!$info->user->is_anonymous) {
+                    $x[$f] = $info->user->lastName;
+                }
+            } else if ($f === "email") {
+                if (!$info->user->is_anonymous) {
+                    $x[$f] = $info->user->email;
+                }
+            } else if ($f === "huid") {
+                $x[$f] = $info->user->huid;
+            } else if ($f === "user") {
+                if ($info->user->is_anonymous) {
+                    $x[$f] = $info->user->anon_username;
+                } else {
+                    $x[$f] = $info->user->email;
+                }
+            } else if ($f === "year") {
+                $x[$f] = $info->user->studentYear;
+            } else if ($f === "repo") {
+                if ($info->repo) {
+                    $x[$f] = $info->repo->url;
+                }
+            } else if ($f === "hash") {
+                $x[$f] = $info->hash();
+            } else if ($f === "isgrade") {
+                if ($info->is_grading_commit()) {
+                    $x[$f] = "yes";
+                } else if ($info->is_do_not_grade() || $info->has_grading_commit()) {
+                    $x[$f] = "no";
+                }
+            } else if ($f === "commitat") {
+                $t = $info->commitat();
+                $x[$f] = $t ? date("Y-m-d\\TH:i:s", $t) : "";
+            } else if ($f === "subject") {
+                $c = $info->commit();
+                $x[$f] = $c ? $c->subject : null;
+            }
+        }
+        $csv->add_row($x);
     }
 
     function run() {
@@ -96,7 +156,7 @@ class Report_Page {
         $fobj = [];
         $gfc = new GradeFormulaCompiler($this->conf);
         foreach ($this->fields as $ft) {
-            if (in_array($ft, ["first", "last", "email", "user", "year", "huid", "repo", "hash"])) {
+            if (in_array($ft, ["first", "last", "email", "user", "year", "huid", "repo", "hash", "commitat", "isgrade", "subject"])) {
                 $fobj[] = $ft;
             } else if (($ge = $this->pset->gradelike_by_key($ft))) {
                 $fobj[] = $ge;
@@ -106,45 +166,15 @@ class Report_Page {
         }
 
         foreach ($sset as $info) {
-            $x = [];
-            foreach ($fobj as $f) {
-                if ($f instanceof GradeEntry) {
-                    if (($v = $info->grade_value($f)) !== null) {
-                        $x[$f->key] = $f->unparse_value($v);
-                    }
-                } else if (is_array($f)) {
-                    $x[$f[0]] = $f[1]->evaluate($info->user);
-                } else if ($f === "first") {
-                    if (!$info->user->is_anonymous) {
-                        $x[$f] = $info->user->firstName;
-                    }
-                } else if ($f === "last") {
-                    if (!$info->user->is_anonymous) {
-                        $x[$f] = $info->user->lastName;
-                    }
-                } else if ($f === "email") {
-                    if (!$info->user->is_anonymous) {
-                        $x[$f] = $info->user->email;
-                    }
-                } else if ($f === "huid") {
-                    $x[$f] = $info->user->huid;
-                } else if ($f === "user") {
-                    if ($info->user->is_anonymous) {
-                        $x[$f] = $info->user->anon_username;
-                    } else {
-                        $x[$f] = $info->user->github_username;
-                    }
-                } else if ($f === "year") {
-                    $x[$f] = $info->user->studentYear;
-                } else if ($f === "repo") {
-                    if ($info->repo) {
-                        $x[$f] = $info->repo->url;
-                    }
-                } else if ($f === "hash") {
-                    $x[$f] = $info->hash();
+            if ($this->want_history) {
+                $ch = $info->recent_commits();
+                foreach ($ch as $c) {
+                    $info->set_commit($c);
+                    $this->add_row($info, $csv, $fobj);
                 }
+            } else {
+                $this->add_row($info, $csv, $fobj);
             }
-            $csv->add_row($x);
         }
 
         $csv->set_filename("{$this->pset->nonnumeric_key}-{$this->filename}.csv");

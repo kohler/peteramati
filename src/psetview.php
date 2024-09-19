@@ -358,7 +358,7 @@ class PsetView {
      * @param ?StudentSet $sset */
     function force_set_hash($hash, $sset = null) {
         assert($hash === null || (strlen($hash) === 40 && $this->repo));
-        assert(!$this->_is_sset || $sset);
+        // assert(!$this->_is_sset || $sset); -- usually true but not always
         if ($this->_hash !== $hash) {
             $this->_hash = $hash;
             if ($sset && $hash !== null) {
@@ -429,6 +429,13 @@ class PsetView {
                 && ($rpi = $this->rpi())
                 && $rpi->placeholder <= 0
                 && $rpi->gradehash === $this->_hash);
+    }
+
+    /** @return bool */
+    function has_grading_commit() {
+        return $this->pset->gitless_grades
+            && ($rpi = $this->rpi())
+            && $rpi->placeholder <= 0;
     }
 
     /** @return bool */

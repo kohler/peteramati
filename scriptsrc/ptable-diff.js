@@ -189,6 +189,7 @@ function ptable_diffdialog(ptconf, sus) {
             es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: "default", checked: true})), "Grades"));
             if (!ptconf.gitless) {
                 es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: "git"})), "Git information"));
+                es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: "githistory"})), "Git history"));
             }
             for (const fd of ptconf.reports) {
                 es.push($e("label", "checki", $e("span", "checkc", $e("input", {type: "radio", name: "report", value: fd.key})), fd.title));
