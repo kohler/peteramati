@@ -2147,13 +2147,16 @@ class PsetView {
         $diff = $this->repo->diff($this->pset, $commita, $commitb, $args);
 
         // update `emptydiff_at`
-        if (empty($diff)
-            && !isset($args["onlyfiles"])
+        if (!isset($args["onlyfiles"])
             && ($rpi = $this->rpi())
             && $commitb->hash === $rpi->gradehash
             && $commita === $this->base_handout_commit()
             && ($lhc = $this->pset->latest_handout_commit())) {
-            $this->conf->ql("update RepositoryGrade set emptydiff_at=? where repoid=? and branchid=? and pset=?", $lhc->commitat, $this->repo->repoid, $this->branchid, $this->pset->id);
+            $eda = empty($diff) ? $lhc->commitat : null;
+            if ($rpi->emptydiff_at !== $eda) {
+                $this->conf->ql("update RepositoryGrade set emptydiff_at=? where repoid=? and branchid=? and pset=?", $eda, $rpi->repoid, $rpi->branchid, $rpi->pset);
+                $rpi->emptydiff_at = $eda;
+            }
         }
 
         return $diff;
@@ -2223,6 +2226,14 @@ class PsetView {
     }
 
     /** @return array<string,DiffInfo> */
+    function diff(CommitRecord $commita, CommitRecord $commitb,
+                  ?LineNotesOrder $lnorder = null, $args = []) {
+        $this->_prepare_diff_args($lnorder, $args);
+        $diff = $this->_read_diff($commita, $commitb, $args);
+        return $this->_complete_diff($diff, $lnorder, $args);
+    }
+
+    /** @return array<string,DiffInfo> */
     function base_diff(CommitRecord $commitb,
                        ?LineNotesOrder $lnorder = null,
                        $args = []) {
@@ -2272,14 +2283,6 @@ class PsetView {
             }
             uasort($diff, "DiffInfo::compare");
         }
-        return $this->_complete_diff($diff, $lnorder, $args);
-    }
-
-    /** @return array<string,DiffInfo> */
-    function diff(CommitRecord $commita, CommitRecord $commitb,
-                  ?LineNotesOrder $lnorder = null, $args = []) {
-        $this->_prepare_diff_args($lnorder, $args);
-        $diff = $this->_read_diff($commita, $commitb, $args);
         return $this->_complete_diff($diff, $lnorder, $args);
     }
 
