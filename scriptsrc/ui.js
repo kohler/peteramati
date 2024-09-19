@@ -139,7 +139,7 @@ export function fold61(sel, arrowholder, direction) {
 }
 
 
-function input_is_checkboxlike(elt) {
+export function input_is_checkboxlike(elt) {
     return elt.type === "checkbox" || elt.type === "radio";
 }
 

@@ -5,7 +5,7 @@
 import { sprintf, strftime, text_eq, string_utf8_index } from "./utils.js";
 import {
     hasClass, addClass, removeClass, toggleClass, classList,
-    handle_ui, $e
+    handle_ui, $e, input_is_checkboxlike
     } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import "./ui-autogrow.js";
@@ -34,6 +34,7 @@ import "./gc-markdown.js";
 import "./gc-timermark.js";
 import "./ptable-grades.js";
 import "./ptable-diff.js";
+import "./ptable-run.js";
 import { pa_pset_table } from "./ptable.js";
 import LinkifyIt from "linkify-it";
 window.markdownit.linkify = LinkifyIt();
@@ -212,89 +213,90 @@ function fold(which, dofold, foldtype) {
     return false;
 }
 
-function foldup(event, opts) {
-    var e = this, dofold = false, m, x;
+function foldup(evt, opts) {
+    let e = this, wantopen, m;
     if (typeof opts === "number") {
         opts = {n: opts};
     } else if (!opts) {
         opts = {};
     }
     if (this.tagName === "DIV"
-        && event
-        && event.target.closest("a")
+        && evt
+        && evt.target.closest("a")
         && !opts.required) {
         return;
     }
     if (!("n" in opts)
         && e.hasAttribute("data-fold-target")
-        && (m = e.getAttribute("data-fold-target").match(/^(\D[^#]*$|.*(?=#)|)#?(\d*)([cou]?)$/))) {
+        && (m = e.getAttribute("data-fold-target").match(/^((?![#\d]|[couU]$)[^#]*)#?(\d*)([couU]?)$/))) {
         if (m[1] !== "") {
             e = document.getElementById(m[1]);
         }
         opts.n = parseInt(m[2]) || 0;
-        if (!("f" in opts) && m[3] !== "") {
-            if (m[3] === "u" && this.tagName === "INPUT" && this.type === "checkbox") {
-                opts.f = this.checked;
-            } else {
-                opts.f = m[3] === "c";
+        if (!("open" in opts) && m[3] !== "") {
+            if (this.tagName === "INPUT"
+                && input_is_checkboxlike(this)
+                && (this.checked ? m[3] === "u" : m[3] === "U")) {
+                m[3] = "c";
             }
+            opts.open = m[3] !== "c";
         }
     }
     var foldname = "fold" + (opts.n || "");
-    while (e
-           && (!e.id || e.id.substr(0, 4) != "fold")
-           && !hasClass(e, "has-fold")
-           && (opts.n == null
-               || (!hasClass(e, foldname + "c")
-                   && !hasClass(e, foldname + "o")))) {
+    console.log(e);
+    while (e && ((!hasClass(e, "has-fold") && (!e.id || !e.id.startsWith("fold")))
+                 || (opts.n != null && !hasClass(e, foldname + "c") && !hasClass(e, foldname + "o")))) {
         e = e.parentNode;
     }
+    console.log(e, opts);
     if (!e) {
         return true;
     }
     if (opts.n == null) {
-        x = classList(e);
-        for (var i = 0; i !== x.length; ++i) {
-            if (x[i].substring(0, 4) === "fold"
-                && (m = x[i].match(/^fold(\d*)[oc]$/))
+        for (const cl of classList(e)) {
+            if (cl.startsWith("fold")
+                && (m = cl.match(/^fold(\d*)[oc]$/))
                 && (opts.n == null || +m[1] < opts.n)) {
                 opts.n = +m[1];
                 foldname = "fold" + (opts.n || "");
             }
         }
     }
-    if (!("f" in opts)
-        && (this.tagName === "INPUT" || this.tagName === "SELECT")) {
-        var value = null;
+    if (!("open" in opts)
+        && (this.tagName === "INPUT" || this.tagName === "SELECT" || this.tagName === "TEXTAREA")) {
+        let value = null;
         if (this.type === "checkbox") {
-            opts.f = !this.checked;
+            opts.open = this.checked;
         } else if (this.type === "radio") {
             if (!this.checked)
                 return true;
             value = this.value;
         } else if (this.type === "select-one") {
             value = this.selectedIndex < 0 ? "" : this.options[this.selectedIndex].value;
+        } else if (this.type === "text" || this.type === "textarea") {
+            opts.open = this.value !== "";
         }
         if (value !== null) {
-            var values = (e.getAttribute("data-" + foldname + "-values") || "").split(/\s+/);
-            opts.f = values.indexOf(value) < 0;
+            const vstr = e.getAttribute("data-" + foldname + "-values") || "",
+                values = $.trim(vstr) === "" ? [] : vstr.split(/\s+/);
+            opts.open = values.indexOf(value) >= 0;
         }
     }
-    dofold = !hasClass(e, foldname + "c");
-    if (!("f" in opts) || !opts.f !== dofold) {
-        opts.f = dofold;
-        fold(e, dofold, opts.n || 0);
-        $(e).trigger(opts.f ? "fold" : "unfold", opts);
+    wantopen = hasClass(e, foldname + "c");
+    if (!("open" in opts) || !!opts.open === wantopen) {
+        opts.open = wantopen;
+        fold(e, !wantopen, opts.n || 0);
+        $(e).trigger($.Event("foldtoggle", {which: opts}));
     }
     if (this.hasAttribute("aria-expanded")) {
-        this.setAttribute("aria-expanded", dofold ? "false" : "true");
+        this.setAttribute("aria-expanded", wantopen ? "true" : "false");
     }
-    if (event
-        && typeof event === "object"
-        && event.type === "click"
-        && !hasClass(event.target, "uic")) {
-        event.stopPropagation();
-        event.preventDefault(); // needed for expanders despite handle_ui!
+    if (evt
+        && typeof evt === "object"
+        && evt.type === "click"
+        && !hasClass(evt.target, "uic")) {
+        handle_ui.stopPropagation(evt);
+        evt.preventDefault(); // needed for expanders despite handle_ui!
     }
 }
 

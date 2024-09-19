@@ -957,7 +957,7 @@ button.btn-t {
 	background: none;
 	padding: 2px 2px 3px;
 }
-.btnbox > .btn-t {
+.btnbox > .btn-t, .tabbox > .btn-t {
 	border-width: 1px;
 }
 .btn-licon {
@@ -1101,16 +1101,19 @@ button.disabled, button.disabled:hover {
 	margin: 0;
 	flex: 0 1 auto;
 }
-.btnbox > button, .btnbox > .btn {
+.btnbox > button, .btnbox > .btn,
+.nav-pills > button, .nav-pills > .btn {
 	border-radius: 0;
 	border-left-width: 0;
 }
-.btnbox > button:first-child, .btnbox > .btn:first-child {
+.btnbox > button:first-child, .btnbox > .btn:first-child,
+.nav-pills > button:first-child, .nav-pills > .btn:first-child {
 	border-top-left-radius: 4px;
 	border-bottom-left-radius: 4px;
 	border-left-width: 1px;
 }
-.btnbox > button:last-child, .btnbox > .btn:last-child {
+.btnbox > button:last-child, .btnbox > .btn:last-child,
+.nav-pills > button:last-child, .nav-pills > .btn:last-child {
 	border-top-right-radius: 4px;
 	border-bottom-right-radius: 4px;
 }

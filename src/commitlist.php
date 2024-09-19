@@ -3,7 +3,7 @@
 // Peteramati is Copyright (c) 2013-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-class CommitList implements JsonSerializable, IteratorAggregate {
+class CommitList implements JsonSerializable, IteratorAggregate, Countable {
     /** @var array<string,CommitRecord> */
     public $commits = [];
     /** @var bool */
@@ -20,12 +20,19 @@ class CommitList implements JsonSerializable, IteratorAggregate {
         return !empty($this->commits);
     }
 
+    function count() : int {
+        return count($this->commits);
+    }
+
+    /** @param int $i
+     * @return ?CommitRecord */
+    function at_index($i) {
+        return (array_values($this->commits))[$i] ?? null;
+    }
+
     /** @return ?CommitRecord */
     function latest() {
-        foreach ($this->commits as $c) {
-            return $c;
-        }
-        return null;
+        return (array_values($this->commits))[0] ?? null;
     }
 
     #[\ReturnTypeWillChange]

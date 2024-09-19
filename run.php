@@ -23,6 +23,8 @@ class RunRequest {
     public $runner;
     /** @var bool */
     public $if_needed;
+    /** @var ?PsetView */
+    private $info;
 
     /** @param string $err
      * @return array */
@@ -47,7 +49,7 @@ class RunRequest {
         $this->runner = $this->pset->runner_by_key($qreq->run);
         if (!$this->runner
             || (!$this->viewer->isPC && !$this->runner->visible)) {
-            self::quit("No such command.");
+            self::quit("No such command");
         }
 
         $this->if_needed = str_ends_with($qreq->run, ".ifneeded") || $qreq->ifneeded;
@@ -69,11 +71,11 @@ class RunRequest {
     private function check_view($many) {
         if (!$this->viewer->can_view_run($this->pset, $this->runner, $many ? null : $this->user)) {
             if (!$this->viewer->isPC && !$this->runner->visible) {
-                return "No such command.";
+                return "No such command";
             } else if ($this->runner->disabled) {
-                return "Command disabled.";
+                return "Command disabled";
             } else {
-                return "Can’t run command now.";
+                return "Can’t run command now";
             }
         } else {
             return null;
@@ -83,7 +85,7 @@ class RunRequest {
     function run() {
         $qreq = $this->qreq;
         if ($qreq->run === null || !$qreq->valid_post()) {
-            return self::error("Permission error.");
+            return self::error("Permission error");
         } else if (($err = $this->check_view(false))) {
             return self::error($err);
         }
@@ -92,24 +94,24 @@ class RunRequest {
         if ($qreq->queueid === "") {
             unset($qreq->queueid);
         } else if (isset($qreq->queueid) && !ctype_digit($qreq->queueid)) {
-            return self::error("Bad queueid.");
+            return self::error("Bad queueid");
         }
         if ($qreq->check === "") {
             unset($qreq->check);
         } else if (isset($qreq->check) && !ctype_digit($qreq->check)) {
-            return self::error("Bad check timestamp.");
+            return self::error("Bad check timestamp");
         }
 
         // can we run this?
         if (isset($qreq->check) && !$this->runner->evaluate_function
             ? !$this->viewer->can_view_run($this->pset, $this->runner, $this->user)
             : !$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
-            return self::error("You can’t run that command.");
+            return self::error("You can’t run that command");
         }
         if ($this->runner->command
             && $info->repo
             && !$info->can_view_repo_contents()) {
-            return self::error("You can’t view this repository.");
+            return self::error("You can’t view this repository");
         }
 
         // load queue item
@@ -123,13 +125,13 @@ class RunRequest {
                 || ($rr->pset !== $info->pset->urlkey
                     && $this->conf->pset_by_key($rr->pset) !== $info->pset)
                 || $rr->runner !== $this->runner->name) {
-                return self::error("Unknown check timestamp {$qreq->check}.");
+                return self::error("Unknown check timestamp {$qreq->check}");
             }
             $qi = QueueItem::for_run_response($info, $rr);
         }
         if (!$qi && isset($qreq->queueid)) {
             if (!($qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info))) {
-                return self::error("Unknown queueid {$qreq->queueid}.");
+                return self::error("Unknown queueid {$qreq->queueid}");
             }
         }
         if (!$qi && $this->if_needed) {
@@ -143,11 +145,11 @@ class RunRequest {
                 $qi->cancel();
             }
             if (!$info->repo) {
-                return self::error("No repository.");
+                return self::error("No repository");
             } else if ($qreq->newcommit ?? $qreq->commit) {
-                return self::error("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
+                return self::error("Commit " . ($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository");
             } else {
-                return self::error("No commits in repository.");
+                return self::error("No commits in repository");
             }
         }
 
@@ -173,9 +175,9 @@ class RunRequest {
         // otherwise check runnability and enqueue
         if (!$qi) {
             if (!$this->pset->run_dirpattern) {
-                return self::error("Configuration error (run_dirpattern).");
+                return self::error("Configuration error (run_dirpattern)");
             } else if (!$this->pset->run_jailfiles) {
-                return self::error("Configuration error (run_jailfiles).");
+                return self::error("Configuration error (run_jailfiles)");
             } else if (!$info->repo || !$info->pset) {
                 return self::error("Nothing to do.");
             }
@@ -225,6 +227,57 @@ class RunRequest {
             "onqueue" => true,
             "nahead" => $nahead
         ];
+    }
+
+    /** @return ?SearchExpr */
+    private function commitq() {
+        $cq = trim($this->qreq->commitq ?? "");
+        if ($cq === "" || $cq === "grading") {
+            return null;
+        }
+        $sp = new SearchParser($cq);
+        return $sp->parse_expression();
+    }
+
+    private function _eval_before(SearchExpr $e) {
+        if ($e->info === null) {
+            try {
+                $d = new DateTimeImmutable($e->text);
+                $e->info = $d->getTimestamp();
+            } catch (Exception $x) {
+                $e->info = false;
+            }
+        }
+        return $e->info !== false && ($this->info->commitat() ?? PHP_INT_MAX) < $e->info;
+    }
+
+    function _eval_expr(SearchExpr $e) {
+        if ($e->kword !== null) {
+            if ($e->kword === "before") {
+                return $this->_eval_before($e);
+            }
+            return false;
+        }
+        if ($e->text === "latest") {
+            // assume traverse in reverse order
+            return true;
+        }
+        if ($e->text === "grading") {
+            return $this->info->is_grading_commit();
+        }
+        return str_starts_with($this->info->hash(), $e->text);
+    }
+
+    private function _select_commit(PsetView $info, SearchExpr $expr) {
+        $this->info = $info;
+        $cl = $info->commit_list();
+        foreach ($cl as $c) {
+            $info->set_commit($c);
+            if ($expr->evaluate_simple([$this, "_eval_expr"])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function runmany() {
@@ -282,21 +335,27 @@ class RunRequest {
             }
             $runorder = QueueItem::unscheduled_runorder();
             $chain = QueueItem::new_chain();
+            $commitq = $this->commitq();
             foreach ($users as $uname) {
-                if (($u = $this->conf->user_by_whatever($uname))) {
-                    $info = PsetView::make($this->pset, $u, $this->viewer);
-                    if (!$this->runner->command || $info->repo) {
-                        $qi = QueueItem::make_info($info, $this->runner);
-                        $qi->chain = $chain;
-                        $qi->runorder = $runorder;
-                        $qi->flags |= QueueItem::FLAG_UNWATCHED;
-                        if ($this->if_needed) {
-                            $qi->ifneeded = 1;
-                        }
-                        $qi->enqueue();
-                        $runorder += 10;
-                    }
+                if (!($u = $this->conf->user_by_whatever($uname))) {
+                    continue;
                 }
+                $info = PsetView::make($this->pset, $u, $this->viewer);
+                if ($this->runner->command && !$info->repo) {
+                    continue;
+                }
+                if ($commitq && !$this->_select_commit($info, $commitq)) {
+                    continue;
+                }
+                $qi = QueueItem::make_info($info, $this->runner);
+                $qi->chain = $chain;
+                $qi->runorder = $runorder;
+                $qi->flags |= QueueItem::FLAG_UNWATCHED;
+                if ($this->if_needed) {
+                    $qi->ifneeded = 1;
+                }
+                $qi->enqueue();
+                $runorder += 10;
             }
             $this->conf->redirect_hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain]);
         }
@@ -305,13 +364,13 @@ class RunRequest {
     function download() {
         $qreq = $this->qreq;
         if ($qreq->run === null || !$qreq->valid_token()) {
-            return self::error("Permission error.");
+            return self::error("Permission error");
         } else if (($err = $this->check_view(true))) {
             return self::error($err);
         } else if (!$qreq->jobs
                    || !($jobs = json_decode($qreq->jobs))
                    || !is_array($jobs)) {
-            return self::error("Bad `jobs` parameter.");
+            return self::error("Bad `jobs` parameter");
         }
 
         $boundary = "--peteramati-" . base64url_encode(random_bytes(24));
@@ -323,19 +382,19 @@ class RunRequest {
                 || (!is_string($run->pset ?? null) && !is_int($run->pset ?? null))
                 || !is_string($run->run ?? null)
                 || !is_int($run->timestamp ?? null)) {
-                return self::error("Bad `jobs[{$i}]` parameter.");
+                return self::error("Bad `jobs[{$i}]` parameter");
             }
             $pset = $this->conf->pset_by_key($run->pset);
             if (!$pset) {
-                return self::error("Bad `jobs[{$i}].pset` parameter.");
+                return self::error("Bad `jobs[{$i}].pset` parameter");
             }
             $user = ContactView::find_user($run->u, $this->viewer, $pset->anonymous);
             if (!$user) {
-                return self::error("No such user `jobs[{$i}].u` ({$run->u}).");
+                return self::error("No such user `jobs[{$i}].u` ({$run->u})");
             }
             $runner = $pset->runner_by_key($run->run);
             if (!$runner) {
-                return self::error("No such runner `jobs[{$i}].run` ({$run->run}).");
+                return self::error("No such runner `jobs[{$i}].run` ({$run->run})");
             }
             if (!$this->viewer->can_view_run($pset, $runner, $user)) {
                 fwrite($mf, "{$boundary}\n" . json_encode($run) . ": Cannot view\n");

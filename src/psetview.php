@@ -376,6 +376,11 @@ class PsetView {
         $this->force_set_hash($commit->hash);
     }
 
+    function set_connected_commit(CommitRecord $commit) {
+        $this->force_set_hash($commit->hash);
+        $this->_recent_connected_commit = $commit;
+    }
+
     /** @param ?StudentSet $sset */
     function set_latest_nontrivial_commit($sset = null) {
         if (($c = $this->latest_nontrivial_commit())) {
