@@ -422,6 +422,60 @@ class PsetView {
         }
     }
 
+
+    /** @param ?string $q
+     * @return ?SearchExpr */
+    static function parse_commit_query($q) {
+        $cq = trim($q ?? "");
+        if ($cq === "" || $cq === "grading") {
+            return null;
+        }
+        $sp = new SearchParser($cq);
+        return $sp->parse_expression();
+    }
+
+    private function _eval_before(SearchExpr $e) {
+        if ($e->info === null) {
+            try {
+                $d = new DateTimeImmutable($e->text);
+                $e->info = $d->getTimestamp();
+            } catch (Exception $x) {
+                $e->info = false;
+            }
+        }
+        return $e->info !== false && ($this->commitat() ?? PHP_INT_MAX) < $e->info;
+    }
+
+    function _eval_expr(SearchExpr $e) {
+        if ($e->kword !== null) {
+            if ($e->kword === "before") {
+                return $this->_eval_before($e);
+            }
+            return false;
+        }
+        if ($e->text === "latest") {
+            // assume traverse in reverse order
+            return true;
+        }
+        if ($e->text === "grading") {
+            return $this->is_grading_commit();
+        }
+        return str_starts_with($this->hash(), $e->text);
+    }
+
+    /** @return bool */
+    function select_commit(SearchExpr $expr) {
+        $cl = $this->commit_list();
+        foreach ($cl as $c) {
+            $this->set_connected_commit($c);
+            if ($expr->evaluate_simple([$this, "_eval_expr"])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     /** @return bool */
     function is_handout_commit() {
         return $this->_hash && $this->_hash === $this->derived_handout_hash();

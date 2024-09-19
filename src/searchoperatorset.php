@@ -108,6 +108,6 @@ class SearchOperatorSet {
     /** @param 'and'|'or'|'not'|'xor' $name
      * @return SearchOperator */
     static function simple_operator($name) {
-        return self::paper_search_operators()->lookup($name);
+        return self::simple_operators()->lookup($name);
     }
 }

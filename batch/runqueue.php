@@ -478,6 +478,7 @@ class RunQueue_Batch {
         "ensure !",
         "u[]+,user[]+ !add Match these users",
         "H:,hash:,commit: !add Use this commit",
+        "commit-query:,commitq: !add Use the commit matching this search",
         "C:,c:,chain: !add Set chain ID",
         "at-end,last !add Schedule after all previous jobs",
         "t[],tag[] !add Add tag",
@@ -572,6 +573,8 @@ class RunEnqueue_Batch {
     public $usermatch = [];
     /** @var ?string */
     public $hash;
+    /** @var ?SearchExpr */
+    public $commitq;
 
     /** @param list<string> $usermatch */
     function __construct(Pset $pset, RunnerConfig $runner, $usermatch = []) {
@@ -637,6 +640,12 @@ class RunEnqueue_Batch {
     }
 
     /** @param PsetView $info
+     * @return string */
+    private function unparse_hashless_key($info) {
+        return "~{$info->user->username}/{$info->pset->urlkey}/{$this->runner->name}";
+    }
+
+    /** @param PsetView $info
      * @param ?string $hash
      * @return string */
     private function unparse_key($info, $hash = null) {
@@ -671,9 +680,11 @@ class RunEnqueue_Batch {
             if (!$info->repo) {
                 continue;
             }
-            if ($this->hash && !$info->set_hash($this->hash, true)) {
+            if (($this->hash && !$info->set_hash($this->hash, true))
+                || ($this->commitq && !$info->select_commit($this->commitq))) {
                 if ($this->verbose) {
-                    fwrite(STDERR, $this->unparse_key($info, $this->hash) . ": no such commit on {$info->branch}{$chainstr}\n");
+                    $key = $this->hash ? $this->unparse_key($info, $this->hash) : $this->unparse_hashless_key($info);
+                    fwrite(STDERR, "{$key}: no such commit on {$info->branch}{$chainstr}\n");
                 }
                 continue;
             }
@@ -798,6 +809,9 @@ class RunEnqueue_Batch {
                 throw new CommandLineException("bad `--commit`");
             }
             $self->hash = $hp;
+        }
+        if (isset($arg["commit-query"])) {
+            $self->commitq = PsetView::parse_commit_query($arg["commit-query"]);
         }
         if (isset($arg["event-source"])) {
             $self->eventsource = true;

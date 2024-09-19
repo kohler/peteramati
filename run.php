@@ -229,56 +229,6 @@ class RunRequest {
         ];
     }
 
-    /** @return ?SearchExpr */
-    private function commitq() {
-        $cq = trim($this->qreq->commitq ?? "");
-        if ($cq === "" || $cq === "grading") {
-            return null;
-        }
-        $sp = new SearchParser($cq);
-        return $sp->parse_expression();
-    }
-
-    private function _eval_before(SearchExpr $e) {
-        if ($e->info === null) {
-            try {
-                $d = new DateTimeImmutable($e->text);
-                $e->info = $d->getTimestamp();
-            } catch (Exception $x) {
-                $e->info = false;
-            }
-        }
-        return $e->info !== false && ($this->info->commitat() ?? PHP_INT_MAX) < $e->info;
-    }
-
-    function _eval_expr(SearchExpr $e) {
-        if ($e->kword !== null) {
-            if ($e->kword === "before") {
-                return $this->_eval_before($e);
-            }
-            return false;
-        }
-        if ($e->text === "latest") {
-            // assume traverse in reverse order
-            return true;
-        }
-        if ($e->text === "grading") {
-            return $this->info->is_grading_commit();
-        }
-        return str_starts_with($this->info->hash(), $e->text);
-    }
-
-    private function _select_commit(PsetView $info, SearchExpr $expr) {
-        $this->info = $info;
-        $cl = $info->commit_list();
-        foreach ($cl as $c) {
-            $info->set_commit($c);
-            if ($expr->evaluate_simple([$this, "_eval_expr"])) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     function runmany() {
         if (!$this->viewer->isPC) {
@@ -336,7 +286,7 @@ class RunRequest {
             }
             $runorder = QueueItem::unscheduled_runorder();
             $chain = QueueItem::new_chain();
-            $commitq = $this->commitq();
+            $commitq = PsetView::parse_commit_query($this->qreq->commitq);
             foreach ($users as $uname) {
                 if (!($u = $this->conf->user_by_whatever($uname))) {
                     continue;
@@ -345,7 +295,7 @@ class RunRequest {
                 if ($this->runner->command && !$info->repo) {
                     continue;
                 }
-                if ($commitq && !$this->_select_commit($info, $commitq)) {
+                if ($commitq && !$info->select_commit($commitq)) {
                     continue;
                 }
                 $qi = QueueItem::make_info($info, $this->runner);
