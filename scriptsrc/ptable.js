@@ -5,10 +5,10 @@
 import { hasClass, addClass, removeClass, toggleClass,
          handle_ui } from "./ui.js";
 import { wstorage, sprintf, strftime } from "./utils.js";
-import { hoturl, hoturl_post_go } from "./hoturl.js";
+import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { GradeSheet } from "./gradeentry.js";
-import { popup_skeleton, popup_close } from "./popup.js";
+import { popup_skeleton } from "./popup.js";
 import { tooltip } from "./tooltip.js";
 import { ptable_gdialog } from "./ptable-grades.js";
 

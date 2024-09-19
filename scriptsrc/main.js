@@ -243,12 +243,10 @@ function foldup(evt, opts) {
         }
     }
     var foldname = "fold" + (opts.n || "");
-    console.log(e);
     while (e && ((!hasClass(e, "has-fold") && (!e.id || !e.id.startsWith("fold")))
                  || (opts.n != null && !hasClass(e, foldname + "c") && !hasClass(e, foldname + "o")))) {
         e = e.parentNode;
     }
-    console.log(e, opts);
     if (!e) {
         return true;
     }
@@ -1054,6 +1052,7 @@ function pa_runmany(chain) {
         doneinfo.push({
             u: f.elements.u.value,
             pset: f.elements.pset.value,
+            commit: f.elements.commit.value,
             run: category,
             timestamp: timestamp
         });
@@ -1117,7 +1116,11 @@ function pa_runmany(chain) {
         if (data && data.ok && data.queueid) {
             f.elements.u.value = data.u;
             f.elements.pset.value = data.pset;
-            const url = `${siteinfo.site_relative}~${encodeURIComponent(data.u)}/pset/${data.pset}`;
+            f.elements.commit.value = data.hash || "";
+            let url = `${siteinfo.site_relative}~${encodeURIComponent(data.u)}/pset/${data.pset}`;
+            if (data.hash) {
+                url += `/${data.hash}`;
+            }
             run(f.elements.run, {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: `\x1b]8;;${url}\x07${data.u}\x1b]8;;\x07`, done_function: check});
         }
         if (data && data.njobs != null) {

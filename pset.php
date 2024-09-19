@@ -523,7 +523,7 @@ class PsetRequest {
         $this->info->update_placeholder(null);
 
         // current commit and commit selector
-        $rc = $this->info->recent_commits();
+        $rc = $this->info->commit_list();
         $sel = $bhashes = [];
         $curhead = $grouphead = null;
         foreach ($rc as $k) {
@@ -913,7 +913,7 @@ class PsetRequest {
             $this->echo_grader();
             $this->echo_all_grades();
 
-        } else if ($this->info->repo && $this->info->recent_commits()->nonempty()) {
+        } else if ($this->info->repo && $this->info->commit_list()->nonempty()) {
             $this->echo_grade_cdf();
             $this->echo_commit();
             $this->echo_flags();

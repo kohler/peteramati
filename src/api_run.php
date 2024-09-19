@@ -25,9 +25,10 @@ class Run_API {
             $anon = $qreq->anonymous ?? $pset->anonymous;
             return [
                 "ok" => true,
-                "queueid" => $qi->queueid,
                 "u" => $user->user_linkpart($u, !!$anon),
                 "pset" => $pset->urlkey,
+                "hash" => $qi->hash(),
+                "queueid" => $qi->queueid,
                 "runner" => $qi->runnername,
                 "timestamp" => $qi->runat,
                 "njobs" => $user->conf->fetch_ivalue("select count(*) from ExecutionQueue where chain=? and status<?", $chain, QueueItem::STATUS_CANCELLED)

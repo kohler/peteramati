@@ -158,7 +158,7 @@ class RunRequest {
             if ($qi->psetid !== $info->pset->id
                 || $qi->repoid !== ($info->repo ? $info->repo->repoid : 0)
                 || $qi->runnername !== $this->runner->name) {
-                return self::error("Wrong runner.");
+                return self::error("Wrong runner");
             }
             if ($qi->has_response()) {
                 return $qi->full_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
@@ -179,7 +179,7 @@ class RunRequest {
             } else if (!$this->pset->run_jailfiles) {
                 return self::error("Configuration error (run_jailfiles)");
             } else if (!$info->repo || !$info->pset) {
-                return self::error("Nothing to do.");
+                return self::error("Nothing to do");
             }
             $qi = QueueItem::make_info($info, $this->runner);
             if ($this->viewer->privChair) {
@@ -282,7 +282,7 @@ class RunRequest {
 
     function runmany() {
         if (!$this->viewer->isPC) {
-            self::quit("Command reserved for TFs.");
+            self::quit("Command reserved for TFs");
         } else if (($err = $this->check_view(true))) {
             self::quit($err);
         } else if (isset($this->qreq->chain) && ctype_digit($this->qreq->chain)) {
@@ -303,6 +303,7 @@ class RunRequest {
                 '<div class="f-contain">',
                 Ht::hidden("u", ""),
                 Ht::hidden("pset", $this->pset->urlkey),
+                Ht::hidden("commit", ""),
                 Ht::hidden("jobs", "", ["disabled" => 1]);
             if ($this->if_needed) {
                 echo Ht::hidden("ifneeded", 1);
@@ -320,7 +321,7 @@ class RunRequest {
             echo "<hr class=\"c\">\n";
             $this->conf->footer();
         } else if (!$this->qreq->valid_post()) {
-            self::quit("Session out of date.");
+            self::quit("Session out of date");
         } else {
             $users = [];
             foreach ($this->qreq as $k => $v) {

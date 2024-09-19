@@ -167,7 +167,7 @@ class Report_Page {
 
         foreach ($sset as $info) {
             if ($this->want_history) {
-                $ch = $info->recent_commits();
+                $ch = $info->commit_list();
                 foreach ($ch as $c) {
                     $info->set_commit($c);
                     $this->add_row($info, $csv, $fobj);

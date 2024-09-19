@@ -249,7 +249,7 @@ class PsetView {
 
 
     /** @return CommitList */
-    function recent_commits() {
+    function commit_list() {
         if (!$this->repo) {
             return new CommitList;
         }
@@ -485,7 +485,7 @@ class PsetView {
             $this->_derived_handout_commit = null;
             $hbases = $this->pset->handout_commits();
             $seen_hash = !$this->_hash;
-            foreach ($this->recent_commits() as $c) {
+            foreach ($this->commit_list() as $c) {
                 if ($c->hash === $this->_hash) {
                     $seen_hash = true;
                 }
