@@ -1047,6 +1047,27 @@ function pa_runmany(chain) {
             }
         });
         f.setAttribute("data-pa-runmany-unload", "");
+        addClass(f, "has-hotlist");
+        f.addEventListener("pa-hotlist", make_hotlist);
+    }
+    function make_hotlist(event) {
+        const j = [];
+        for (const s of doneinfo) {
+            let t = `~${s.u}/pset/${s.pset}`;
+            if (s.commit) {
+                t += `/${s.commit}`;
+            }
+            j.push(t);
+        }
+        const u = f.elements.u.value;
+        if (u) {
+            let t = `~${u}/pset/${f.elements.pset.value}`;
+            if (f.elements.commit.value) {
+                t += `/${f.elements.commit.value}`;
+            }
+            j.push(t);
+        }
+        event.detail.hotlist = {items: j};
     }
     function mark_job_complete(category, timestamp) {
         doneinfo.push({
@@ -1057,6 +1078,7 @@ function pa_runmany(chain) {
             timestamp: timestamp
         });
         f.elements.jobs.value = JSON.stringify(doneinfo);
+        f.elements.u.value = "";
         if (doneinfo.length === 1) { // just added first output
             const button = document.createElement("button");
             button.append("Download");
