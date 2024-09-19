@@ -26,7 +26,7 @@ class Home_TA_Page {
 
     /** @param bool $anonymous
      * @return array */
-    private function flag_row_json(Pset $pset, Contact $s = null, FlagTableRow $row, $anonymous) {
+    private function flag_row_json(Pset $pset, ?Contact $s, FlagTableRow $row, $anonymous) {
         $j = $s ? StudentSet::json_basics($s, $anonymous) : [];
         if (($gcid = $row->jnote("gradercid") ?? null)) {
             $j["gradercid"] = $gcid;
@@ -37,8 +37,8 @@ class Home_TA_Page {
         $bhash = $row->bhash();
         $j["commit"] = bin2hex($bhash);
         $j["flagid"] = $row->flagid;
-        if ($row->rpi && $row->rpi->gradebhash) {
-            $j["grade_commit"] = bin2hex($row->rpi->gradebhash);
+        if ($row->rpi && $row->rpi->gradehash && $row->rpi->placeholder <= 0) {
+            $j["grade_commit"] = $row->rpi->gradehash;
         }
         if ($row->cpi->haslinenotes) {
             $j["has_notes"] = true;
@@ -237,7 +237,7 @@ class Home_TA_Page {
                 && ($svh ?? $pset->scores_visible_student())) {
                 $info->update_placeholder(function ($info, $rpi) {
                     $placeholder_at = $rpi ? $rpi->placeholder_at : 0;
-                    if (($rpi && !$rpi->placeholder)
+                    if (($rpi && $rpi->placeholder <= 0)
                         || microtime(true) - $this->tinit >= 0.2) {
                         return false;
                     } else if ($placeholder_at && $placeholder_at < $this->tinit - 3600) {

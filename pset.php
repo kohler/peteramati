@@ -104,13 +104,6 @@ class PsetRequest {
     }
 
     function handle_setcommit() {
-        if (isset($this->qreq->grade)
-            && $this->qreq->valid_post()
-            && $this->info->can_have_grades()
-            && $this->viewer->isPC
-            && $this->viewer !== $this->user) {
-            $this->info->mark_grading_commit();
-        }
         $this->conf->redirect($this->info->hoturl("pset"));
     }
 
@@ -566,7 +559,6 @@ class PsetRequest {
             from CommitNotes where pset=? and bhash?a and (haslinenotes or hasflags)",
             $pset->psetid, $bhashes);
         while (($row = $result->fetch_row())) {
-            $hex = bin2hex($row[0]);
             $f = "";
             if (((int) $row[1]) & $notesflag) {
                 $f .= "♪";
@@ -577,7 +569,7 @@ class PsetRequest {
                 $f .= "⚐";
             }
             if ($f !== "") {
-                $sel[bin2hex($row[0])] .= "  $f";
+                $sel[bin2hex($row[0])] .= "  {$f}";
             }
         }
         Dbl::free($result);
@@ -585,7 +577,7 @@ class PsetRequest {
         if (!empty($sel)
             && ($h = $this->info->grading_hash())
             && isset($sel[$h])) {
-            $sel[$h] = preg_replace('/\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z/', '$1 &nbsp;✱$2', $sel[$h]);
+            $sel[$h] = preg_replace('/\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z/', '$1  G⃝$2', $sel[$h]);
         }
         assert(isset($sel[$this->info->hash()]));
 
@@ -595,10 +587,6 @@ class PsetRequest {
             $key = "this commit";
         }
         $value = Ht::select("newcommit", $sel, $this->info->commit_hash(), ["class" => "uich js-pset-setcommit pa-commit-selector"]);
-        if ($this->info->pc_view) {
-            $x = $this->info->is_grading_commit() ? "" : "font-weight:bold";
-            $value .= " " . Ht::submit("grade", "Grade", array("style" => $x));
-        }
 
         // view options
         $fold_viewoptions = !isset($this->qreq->tab) && !isset($this->qreq->wdiff);
@@ -715,86 +703,117 @@ class PsetRequest {
 
         // actually print
         echo Ht::form($this->info->hoturl("=pset", ["commit" => null, "setcommit" => 1]),
-                ["class" => "pa-commitcontainer", "data-pa-pset" => $this->pset->urlkey, "data-pa-checkhash" => $this->info->latest_hash()]),
-            "<div class=\"f-contain\">";
+                ["class" => "pa-commitcontainer", "data-pa-pset" => $this->pset->urlkey, "data-pa-checkhash" => $this->info->latest_hash()]);
         ContactView::echo_group($key, $value, $remarks);
-        echo "</div></form>\n";
+        echo "</form>\n";
     }
 
+
+    private function echo_flags() {
+        $user = $this->user;
+        $viewer = $this->viewer;
+        $admin = $viewer->isPC && $viewer !== $user;
+        if (($viewer !== $user && !$admin) || $this->info->is_handout_commit()) {
+            return;
+        }
+
+        echo '<div class="pa-p"><div class="pa-pt"></div><div class="pa-pv"><form>';
+        $any = false;
+        $all_resolved = true;
+        foreach ($this->info->commit_jnote("flags") ?? [] as $k => $v) {
+            $resolved = $v->resolved ?? false;
+            $all_resolved = $all_resolved && $resolved;
+            $conversation = "";
+            if ($v->conversation ?? false) {
+                $conversation = htmlspecialchars((string) $v->conversation[0][2]);
+            }
+            if ($resolved && $conversation === "") {
+                continue;
+            }
+            echo $any ? "" : '<ul class="x mb-0">',
+                $resolved ? '<li class="pa-flag-resolved">🏳️' : '<li class="pa-flag-active">🏴';
+            $any = true;
+            if ($conversation !== "") {
+                echo ' ', $conversation;
+            }
+            if (!$resolved) {
+                echo '<span style="display:inline-block;margin-left:1em">',
+                    Ht::button("✓", ["class" => "ui pa-flagger-resolve", "data-flagid" => $k, "title" => "Resolve flag"]),
+                    '</span>';
+            }
+            echo '</li>';
+        }
+        if ($any) {
+            echo '</li>';
+        }
+
+        $rpi = $this->info->rpi();
+        echo '<div>';
+        $gradelock = $rpi->placeholder === 0;
+        if ($admin) {
+            echo '<div class="btnbox mr-3">',
+                Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade" . ($this->info->is_grading_commit() ? " active" : "")]),
+                Ht::button("🔒", ["class" => "ui pa-flagger-gradelock" . ($this->info->is_grading_commit() && $gradelock ? " active" : "")]),
+                '</div>';
+        } else if (!$gradelock) {
+            echo Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade mr-3" . ($this->info->is_grading_commit() ? " active" : "")]);
+        }
+        if ($admin || !$gradelock) {
+            echo Ht::button("DO NOT GRADE", ["class" => "ui pa-flagger-nograde mr-4" . ($this->info->is_do_not_grade() ? " active" : "")]);
+        }
+        echo Ht::button("Flag this commit", ["class" => "ui pa-flagger" . ($all_resolved ? "" : " hidden"), "name" => "flag"]),
+            '</div>',
+            '</form></div></div>';
+    }
 
     private function echo_runner_buttons() {
         $user = $this->user;
         $viewer = $this->viewer;
 
-        $runnerbuttons = [];
-        $last_run = false;
+        $rbrunners = $hiddenrunners = [];
         foreach ($this->pset->runners as $r) {
             if ($viewer->can_view_run($this->pset, $r, $user)) {
                 if ($viewer->can_run($this->pset, $r, $user)) {
-                    $b = Ht::button(htmlspecialchars($r->title), [
-                        "value" => $r->name,
-                        "class" => "btn ui pa-runner",
-                        "data-pa-run-grade" => isset($r->evaluate_function) ? "true" : null
-                    ]);
-                    $runnerbuttons[] = ($last_run ? " &nbsp;" : "") . $b;
-                    $last_run = true;
+                    $rbrunners[] = $r;
                 } else {
-                    $runnerbuttons[] = '<input type="hidden" class="pa-runner" value="' . htmlspecialchars($r->name) . '">';
+                    $hiddenrunners[] = $r;
                 }
             }
         }
-        if (count($runnerbuttons)
-            && $viewer->isPC
-            && $viewer !== $user
-            && $last_run) {
-            $runnerbuttons[] = " &nbsp;"
-                . Ht::button("+", ["class" => "btn ui pa-runconfig ui font-weight-bold",
-                                   "name" => "define"]);
+
+        foreach ($hiddenrunners as $r) {
+            echo '<input type="hidden" class="pa-runner" value="', htmlspecialchars($r->name), '">';
         }
-        if ((($viewer->isPC && $viewer != $user) || $viewer == $user)
-            && !$this->info->is_handout_commit()) {
-            $runnerbuttons[] = '<div class="g"></div>';
-            $all_resolved = true;
-            foreach ($this->info->commit_jnote("flags") ?? [] as $k => $v) {
-                $resolved = $v->resolved ?? false;
-                $all_resolved = $all_resolved && $resolved;
-                $conversation = "";
-                if ($v->conversation ?? false) {
-                    $conversation = htmlspecialchars((string) $v->conversation[0][2]);
-                }
-                if ($resolved && $conversation === "") {
-                    continue;
-                }
-                $x = $resolved ? "Resolved" : "<strong>Flagged</strong>";
-                if ($conversation !== "") {
-                    $x .= " (" . $conversation . ")";
-                }
-                if (!$resolved) {
-                    $x .= '<span style="display:inline-block;margin-left:1em">'
-                        . Ht::button("Resolve", ["name" => "resolveflag", "class" => "ui js-pset-flag", "data-flagid" => $k])
-                        . '</span>';
-                }
-                $runnerbuttons[] = $x . "<br />";
+
+        if (!empty($rbrunners)) {
+            $want_plus = $viewer->isPC && $viewer !== $user;
+            echo '<div class="pa-p"><div class="pa-pt"></div><div class="pa-pv">',
+                Ht::form($this->info->hoturl("=run"));
+            $nrunners = count($rbrunners);
+            for ($i = 0; $i !== $nrunners; ++$i) {
+                $r = $rbrunners[$i];
+                echo Ht::button(htmlspecialchars($r->title), [
+                    "value" => $r->name,
+                    "class" => "btn ui pa-runner " . ($i === $nrunners - 1 && $want_plus ? "mr-3" : "mr-2"),
+                    "data-pa-run-grade" => isset($r->evaluate_function) ? "true" : null
+                ]);
             }
-            if ($all_resolved) {
-                $runnerbuttons[] = Ht::button("Flag this commit", ["style" => "font-weight:bold;font-size:100%;background:#ffeeee", "class" => "ui js-pset-flag", "name" => "flag"]);
+            if ($want_plus) {
+                echo Ht::button("+", ["class" => "btn ui pa-runconfig ui font-weight-bold", "name" => "define"]);
+            }
+            echo "</form></div></div>\n";
+        }
+
+        if ($viewer->isPC && $viewer !== $user) {
+            echo Ht::form($this->info->hoturl("=pset", ["saverunsettings" => 1, "ajax" => 1])),
+                "<div id=\"pa-runsettings\"></div></form>\n";
+            // XXX always using grading commit's settings?
+            if (($runsettings = $this->info->commit_jnote("runsettings"))) {
+                Ht::stash_script("\$pa.load_runsettings(" . json_encode_browser($runsettings) . ")");
             }
         }
-        if (!empty($runnerbuttons)) {
-            echo Ht::form($this->info->hoturl("=run")),
-                '<div class="f-contain">';
-            ContactView::echo_group("", join("", $runnerbuttons));
-            echo "</div></form>\n";
-            if ($viewer->isPC && $viewer != $user) {
-                echo Ht::form($this->info->hoturl("=pset", ["saverunsettings" => 1, "ajax" => 1])),
-                    '<div class="f-contain"><div id="pa-runsettings"></div></div></form>', "\n";
-                // XXX always using grading commit's settings?
-                if (($runsettings = $this->info->commit_jnote("runsettings"))) {
-                    echo '<script>$pa.load_runsettings(', json_encode_browser($runsettings), ')</script>';
-                }
-            }
-            Ht::stash_script("\$('button.pa-runner').prop('disabled',false)");
-        }
+
+        Ht::stash_script("\$('button.pa-runner').prop('disabled',false)");
     }
 
     /** @param PsetView $info
@@ -897,12 +916,12 @@ class PsetRequest {
         } else if ($this->info->repo && $this->info->recent_commits()->nonempty()) {
             $this->echo_grade_cdf();
             $this->echo_commit();
+            $this->echo_flags();
+            $this->echo_grader();
 
             // print runner buttons
+            echo '<hr>';
             $this->echo_runner_buttons();
-
-            // print current grader
-            $this->echo_grader();
 
             // print grade entries
             $this->echo_all_grades();

@@ -141,25 +141,28 @@ class ContactView {
      * @param Contact $viewer */
     static function echo_heading($user, $viewer) {
         $u = $viewer->user_linkpart($user);
+
         if ($user !== $viewer && !$user->is_anonymous && $user->contactImageId) {
             echo '<img class="pa-smallface float-left" src="' . $user->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
         }
 
-        echo '<h2 class="homeemail"><a href="',
-            $user->conf->hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
-        if ($user->extension)
-            echo " (X)";
-        /*if ($viewer->privChair && $user->is_anonymous)
-            echo " ",*/
-        if ($viewer->privChair)
-            echo "&nbsp;", become_user_link($user);
-        if ($viewer->isPC
-            && !$user->is_anonymous
-            && $user->github_username
-            && $viewer->conf->opt("githubOrganization")) {
-            echo ' <button type="button" class="qo small ui js-repo-list need-tooltip" data-tooltip="List repositories" data-pa-user="', htmlspecialchars($user->github_username), '">®</button>';
+        if ($u !== null) {
+            echo '<h2 class="homeemail"><a href="',
+                $user->conf->hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
+            if ($user->extension)
+                echo " (X)";
+            /*if ($viewer->privChair && $user->is_anonymous)
+                echo " ",*/
+            if ($viewer->privChair)
+                echo "&nbsp;", become_user_link($user);
+            if ($viewer->isPC
+                && !$user->is_anonymous
+                && $user->github_username
+                && $viewer->conf->opt("githubOrganization")) {
+                echo ' <button type="button" class="qo small ui js-repo-list need-tooltip" data-tooltip="List repositories" data-pa-user="', htmlspecialchars($user->github_username), '">®</button>';
+            }
+            echo '</h2>';
         }
-        echo '</h2>';
 
         if ($user !== $viewer && !$user->is_anonymous) {
             echo '<h3>', Text::user_html($user);
@@ -177,8 +180,9 @@ class ContactView {
             echo '</h3>';
         }
 
-        if ($user->dropped)
+        if ($user->dropped) {
             ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
+        }
 
         echo '<hr class="c" />';
     }

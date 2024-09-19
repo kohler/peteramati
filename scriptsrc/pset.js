@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { handle_ui, fold61 } from "./ui.js";
+import { handle_ui, fold61, addClass, hasClass, $e } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
@@ -77,10 +77,14 @@ handle_ui.on("js-pset-setcommit", function () {
     this.closest("form").submit();
 });
 
-handle_ui.on("js-pset-flag", function () {
+handle_ui.on("pa-flagger", function () {
     let self = this, form = self.closest("form");
-    if (this.name === "flag" && !form.elements.flagreason) {
-        $(self).before('<span class="flagreason">Why do you want to flag this commit? &nbsp;<input type="text" name="flagreason" value="" placeholder="Optional reason" class="need-autogrow"> &nbsp;</span>');
+    if (!form.elements.flagreason) {
+        self.parentElement.append($e("div", "flagreasoneditor mt-1",
+            $e("span", "flagreason mr-2", "Why do you want to flag this commit?"),
+            $e("input", {type: "text", name: "flagreason", value: "", placeholder: "Optional reason", class: "need-autogrow mr-2"}),
+            $e("button", {type: "button", class: "ui pa-flagger"}, "OK"),
+            $e("span", "ajaxsave61")));
         $(form.elements.flagreason).on("keypress", function (evt) {
             if (!event_modkey(evt) && event_key(evt) === "Enter") {
                 evt.preventDefault();
@@ -88,26 +92,53 @@ handle_ui.on("js-pset-flag", function () {
                 $(self).click();
             }
         }).autogrow()[0].focus();
-        $(self).html("OK");
-    } else if (this.name === "flag") {
+        addClass(self, "hidden");
+    } else {
         $.post(hoturl("=api/flag", {psetinfo: this, flagid: "new"}),
             {reason: form.elements.flagreason.value},
             function (data) {
                 if (data && data.ok) {
-                    $(form).find(".flagreason").remove();
-                    $(self).replaceWith("<strong>Flagged</strong>");
-                } else {
-                    $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
-                }
-            });
-    } else if (this.name == "resolveflag") {
-        $.post(hoturl("=api/flag", {psetinfo: this, flagid: this.getAttribute("data-flagid"), resolve: 1}), {},
-            function (data) {
-                if (data && data.ok) {
-                    $(self).replaceWith("<strong>Resolved</strong>");
+                    $(form).find(".flagreasoneditor").remove();
+                    $(self).replaceWith($e("strong", null, "Flagged"));
                 } else {
                     $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
                 }
             });
     }
+});
+
+function apply_flagger(e, data) {
+    const psetinfo = e.closest(".pa-psetinfo"),
+        grade = !!data.gradecommit && data.gradecommit === psetinfo.getAttribute("data-pa-commit");
+    $(psetinfo).find(".pa-flagger-grade").toggleClass("active", grade);
+    $(psetinfo).find(".pa-flagger-gradelock").toggleClass("active", grade && data.gradelock);
+    $(psetinfo).find(".pa-flagger-nograde").toggleClass("active", data.gradecommit === "");
+}
+
+function make_flagger(what) {
+    return function () {
+        const self = this, arg = {psetinfo: this, [what]: hasClass(this, "active") ? 0 : 1};
+        if (what === "gradelock") {
+            arg.grade = 1;
+        }
+        $.post(hoturl("=api/gradeflag", arg), {}, function (data) {
+            data && data.ok && apply_flagger(self, data);
+        });
+    };
+}
+
+handle_ui.on("pa-flagger-grade", make_flagger("grade"));
+handle_ui.on("pa-flagger-nograde", make_flagger("nograde"));
+handle_ui.on("pa-flagger-gradelock", make_flagger("gradelock"));
+
+handle_ui.on("pa-flagger-resolve", function () {
+    let self = this, form = self.closest("form");
+    $.post(hoturl("=api/flag", {psetinfo: this, flagid: this.getAttribute("data-flagid"), resolve: 1}), {},
+        function (data) {
+            if (data && data.ok) {
+                $(self).replaceWith("<strong>Resolved</strong>");
+            } else {
+                $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
+            }
+        });
 });

@@ -71,6 +71,17 @@ fieldset {
 	border-color: #aaa;
 	border-width: 1px;
 }
+ul.x {
+	margin: 0 0 1em;
+	padding-left: 0 !important;
+	list-style-type: none;
+}
+ul.x > li {
+	margin: 0 0 0.25em;
+}
+ul.x > li:last-child {
+	margin-bottom: 0;
+}
 .group-only {
 	margin: 0 !important;
 	padding: 0 !important;
@@ -3343,6 +3354,35 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	font-size: smaller;
 	white-space: pre-wrap;
 	color: #440000;
+}
+.pa-flagger, .pa-flagger-grade, .pa-flagger-nograde {
+	font-weight: 500;
+}
+.pa-flagger {
+	background: #ffffee;
+}
+.pa-flagger-grade, .pa-flagger-gradelock {
+	background: #eeffee;
+}
+.pa-flagger-nograde {
+	background: #ffeeee;
+}
+.pa-flagger-grade:hover, .pa-flagger-grade:active,
+.pa-flagger-gradelock:hover, .pa-flagger-gradelock:active {
+	border-color: #005f00;
+	background-image: linear-gradient(#ddeedd, #d0eed0);
+}
+.pa-flagger-grade.active, .pa-flagger-gradelock.active {
+	border-color: #007f00;
+	background: #00ba00;
+	background-image: linear-gradient(#00ba00, #00a500);
+	color: white;
+}
+.pa-flagger-nograde.active {
+	border-color: #cc0000;
+	background: #ff0000;
+	background-image: linear-gradient(#ff4040, #ff0000);
+	color: white;
 }
 .pa-runner, .pa-runconfig {
 	font-size: 9pt;

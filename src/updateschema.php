@@ -16,10 +16,10 @@ class UpdateSchema {
         $drops = [];
         foreach (is_array($key) ? $key : [$key] as $k) {
             if (in_array($k, $indexes))
-                $drops[] = ($k === "PRIMARY" ? "drop primary key" : "drop key `$k`");
+                $drops[] = ($k === "PRIMARY" ? "drop primary key" : "drop key `{$k}`");
         }
         if (count($drops)) {
-            return $this->conf->ql_ok("alter table `$table` " . join(", ", $drops));
+            return $this->conf->ql_ok("alter table `{$table}` " . join(", ", $drops));
         } else {
             return true;
         }
@@ -37,7 +37,7 @@ class UpdateSchema {
         $hashes = [[], [], [], []];
         $result = $this->conf->ql("select hash, notes from CommitNotes");
         while (($row = $result->fetch_row())) {
-            $x = PsetView::notes_haslinenotes(json_decode($row[1]));
+            $x = CommitPsetInfo::notes_haslinenotes(json_decode($row[1]));
             $hashes[$x][] = $row[0];
         }
         foreach ($hashes as $x => $h) {
@@ -1019,6 +1019,15 @@ class UpdateSchema {
         if ($conf->sversion === 173
             && $this->v174_repogid()) {
             $conf->update_schema_version(174);
+        }
+        if ($conf->sversion === 174
+            && $conf->ql_ok("alter table CommitNotes add `cnflags` int(11) NOT NULL DEFAULT 0")) {
+            $conf->update_schema_version(175);
+        }
+        if ($conf->sversion === 175
+            || ($conf->sversion === 176
+                && $conf->ql_ok("alter table RepositoryGrade drop `userbhash`"))) {
+            $conf->update_schema_version(177);
         }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");

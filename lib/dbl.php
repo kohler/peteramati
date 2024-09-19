@@ -33,6 +33,16 @@ class Dbl_Result {
         $r->errno = 0;
         return $r;
     }
+    /** @param int $n
+     * @return Dbl_Result */
+    static function make_affected_rows($n = 1) {
+        $r = new Dbl_Result;
+        $r->affected_rows = $n;
+        $r->warning_count = 0;
+        $r->insert_id = null;
+        $r->errno = 0;
+        return $r;
+    }
     /** @return Dbl_Result */
     static function make_error() {
         $r = new Dbl_Result;

@@ -872,22 +872,21 @@ class Repository {
 
     /** @return bool */
     function update_info() {
-        if ($this->infosnapat < $this->snapat) {
-            $qstager = Dbl::make_multi_query_stager($this->conf->dblink, Dbl::F_ERROR);
-            $result = $this->conf->qe("select * from RepositoryGrade where repoid=? and gradebhash is not null and (commitat is null or commitat=0)", $this->repoid);
-            while (($rpi = RepositoryPsetInfo::fetch($result))) {
-                $c = $this->connected_commit(bin2hex($rpi->gradebhash));
-                $at = $c ? $c->commitat : 0;
-                $qstager("update RepositoryGrade set commitat=? where repoid=? and branchid=? and pset=? and gradebhash=?", $at, $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->gradebhash);
-            }
-            Dbl::free($result);
-            $qstager("update Repository set infosnapat=greatest(infosnapat,?) where repoid=?",
-                     $this->snapat, $this->repoid);
-            $qstager(null);
-            return true;
-        } else {
+        if ($this->infosnapat >= $this->snapat) {
             return false;
         }
+        $qstager = Dbl::make_multi_query_stager($this->conf->dblink, Dbl::F_ERROR);
+        $result = $this->conf->qe("select * from RepositoryGrade where repoid=? and gradebhash is not null and (commitat is null or commitat=0)", $this->repoid);
+        while (($rpi = RepositoryPsetInfo::fetch($result))) {
+            $c = $this->connected_commit($rpi->gradehash);
+            $at = $c ? $c->commitat : 0;
+            $qstager("update RepositoryGrade set commitat=? where repoid=? and branchid=? and pset=? and gradebhash=?", $at, $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->gradebhash);
+        }
+        Dbl::free($result);
+        $qstager("update Repository set infosnapat=greatest(infosnapat,?) where repoid=?",
+                 $this->snapat, $this->repoid);
+        $qstager(null);
+        return true;
     }
 
 

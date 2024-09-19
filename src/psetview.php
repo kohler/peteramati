@@ -102,8 +102,6 @@ class PsetView {
     /** @var ?LineNotesOrder */
     private $_diff_lnorder;
 
-    static private $forced_commitat = 0;
-
     private function __construct(Pset $pset, Contact $user, Contact $viewer) {
         $this->conf = $pset->conf;
         $this->pset = $pset;
@@ -189,7 +187,7 @@ class PsetView {
     }
 
     /** @return ?RepositoryPsetInfo */
-    private function rpi() {
+    function rpi() {
         if (!$this->_rpi && $this->repo) {
             $this->_rpi = new RepositoryPsetInfo($this->repo->repoid, $this->branchid, $this->pset->id);
             $this->_rpi->reload($this->conf);
@@ -297,7 +295,7 @@ class PsetView {
     /** @return ?non-empty-string */
     function grading_hash() {
         $rpi = $this->pset->gitless_grades ? null : $this->rpi();
-        return $rpi && !$rpi->placeholder ? $rpi->gradehash : null;
+        return $rpi && $rpi->placeholder <= 0 ? $rpi->gradehash : null;
     }
 
 
@@ -418,8 +416,15 @@ class PsetView {
         return $this->pset->gitless_grades
             || ($this->_hash !== null
                 && ($rpi = $this->rpi())
-                && !$rpi->placeholder
+                && $rpi->placeholder <= 0
                 && $rpi->gradehash === $this->_hash);
+    }
+
+    /** @return bool */
+    function is_do_not_grade() {
+        return !$this->pset->gitless_grades
+            && ($rpi = $this->rpi())
+            && $rpi->placeholder === 2;
     }
 
     /** @return bool */
@@ -525,28 +530,15 @@ class PsetView {
     /** @param ?callable(PsetView,?RepositoryPsetInfo):bool $updater
      * @return void */
     function update_placeholder($updater) {
-        if (!$this->pset->gitless_grades && $this->repo) {
-            $rpi = $this->rpi();
-            if (($rpi->placeholder
-                 || $rpi->gradebhash === null)
-                && ($updater === null
-                    || call_user_func($updater, $this, $rpi))) {
-                $c = $this->latest_commit();
-                $bh = $c ? hex2bin($c->hash) : null;
-                if (($rpi->placeholder_at ?? 0) === 0
-                    || $rpi->gradebhash !== $bh) {
-                    $rpi->materialize($this->conf);
-                    $this->conf->qe("update RepositoryGrade
-                        set gradebhash=(if(placeholder=1,?,gradebhash)),
-                        commitat=(if(placeholder=1,?,commitat)),
-                        placeholder_at=?, emptydiff_at=null
-                        where repoid=? and branchid=? and pset=?",
-                        $bh, $c ? $c->commitat : null, Conf::$now,
-                        $rpi->repoid, $rpi->branchid, $rpi->pset);
-                    $rpi->reload($this->conf);
-                }
-            }
+        if ($this->pset->gitless_grades || !$this->repo) {
+            return;
         }
+        $rpi = $this->rpi();
+        if ($rpi->placeholder <= 0
+            || ($updater !== null && !call_user_func($updater, $this, $rpi))) {
+            return;
+        }
+        $rpi->save_grading_commit($this->latest_commit(), $rpi->placeholder, RepositoryPsetInfo::SGC_PLACEHOLDER, $this->conf);
     }
 
 
@@ -939,59 +931,6 @@ class PsetView {
     }
 
 
-    /** @param ?object $j */
-    static private function clean_notes($j) {
-        if (is_object($j)
-            && isset($j->grades)
-            && is_object($j->grades)
-            && isset($j->autogrades)
-            && is_object($j->autogrades)) {
-            foreach ($j->autogrades as $k => $v) {
-                if (($j->grades->$k ?? null) === $v)
-                    unset($j->grades->$k);
-            }
-            if (!count(get_object_vars($j->grades))) {
-                unset($j->grades);
-            }
-        }
-        if (is_object($j)) {
-            unset($j->formula);
-            unset($j->formula_at);
-        }
-    }
-
-    /** @param ?object $j
-     * @return int */
-    static function notes_haslinenotes($j) {
-        $x = 0;
-        if ($j && isset($j->linenotes)) {
-            foreach ($j->linenotes as $fn => $fnn) {
-                foreach ($fnn as $ln => $n) {
-                    $x |= (is_array($n) && $n[0] ? HASNOTES_COMMENT : HASNOTES_GRADE);
-                }
-            }
-        }
-        return $x;
-    }
-
-    /** @param ?object $j
-     * @return int */
-    static function notes_hasflags($j) {
-        return $j && isset($j->flags) && count((array) $j->flags) ? 1 : 0;
-    }
-
-    /** @param ?object $j
-     * @return int */
-    static function notes_hasactiveflags($j) {
-        if ($j && isset($j->flags)) {
-            foreach ($j->flags as $f) {
-                if (!($f->resolved ?? false))
-                    return 1;
-            }
-        }
-        return 0;
-    }
-
     private function clear_can_view_grade() {
         $this->_vf = null;
         $this->_can_view_grade = null;
@@ -1017,13 +956,13 @@ class PsetView {
         while (true) {
             // change notes
             $new_notes = json_update($upi ? $upi->jnotes() : null, $updates);
-            self::clean_notes($new_notes);
+            CommitPsetInfo::clean_notes($new_notes);
 
             // update database
             $notes = json_encode_db($new_notes);
             $notesa = strlen($notes) > 32000 ? null : $notes;
             $notesb = strlen($notes) > 32000 ? $notes : null;
-            $hasactiveflags = self::notes_hasactiveflags($new_notes);
+            $hasactiveflags = CommitPsetInfo::notes_hasactiveflags($new_notes);
             if ($upi->phantom) {
                 $result = Dbl::qx($this->conf->dblink, "insert ignore into ContactGrade
                     set cid=?, pset=?, updateat=?, updateby=?, studentupdateat=?,
@@ -1092,124 +1031,28 @@ class PsetView {
 
     /** @param array $updates */
     function update_repository_notes($updates) {
-        // find original
         $rpi = $this->rpi();
-        assert(!!$rpi);
-
-        // compare-and-swap loop
-        while (true) {
-            // change notes
-            $new_notes = json_update($rpi->jrpnotes(), $updates);
-            self::clean_notes($new_notes);
-
-            // update database
-            $notes = json_encode_db($new_notes);
-            $notesa = strlen($notes) > 16000 ? null : $notes;
-            $notesb = strlen($notes) > 16000 ? $notes : null;
-            if ($rpi->phantom) {
-                $result = Dbl::qe($this->conf->dblink, "insert ignore into RepositoryGrade set
-                    repoid=?, branchid=?, pset=?,
-                    placeholder=1, placeholder_at=?, rpnotes=?, rpnotesOverflow=?",
-                    $rpi->repoid, $rpi->branchid, $rpi->pset,
-                    Conf::$now, $notesa, $notesb);
-            } else if ($rpi->rpnotes === $notes) {
-                return;
-            } else {
-                $result = $this->conf->qe("update RepositoryGrade
-                    set rpnotes=?, rpnotesOverflow=?, rpnotesversion=?
-                    where repoid=? and branchid=? and pset=? and rpnotesversion=?",
-                    $notesa, $notesb, $rpi->rpnotesversion + 1,
-                    $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->rpnotesversion);
-            }
-            if ($result && $result->affected_rows) {
-                break;
-            }
-
-            // reload record
-            $rpi->reload($this->conf);
-        }
-
-        $rpi->assign_rpnotes($notes, $new_notes);
+        do {
+            $notes = json_update($rpi->jrpnotes(), $updates);
+        } while (!$rpi->save_rpnotes($notes, $this));
     }
 
-
-    /** @param non-empty-string $hash
-     * @param array $updates
-     * @param ?bool $is_student */
-    function update_commit_notes_at($hash, $updates, $is_student = null) {
-        assert(strlen($hash) === 40);
-
-        // find original
-        if ($this->_hash === $hash) {
-            $cpi = $this->cpi();
-        } else {
-            $cpi = $this->pset->cpi_at($hash) ?? new CommitPsetInfo($this->pset->id, $hash, $this->repo->repoid);
-        }
-        $old_notes = $cpi->jnotes();
-        $commit = null;
-
-        // compare-and-swap loop
-        while (true) {
-            // change notes
-            $new_notes = json_update($old_notes, $updates);
-            self::clean_notes($new_notes);
-
-            // update database
-            $notes = json_encode_db($new_notes);
-            $haslinenotes = self::notes_haslinenotes($new_notes);
-            $hasflags = self::notes_hasflags($new_notes);
-            $hasactiveflags = self::notes_hasactiveflags($new_notes);
-            if ($cpi->phantom) {
-                $commit = $commit ?? $this->connected_commit($hash);
-                $commitat = $commit ? $commit->commitat : null;
-                $result = $this->conf->qe("insert ignore into CommitNotes set
-                    pset=?, bhash=?, repoid=?, commitat=?,
-                    notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?,
-                    notesversion=?, updateat=?",
-                    $cpi->pset, $cpi->bhash, $this->repo->repoid, $commitat,
-                    $notes, $haslinenotes, $hasflags, $hasactiveflags,
-                    1, Conf::$now);
-            } else if ($old_notes === $notes) {
-                return;
-            } else {
-                $result = $this->conf->qe("update CommitNotes set
-                    notes=?, haslinenotes=?, hasflags=?, hasactiveflags=?,
-                    notesversion=?, updateat=?
-                    where pset=? and bhash=? and notesversion=?",
-                    $notes, $haslinenotes, $hasflags, $hasactiveflags,
-                    $cpi->notesversion + 1, Conf::$now,
-                    $cpi->pset, $cpi->bhash, $cpi->notesversion);
-            }
-            if ($result && $result->affected_rows) {
-                break;
-            }
-
-            // reload record
-            $cpi->reload($this->conf);
-            $old_notes = $cpi->jnotes();
-        }
-
-        if ($this->_hash === $hash) {
-            $cpi->assign_notes($notes, $new_notes);
-            $cpi->hasflags = $hasflags;
-            $cpi->hasactiveflags = $hasactiveflags;
-            $cpi->haslinenotes = $haslinenotes;
-        }
-        if (isset($updates["grades"]) || isset($updates["autogrades"])) {
-            $this->clear_can_view_grade();
-            $this->_gtime = null;
-            if ($this->grading_hash() === $hash) {
-                $this->user->invalidate_grades($this->pset->id);
-            }
-        }
-    }
 
     /** @param array $updates */
     function update_commit_notes($updates) {
-        if (!$this->_hash) {
-            throw new Error("update_commit_notes with no hash");
+        assert(strlen($this->_hash ?? "") === 40);
+        $cpi = $this->cpi();
+        do {
+            $notes = json_update($cpi->jnotes(), $updates);
+        } while (!$cpi->save_notes($notes, $this));
+
+        if (isset($updates["grades"]) || isset($updates["autogrades"])) {
+            $this->clear_can_view_grade();
+            $this->_gtime = null;
+            if ($this->grading_hash() === $this->_hash) {
+                $this->user->invalidate_grades($this->pset->id);
+            }
         }
-        $this->update_commit_notes_at($this->_hash, $updates);
     }
 
     /** @param array $updates */
@@ -1586,14 +1429,8 @@ class PsetView {
             return $this->vupi()->studentupdateat;
         } else if ($this->_hash
                    && ($rpi = $this->rpi())
-                   && $rpi->gradehash === $this->_hash) {
-            if (!$rpi->commitat
-                && ($force || self::$forced_commitat < 60)
-                && $this->repo->update_info()) {
-                ++self::$forced_commitat;
-                $cr = $this->grading_commit();
-                $rpi->commitat = $cr ? $cr->commitat : 1;
-            }
+                   && $rpi->gradehash === $this->_hash
+                   && $rpi->commitat) {
             return $rpi->commitat;
         } else if ($this->_hash && ($ls = $this->commit())) {
             return $ls->commitat;
@@ -1687,14 +1524,14 @@ class PsetView {
                 $upi->gradercid = $gcid;
             }
         } else if ($this->_hash !== null) {
-            $bhash = hex2bin($this->_hash);
             $rpi = $this->rpi();
-            if ($rpi->gradebhash === $bhash && ($rpi->gradercid !== $gcid || $rpi->placeholder)) {
-                $rpi->materialize($this->conf);
-                $this->conf->qe("update RepositoryGrade set gradercid=?, placeholder=0 where repoid=? and branchid=? and pset=? and gradebhash=?",
-                    $gcid, $rpi->repoid, $rpi->branchid, $rpi->pset, $bhash);
+            if ($rpi->gradehash === $this->_hash && $rpi->placeholder === 1) {
+                $rpi->save_grading_commit($this->commit(), -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
+            }
+            if ($rpi->gradehash === $this->_hash && $rpi->gradercid !== $gcid) {
+                $this->conf->qe("update RepositoryGrade set gradercid=? where repoid=? and branchid=? and pset=? and gradebhash=?",
+                    $gcid, $rpi->repoid, $rpi->branchid, $rpi->pset, $rpi->gradebhash);
                 $rpi->gradercid = $gcid;
-                $rpi->placeholder = 0;
             }
             $this->update_commit_notes(["gradercid" => $gcid]);
         } else {
@@ -1715,23 +1552,19 @@ class PsetView {
                 $this->user->invalidate_grades($this->pset->id);
             }
         } else if ($this->_hash !== null) {
-            $bhash = $this->bhash();
             $cn = $this->commit_jnotes();
             $gcid = $cn ? $cn->gradercid ?? null : null;
             $commit = $this->connected_commit($this->_hash);
             $rpi = $this->rpi();
-            if ($rpi->gradebhash !== $bhash || $rpi->placeholder) {
-                $rpi->materialize($this->conf);
-                $this->conf->qe("update RepositoryGrade set gradebhash=?, commitat=?, gradercid=?, placeholder=0, emptydiff_at=null where repoid=? and branchid=? and pset=?",
-                    $bhash, $commit ? $commit->commitat : null, $gcid ?? $rpi->gradercid,
-                    $rpi->repoid, $rpi->branchid, $rpi->pset);
-                $rpi->gradebhash = $bhash;
-                $rpi->commitat = $commit ? $commit->commitat : null;
-                $rpi->gradercid = $gcid ?? $rpi->gradercid;
-                $rpi->placeholder = 0;
-                $rpi->emptydiff_at = null;
+            $rpi->materialize($this->conf);
+            if ($rpi->gradehash !== $this->_hash || $rpi->placeholder > 0) {
+                $rpi->save_grading_commit($commit, $rpi->placeholder === 0 ? 0 : -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
                 $this->clear_can_view_grade();
                 $this->user->invalidate_grades($this->pset->id);
+            }
+            if ($gcid !== null && $rpi->gradercid !== $gcid) {
+                $this->conf->qe("update RepositoryGrade set gradercid=? where repoid=? and branchid=? and pset=?", $gcid, $rpi->repoid, $rpi->branchid, $rpi->pset);
+                $rpi->gradercid = $gcid;
             }
         } else {
             throw new Error("mark_grading_commit with no hash");

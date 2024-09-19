@@ -32,31 +32,75 @@ class Flag_API {
         return true;
     }
 
-    static function flag(Contact $user, Qrequest $qreq, APIData $api) {
-        $info = PsetView::make($api->pset, $api->user, $user);
+    static function flag(Contact $viewer, Qrequest $qreq, APIData $api) {
+        $info = PsetView::make($api->pset, $api->user, $viewer);
         if (($err = $api->prepare_commit($info))) {
             return $err;
-        } else if (!$user->isPC && $user !== $api->user) {
-            return ["ok" => false, "error" => "Permission error."];
+        } else if (!$viewer->isPC && $viewer !== $api->user) {
+            return ["ok" => false, "error" => "Permission error"];
         }
         if ($qreq->is_post()) {
             $flagid = $qreq->flagid;
             $create = !$flagid || $flagid === "new";
             $when = Conf::$now;
-            self::update_flag($info, $create ? "t$when" : $flagid, $create,
-                              $user->contactId, trim($qreq->reason ?? ""), !!$qreq->resolve, $when);
+            self::update_flag($info, $create ? "t{$when}" : $flagid, $create,
+                              $viewer->contactId, trim($qreq->reason ?? ""), !!$qreq->resolve, $when);
         }
         return ["ok" => true, "flags" => $info->commit_jnote("flags")];
+    }
+
+    static function gradeflag(Contact $viewer, Qrequest $qreq, APIData $api) {
+        $info = PsetView::make($api->pset, $api->user, $viewer);
+        if (($err = $api->prepare_commit($info))) {
+            return $err;
+        } else if (!$viewer->isPC && $viewer !== $api->user) {
+            return ["ok" => false, "error" => "Permission error"];
+        }
+        $rpi = $info->rpi();
+        if ($qreq->valid_post()) {
+            $grade = $nograde = null;
+            if ((isset($qreq->grade) && ($grade = friendly_boolean($qreq->grade)) === null)
+                || (isset($qreq->nograde) && ($nograde = friendly_boolean($qreq->nograde)) === null)) {
+                return ["ok" => false, "error" => "Parameter error"];
+            }
+            $admin = $viewer->isPC && $viewer !== $api->user;
+            $mode = $admin ? RepositoryPsetInfo::SGC_ADMIN : RepositoryPsetInfo::SGC_USER;
+            if ($grade) {
+                $placeholder = -1;
+                if ($admin && (friendly_boolean($qreq->gradelock) ?? ($rpi->placeholder === 0 || $rpi->placeholder === 2))) {
+                    $placeholder = 0;
+                }
+                $rpi->save_grading_commit($info->commit(), $placeholder, $mode, $info->conf);
+            } else if ($nograde) {
+                $rpi->save_grading_commit($info->latest_commit(), 2, $mode, $info->conf);
+            } else if ($grade === false) {
+                if ($info->is_grading_commit()) {
+                    // XXX compare-and-swap would be better
+                    $rpi->save_grading_commit($info->latest_commit(), 1, $mode, $info->conf);
+                }
+            } else if ($nograde === false) {
+                if ($rpi->placeholder === 2) {
+                    $rpi->save_grading_commit($info->latest_commit(), 1, $mode, $info->conf);
+                }
+            }
+        }
+        if ($rpi->placeholder === 2) {
+            return ["ok" => true, "gradecommit" => ""];
+        } else if ($rpi->placeholder === 1) {
+            return ["ok" => true, "gradecommit" => null];
+        } else {
+            return ["ok" => true, "gradecommit" => $rpi->gradehash, "gradelock" => $rpi->placeholder === 0];
+        }
     }
 
     static function multiresolve(Contact $viewer, Qrequest $qreq, APIData $api) {
         if (!isset($qreq->flags)
             || !($flags = json_decode($qreq->flags))
             || !is_array($flags)) {
-            return ["ok" => false, "error" => "Missing parameter."];
+            return ["ok" => false, "error" => "Missing parameter"];
         }
         if ($qreq->is_post() && !$qreq->valid_post()) {
-            return ["ok" => false, "error" => "Missing credentials."];
+            return ["ok" => false, "error" => "Missing credentials"];
         }
 
         $info = null;

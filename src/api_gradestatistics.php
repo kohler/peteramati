@@ -136,7 +136,7 @@ class GradeStatistics_API {
             $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset={$pset->id})";
         } else {
             $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset={$pset->id})
-                join RepositoryGrade rg on (rg.repoid=l.link and rg.pset={$pset->id} and not rg.placeholder)
+                join RepositoryGrade rg on (rg.repoid=l.link and rg.pset={$pset->id} and rg.placeholder<=0)
                 join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)\n";
         }
         $result = $pset->conf->qe_raw($q . " where $notdropped");

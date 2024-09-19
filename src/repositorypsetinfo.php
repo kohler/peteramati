@@ -42,6 +42,12 @@ class RepositoryPsetInfo {
     /** @var bool */
     public $phantom = true;
 
+    // placeholder values:
+    // 2: user does not want grade; gradebhash is latest
+    // 1: user has not marked grading commit; gradebhash is latest
+    // 0: admin has locked grading commit
+    // -1: user has requested grade
+
     /** @param int $repoid
      * @param int $branchid
      * @param int $pset */
@@ -107,15 +113,6 @@ class RepositoryPsetInfo {
         return $this->jrpnotes;
     }
 
-    /** @param ?string $rpnotes
-     * @param ?object $jrpnotes */
-    function assign_rpnotes($rpnotes, $jrpnotes) {
-        $this->rpnotes = $rpnotes;
-        $this->jrpnotes = $jrpnotes;
-        $this->rpnotesversion = $this->phantom ? 1 : $this->rpnotesversion + 1;
-        $this->phantom = false;
-    }
-
 
     /** @return ?object */
     function jrpxnotes() {
@@ -131,5 +128,110 @@ class RepositoryPsetInfo {
         assert(!$this->phantom);
         $this->rpxnotes = $rpxnotes;
         $this->jrpxnotes = $jrpxnotes;
+    }
+
+
+    /** @param ?object $notes
+     * @return bool */
+    function save_rpnotes($notes, PsetView $info) {
+        CommitPsetInfo::clean_notes($notes);
+        $notestr = json_encode_db($notes);
+        if ($notestr === "null" || $notestr === "{}") {
+            $notestr = $notestra = $notestrb = null;
+        } else {
+            $notestra = strlen($notestr) > 16000 ? null : $notestr;
+            $notestrb = strlen($notestr) > 16000 ? $notestr : null;
+        }
+
+        $rpnotesversion = $this->phantom ? 1 : $this->rpnotesversion + 1;
+
+        if ($this->phantom) {
+            $result = $info->conf->qe("insert into RepositoryGrade set
+                repoid=?, branchid=?, pset=?,
+                placeholder=1, placeholder_at=?,
+                rpnotes=?, rpnotesOverflow=?, rpnotesversion=?
+                on duplicate key update repoid=repoid",
+                $this->repoid, $this->branchid, $this->pset,
+                Conf::$now,
+                $notestra, $notestrb, $rpnotesversion);
+        } else if ($notestr !== $this->rpnotes) {
+            $result = $info->conf->qe("update RepositoryGrade
+                set rpnotes=?, rpnotesOverflow=?, rpnotesversion=?
+                where repoid=? and branchid=? and pset=? and rpnotesversion=?",
+                $notestra, $notestrb, $rpnotesversion,
+                $this->repoid, $this->branchid, $this->pset, $this->rpnotesversion);
+        } else {
+            $result = Dbl_Result::make_affected_rows(1);
+        }
+
+        $ok = $result->affected_rows > 0;
+        $result->close();
+        if (!$ok) {
+            $this->reload($info->conf);
+            return false;
+        }
+
+        if ($this->phantom) {
+            $this->phantom = false;
+            $this->placeholder = 1;
+            $this->placeholder_at = Conf::$now;
+        }
+        $this->rpnotes = $notestr;
+        $this->jrpnotes = $notes;
+        $this->rpnotesversion = $rpnotesversion;
+        return true;
+    }
+
+    const SGC_ADMIN = 0;
+    const SGC_USER = 1;
+    const SGC_PLACEHOLDER = 2;
+
+    /** @param null|-1|0|1|2 $placeholder
+     * @param 0|1|2 $utype */
+    function save_grading_commit(?CommitRecord $commit, $placeholder, $utype, Conf $conf) {
+        assert($commit || $placeholder > 0);
+        $bhash = $commit ? hex2bin($commit->hash) : null;
+        if (!$commit && $placeholder === 1 && $this->phantom) {
+            return;
+        }
+
+        $this->materialize($conf);
+        if ($utype === self::SGC_ADMIN) {
+            $conf->qe("update RepositoryGrade
+                set gradebhash=?, commitat=?,
+                placeholder=?, placeholder_at=?,
+                emptydiff_at=(if(gradebhash!=?,null,emptydiff_at))
+                where repoid=? and branchid=? and pset=?",
+                $bhash, $commit ? $commit->commitat : null,
+                $placeholder, Conf::$now,
+                $bhash,
+                $this->repoid, $this->branchid, $this->pset);
+            if ($bhash !== $this->gradebhash) {
+                $this->emptydiff_at = null;
+            }
+            $this->gradebhash = $bhash;
+            $this->gradehash = $commit ? $commit->hash : null;
+            $this->placeholder = $placeholder;
+            $this->placeholder_at = Conf::$now;
+        } else {
+            if ($utype === self::SGC_USER) {
+                $pmatch = $psetmatch = "placeholder!=0";
+            } else {
+                $pmatch = "placeholder>0";
+                $psetmatch = "0";
+            }
+            $conf->qe("update RepositoryGrade
+                set gradebhash=(if({$pmatch},?,gradebhash)),
+                commitat=(if({$pmatch},?,commitat)),
+                placeholder=(if({$psetmatch},?,placeholder)), placeholder_at=?,
+                emptydiff_at=(if({$pmatch} and gradebhash!=?,null,emptydiff_at))
+                where repoid=? and branchid=? and pset=?",
+                $bhash,
+                $commit ? $commit->commitat : null,
+                $placeholder, Conf::$now,
+                $bhash,
+                $this->repoid, $this->branchid, $this->pset);
+            $this->reload($conf);
+        }
     }
 }

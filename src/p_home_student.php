@@ -30,6 +30,10 @@ class Home_Student_Page {
             htmlspecialchars($info->pset->title), "</a>";
         $x = [];
         $c = null;
+        if ($info->is_do_not_grade()) {
+            $x[] = "unready";
+            $c = "gradesmissing";
+        }
         if ($info->user_can_view_some_grade() && $info->needs_answers()) {
             $x[] = "empty";
             $c = "gradesmissing";
@@ -40,7 +44,7 @@ class Home_Student_Page {
             } else {
                 $x[] = "grade partially ready";
             }
-            $c = "gradesready";
+            $c = $c ?? "gradesready";
         }
         if ($x) {
             echo ' <a class="', $c, '" href="', $pseturl, '">(', join(", ", $x), ')</a>';

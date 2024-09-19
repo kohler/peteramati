@@ -269,7 +269,7 @@ class Conf {
 
         // update schema
         $this->sversion = $this->settings["allowPaperOption"];
-        if ($this->sversion < 174) {
+        if ($this->sversion < 177) {
             $old_nerrors = Dbl::$nerrors;
             (new UpdateSchema($this))->run();
             Dbl::$nerrors = $old_nerrors;
@@ -2101,9 +2101,14 @@ class Conf {
                 && (($Me->privChair && strcasecmp($actas, $Me->email) !== 0)
                     || Contact::$base_auth_user)) {
                 // Link becomes true user if not currently chair.
-                $actas = Contact::$base_auth_user ? Contact::$base_auth_user->email : $actas;
+                if (($u = Contact::$base_auth_user)) {
+                    $arg = ["actas" => null, "u" => $Me->email];
+                    $actas = Contact::$base_auth_user->email;
+                } else {
+                    $arg = ["actas" => $actas];
+                }
                 $profile_parts[] = "<a href=\""
-                    . $this->selfurl(null, ["actas" => Contact::$base_auth_user ? null : $actas]) . "\">"
+                    . $this->selfurl(null, $arg) . "\">"
                     . (Contact::$base_auth_user ? "Admin" : htmlspecialchars($actas))
                     . "&nbsp;" . Ht::img("viewas.png", "Act as " . htmlspecialchars($actas))
                     . "</a>";
@@ -2713,6 +2718,7 @@ class Conf {
             "filediff" => "15 Repo_API::filediff",
             "flag" => "15 Flag_API::flag",
             "grade" => "3 Grade_API::grade",
+            "gradeflag" => "15 Flag_API::gradeflag",
             "gradesettings" => "3 Grade_API::gradesettings",
             "gradestatistics" => "3 GradeStatistics_API::run",
             "jserror" => "1 JSError_API::jserror",
