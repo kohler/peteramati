@@ -55,6 +55,9 @@ class Report_Page {
                 foreach ($this->pset->tabular_grades() as $ge) {
                     $this->fields[] = $ge->key;
                 }
+            } else if ($this->report === "nameemail") {
+                $this->filename = "nameemail";
+                $this->fields = ["email", "last", "first"];
             }
         }
     }
