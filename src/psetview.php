@@ -305,7 +305,7 @@ class PsetView {
 
     /** @return ?non-empty-string */
     function grading_hash() {
-        $rpi = $this->pset->gitless_grades ? null : $this->rpi();
+        $rpi = $this->pset->gitless ? null : $this->rpi();
         return $rpi && $rpi->placeholder <= 0 ? $rpi->gradehash : null;
     }
 
@@ -486,24 +486,22 @@ class PsetView {
 
     /** @return bool */
     function is_grading_commit() {
-        return $this->pset->gitless_grades
-            || ($this->_hash !== null
-                && ($rpi = $this->rpi())
-                && $rpi->placeholder <= 0
-                && $rpi->gradehash === $this->_hash);
+        assert(!$this->pset->gitless);
+        return $this->_hash !== null
+            && ($rpi = $this->rpi())
+            && $rpi->placeholder <= 0
+            && $rpi->gradehash === $this->_hash;
     }
 
     /** @return bool */
     function has_grading_commit() {
-        return $this->pset->gitless_grades
-            && ($rpi = $this->rpi())
+        return ($rpi = $this->rpi())
             && $rpi->placeholder <= 0;
     }
 
     /** @return bool */
     function is_do_not_grade() {
-        return !$this->pset->gitless_grades
-            && ($rpi = $this->rpi())
+        return ($rpi = $this->rpi())
             && $rpi->placeholder === 2;
     }
 
@@ -2004,7 +2002,9 @@ class PsetView {
         }
 
         $this->ensure_grades();
-        if ($this->_g !== null || $this->is_grading_commit()) {
+        if ($this->_g !== null
+            || $this->pset->gitless_grades
+            || $this->is_grading_commit()) {
             $this->grade_export_grades($gexp);
             $this->grade_export_linenotes($gexp);
             $this->grade_export_updates($gexp);
@@ -2016,16 +2016,23 @@ class PsetView {
 
         if (!$this->pset->gitless) {
             $gexp->commit = $this->hash();
-        }
-        if (!$this->pset->gitless_grades && !$this->is_grading_commit()) {
-            $gexp->grade_commit = $this->grading_hash();
+            if (!$this->is_grading_commit()) {
+                $gexp->grade_commit = $this->grading_hash();
+            }
         }
         if (!($flags & self::GRADEJSON_NO_LATE_HOURS)) {
             $this->grade_export_late_hours($gexp);
         }
-        if ($this->pset->gitless_grades
-            && ($xpi = $this->pset->gitless ? $this->upi() : $this->rpi())) {
-            $gexp->version = $xpi->notesversion;
+        if ($this->pset->gitless_grades) {
+            if ($this->pset->gitless) {
+                if (($upi = $this->upi())) {
+                    $gexp->version = $upi->notesversion;
+                }
+            } else {
+                if (($rpi = $this->rpi())) {
+                    $gexp->version = $rpi->rpnotesversion;
+                }
+            }
         }
         if (($ts = $this->student_timestamp(false))) {
             $gexp->student_timestamp = $ts;

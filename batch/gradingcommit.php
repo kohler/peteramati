@@ -72,7 +72,7 @@ class GradingCommit_Batch {
      * @return bool */
     function match($s) {
         foreach ($this->usermatch as $m) {
-            if (fnmatch($m, $s))
+            if ($s !== null && fnmatch($m, $s))
                 return true;
         }
         return empty($this->usermatch);
@@ -127,15 +127,13 @@ class GradingCommit_Batch {
                 || ($this->commitq && !$info->select_commit($this->commitq))) {
                 if ($this->verbose) {
                     $key = $this->hash ? $this->unparse_key($info, $this->hash) : $this->unparse_hashless_key($info);
-                    fwrite(STDERR, "{$key}: no such commit on {$info->branch}{$chainstr}\n");
+                    fwrite(STDERR, "{$key}: no such commit on {$info->branch}\n");
                 }
                 continue;
             }
-            fwrite(STDERR, $this->unparse_key($info, $info->hash()) . "\n");
-            fwrite(STDERR, ". " . $this->unparse_key($info, $info->hash()) . "\n");
             if ($this->clear || $this->nograde) {
                 $info->rpi()->save_grading_commit($info->latest_commit(), $this->nograde ? 2 : 1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
-            } else if ($info->commit()) {
+            } else if ($info->hash()) {
                 $info->rpi()->save_grading_commit($info->commit(), $this->lock ? 0 : -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
             }
             ++$nadded;

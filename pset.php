@@ -750,7 +750,9 @@ class PsetRequest {
         $rpi = $this->info->rpi();
         echo '<div>';
         $gradelock = $rpi->placeholder === 0;
-        if ($admin) {
+        if ($this->pset->gitless_grades || (!$admin && $this->pset->frozen)) {
+            // skip
+        } else if ($admin) {
             echo '<div class="btnbox mr-3">',
                 Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade" . ($this->info->is_grading_commit() ? " active" : "")]),
                 Ht::button("🔒", ["class" => "ui pa-flagger-gradelock" . ($this->info->is_grading_commit() && $gradelock ? " active" : "")]),
@@ -758,7 +760,7 @@ class PsetRequest {
         } else if (!$gradelock) {
             echo Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade mr-3" . ($this->info->is_grading_commit() ? " active" : "")]);
         }
-        if ($admin || !$gradelock) {
+        if ($admin || (!$gradelock && !$this->pset->frozen)) {
             echo Ht::button("DO NOT GRADE", ["class" => "ui pa-flagger-nograde mr-4" . ($this->info->is_do_not_grade() ? " active" : "")]);
         }
         echo Ht::button("Flag this commit", ["class" => "ui pa-flagger" . ($all_resolved ? "" : " hidden"), "name" => "flag"]),
