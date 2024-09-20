@@ -98,7 +98,7 @@ class GradingCommit_Batch {
     /** @param PsetView $info
      * @return string */
     private function unparse_hashless_key($info) {
-        return "~{$info->user->username}/{$info->pset->urlkey}/{$this->runner->name}";
+        return "~{$info->user->username}/{$info->pset->urlkey}";
     }
 
     /** @param PsetView $info
@@ -106,7 +106,7 @@ class GradingCommit_Batch {
      * @return string */
     private function unparse_key($info, $hash = null) {
         $hash = $hash ?? $info->hash() ?? "none";
-        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}/{$this->runner->name}";
+        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}";
     }
 
     /** @return int */
@@ -131,13 +131,12 @@ class GradingCommit_Batch {
                 }
                 continue;
             }
-            if (!$info->hash()) {
-                continue;
-            }
+            fwrite(STDERR, $this->unparse_key($info, $info->hash()) . "\n");
+            fwrite(STDERR, ". " . $this->unparse_key($info, $info->hash()) . "\n");
             if ($this->clear || $this->nograde) {
                 $info->rpi()->save_grading_commit($info->latest_commit(), $this->nograde ? 2 : 1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
-            } else {
-                $info->rpi()->save_grading_commit($this->clear ? null : $info->commit(), $this->lock ? 0 : -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
+            } else if ($info->commit()) {
+                $info->rpi()->save_grading_commit($info->commit(), $this->lock ? 0 : -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
             }
             ++$nadded;
         }
