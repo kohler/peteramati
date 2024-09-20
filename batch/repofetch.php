@@ -1,6 +1,6 @@
 <?php
-// updaterecordedjobs.php -- Peteramati script for updating database information
-// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
+// repofetch.php -- Peteramati script for fetching a remote repository
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {

@@ -427,7 +427,7 @@ class PsetView {
      * @return ?SearchExpr */
     static function parse_commit_query($q) {
         $cq = trim($q ?? "");
-        if ($cq === "" || $cq === "grading") {
+        if ($cq === "" || $cq === "grading" || $cq === "grade") {
             return null;
         }
         $sp = new SearchParser($cq);
@@ -453,11 +453,14 @@ class PsetView {
             }
             return false;
         }
-        if ($e->text === "latest") {
+        if ($e->text === "latest" || $e->text === "head") {
             // assume traverse in reverse order
             return true;
         }
-        if ($e->text === "grading") {
+        if ($e->text === "handout") {
+            return $this->is_handout_commit();
+        }
+        if ($e->text === "grading" || $e->text === "grade") {
             return $this->is_grading_commit();
         }
         return str_starts_with($this->hash(), $e->text);
