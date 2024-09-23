@@ -159,15 +159,15 @@ class Home_TA_Page {
             }
         }
 
-        echo '<div>',
+        echo '<section class="gtable-section">',
             Ht::form("", ["id" => "pa-pset-flagged"]),
-            '<h3 class="pset-title">flagged commits</h3>',
+            '<header class="gtable-section-header"><h3 class="pset-title">flagged commits</h3></header>',
             '<div class="gtable-container-0">',
             '<div class="gtable-container-1">',
             '<div class="gtable-container-2">',
             '<table class="gtable want-gtable-fixed"></table></div></div></div>',
             Ht::button("Resolve flags", ["class" => "btn ui js-multiresolveflag"]),
-            '</form></div>', "\n";
+            '</form>', "\n";
         $jd = [
             "id" => "flagged",
             "flagged_commits" => true,
@@ -182,7 +182,7 @@ class Home_TA_Page {
             $jd["need_total"] = 1;
         }
         echo Ht::unstash(), '<script>$pa.pset_table($("#pa-pset-flagged")[0],',
-            json_encode_browser($jd), ',', json_encode_browser($jx), ')</script>';
+            json_encode_browser($jd), ',', json_encode_browser($jx), ')</script></section>';
         return true;
     }
 
@@ -417,18 +417,18 @@ class Home_TA_Page {
 
         $psettitle = "pset-title"
             . ($pset->disabled || !$pset->visible ? " pa-p-hidden\">" : "\">")
-            . ($pset->visible && !$pset->scores_visible ? '<span class="pa-scores-hidden-marker"></span>' : '')
             . htmlspecialchars($pset->title);
 
-        echo '<form id="', $pset->urlkey, '">';
-        echo '<h3 class="', $psettitle;
+        echo '<section class="gtable-section"><form id="', $pset->urlkey, '"><header class="gtable-section-header">';
+        echo '<h3 class="', $psettitle, "</h3>";
         if ($this->viewer->privChair) {
             echo '<button type="button" class="btn-t small ui js-pset-gconfig ml-2"><span class="filter-gray-if-disabled">⚙️</span></button>';
         }
-        echo "</h3>";
+        echo '<input type="search" class="uii js-ptable-search ml-2" placeholder="Search">';
+        echo '</header>';
         if ($pset->disabled) {
             echo Ht::unstash_script('$pa.pset_table($("#' . $pset->urlkey . '")[0],' . json_encode_browser($jd) . ',null)'),
-                "</form>\n";
+                "</section></form>\n";
             return;
         }
 
@@ -495,7 +495,7 @@ class Home_TA_Page {
         echo Ht::unstash(),
             '<script>$pa.pset_table($("#', $pset->urlkey, '")[0],',
             json_encode_browser($jd), ',',
-            json_encode_browser($jx), ')</script></form>';
+            json_encode_browser($jx), ')</script></form></section>';
     }
 
 
@@ -544,7 +544,6 @@ class Home_TA_Page {
 
         // show flags
         if ($this->render_flags_table(!!$this->qreq->allflags)) {
-            $any = true;
             $this->profile && $this->profile_step();
         }
 
@@ -563,9 +562,7 @@ class Home_TA_Page {
                     $sset = new StudentSet($this->viewer, $ssflags ? : StudentSet::ALL);
                 }
                 $sset->set_pset($pset);
-                echo $any ? "<hr>" : "";
                 $this->render_pset_table($sset);
-                $any = true;
                 $this->profile && $this->profile_step();
             }
         }

@@ -2738,6 +2738,24 @@ td.mhcb {
 	background: yellow;
 }
 
+.gtable-section {
+	margin-bottom: 1rem;
+	margin-top: 1rem;
+}
+.gtable-section + .gtable-section {
+	border-top: 1px solid silver;
+	padding-top: 1rem;
+}
+.gtable-section-header {
+	display: flex;
+	align-items: baseline;
+	margin-bottom: 1rem;
+}
+.gtable-section-header > h3 {
+	display: inline-block;
+	margin-bottom: 0;
+}
+
 .gtable, .gtable-left-pin, .gtable-top-pin {
 	font-size: 75%;
 	line-height: 1.5;

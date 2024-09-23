@@ -6,11 +6,12 @@ import { hasClass, addClass, removeClass, toggleClass,
          handle_ui } from "./ui.js";
 import { wstorage, sprintf, strftime } from "./utils.js";
 import { hoturl } from "./hoturl.js";
-import { escape_entities } from "./encoders.js";
+import { escape_entities, regexp_quote } from "./encoders.js";
 import { GradeSheet } from "./gradeentry.js";
 import { popup_skeleton } from "./popup.js";
 import { tooltip } from "./tooltip.js";
 import { ptable_gdialog } from "./ptable-grades.js";
+import { SearchParser } from "./search.js";
 
 
 function render_name(s, last_first) {
@@ -135,6 +136,8 @@ class PtableConf {
         this.mode = 0;
         this.smap = [null];
         this.uidmap = [];
+
+        this.input_timeout = null;
     }
 
     set_gradesheet(gi) {
@@ -346,6 +349,11 @@ class PtableConf {
 
     get SOME_USERS() {
         return SOME_USERS;
+    }
+
+    user_at(tr) {
+        const spos = tr.getAttribute("data-pa-spos");
+        return spos ? this.smap[spos] : null;
     }
 
     users_in(form, users) {
@@ -1125,10 +1133,9 @@ function ptable_permute(ptconf, table, data) {
         rmap = ptable_permute_rmap(table),
         mode = table.classList.contains("gtable-left-pin") ? 2 : 0,
         klasses = ["k0", "k1"];
-    let was_boringness = false, trn = 0,
+    let was_boringness = false, trn = 1,
         last = tb.firstChild;
-    for (let i = 0; i !== data.length; ++i) {
-        const su = data[i];
+    for (const su of data) {
         if (su.boringness !== was_boringness && was_boringness !== false) {
             if (last && last.className === "gt-boring") {
                 last = last.nextSibling;
@@ -1144,7 +1151,7 @@ function ptable_permute(ptconf, table, data) {
             tb.removeChild(tr);
         }
 
-        ++trn;
+        let any_visible = false;
         for (const ss of su.partners ? [su, ...su.partners] : [su]) {
             const tr = rmap[ss._spos]
                 || ptconf.render_table_row(su, su === ss ? mode : mode | 1);
@@ -1155,10 +1162,11 @@ function ptable_permute(ptconf, table, data) {
             }
             tr.classList.remove(klasses[(trn ^ 1) & 1]);
             tr.classList.add(klasses[trn & 1]);
+            any_visible = any_visible || !tr.hidden;
         }
+        any_visible && ++trn;
     }
 }
-
 
 
 export function pa_pset_table(form, pconf, data) {
@@ -1680,6 +1688,88 @@ tooltip.add_builder("pa-ptable-user", function () {
         resolve(maindiv);
     }), delay: 400, className: "gray small ml-2", dir: "w",
         noDelayClass: "pa-ptable-user"};
+});
+
+
+function ptable_recolor(tb) {
+    const klasses = ["k0", "k1"];
+    let trn = 1, boring = null;
+    for (let tr = tb.firstChild; tr; tr = tr.nextElementSibling) {
+        if (tr.className === "gt-boring") {
+            tr.hidden = true;
+            boring = trn > 1 ? tr : null;
+            continue;
+        } else if (tr.hidden) {
+            continue;
+        }
+        tr.classList.remove(klasses[(trn ^ 1) & 1]);
+        tr.classList.add(klasses[trn & 1]);
+        if (!tr.classList.contains("gtrow-partner")) {
+            ++trn;
+        }
+        if (boring) {
+            boring.hidden = false;
+            boring = null;
+        }
+    }
+}
+
+let search_target, search_target_success;
+
+function evaluate_search(se) {
+    if (se.kword) {
+        return false;
+    }
+    if (!se.info) {
+        se.info = new RegExp(regexp_quote(se.text), "i");
+    }
+    return se.info.test(search_target.first)
+        || se.info.test(search_target.last)
+        || se.info.test(search_target.email)
+        || se.info.test(search_target.user);
+}
+
+function ptable_search_check(ptconf, trx, sexpr) {
+    search_target = ptconf.user_at(trx);
+    return !!search_target && sexpr.evaluate_simple(evaluate_search);
+}
+
+function ptable_search(search) {
+    return function () {
+        const form = search.closest("form");
+        let ptconf = form.pa__ptconf,
+            pexpr = new SearchParser(search.value).parse_expression();
+        if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
+            pexpr = null;
+        }
+        let changed = false;
+        const ptbodies = $(form).find("table.gtable > tbody").toArray(),
+            trs = ptbodies.map((tb) => tb.firstChild);
+        let trx = trs[0], last_boring;
+        search_target_success = false;
+        while (trx !== null) {
+            const hide = !!pexpr && !ptable_search_check(ptconf, trx, pexpr);
+            if (hide !== trx.hidden) {
+                changed = true;
+                for (const tr of trs) {
+                    tr.hidden = hide;
+                }
+            }
+            trx = trx.nextElementSibling;
+            for (let i = 0; i !== trs.length; ++i) {
+                trs[i] = trs[i].nextElementSibling;
+            }
+        }
+        if (changed) {
+            ptbodies.forEach((tb) => ptable_recolor(tb));
+        }
+    };
+}
+
+handle_ui.on("js-ptable-search", function () {
+    let ptconf = this.closest("form").pa__ptconf;
+    ptconf.input_timeout && clearTimeout(ptconf.input_timeout);
+    ptconf.input_timeout = setTimeout(ptable_search(this), 300);
 });
 
 
