@@ -408,7 +408,7 @@ class GradeEntry {
         } else if (ctype_digit($v)) {
             return (int) $v;
         } else {
-            return new GradeError("Invalid timermark.");
+            return new GradeError("Invalid timermark");
         }
     }
 
@@ -441,7 +441,7 @@ class GradeEntry {
         } else if (strcasecmp($v, "auto") === 0) {
             return null;
         } else {
-            return new GradeError("Invalid letter grade.");
+            return new GradeError("Invalid letter grade");
         }
     }
 
@@ -463,7 +463,7 @@ class GradeEntry {
         } else if (strcasecmp($v, "auto") === 0) {
             return null;
         } else {
-            return new GradeError("Number expected.");
+            return new GradeError("Number expected");
         }
     }
 
@@ -490,7 +490,7 @@ class GradeEntry {
             $v = strtolower($v);
             while ($v !== "") {
                 if (!preg_match('/\A(\d+\.?|\d*\.\d+)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
-                    return new GradeError("Invalid duration.");
+                    return new GradeError("Invalid duration");
                 }
                 if ($m[2] === "s") {
                     $mul = 1;
@@ -504,7 +504,7 @@ class GradeEntry {
                     $mul = 86400 * 7;
                 }
                 if ($mul >= $lastmul) {
-                    return new GradeError("Invalid duration.");
+                    return new GradeError("Invalid duration");
                 }
                 $d += floatval($m[1]) * $mul;
                 $v = $m[3];
@@ -518,7 +518,7 @@ class GradeEntry {
     /** @param bool $isnew */
     function parse_value($v, $isnew) {
         if ($this->type === "formula") {
-            return new GradeError("Formula grades cannot be edited.");
+            return new GradeError("Formula grades cannot be edited");
         }
         if ($v === null || is_int($v) || is_float($v)) {
             return $v;
@@ -541,7 +541,7 @@ class GradeEntry {
                 return self::parse_numeric_value($v);
             }
         }
-        return new GradeError("Invalid grade.");
+        return new GradeError("Invalid grade");
     }
 
     function unparse_value($v) {
@@ -579,15 +579,15 @@ class GradeEntry {
         if (!$this->value_differs($newv, $oldv)) {
             return true;
         } else if ($this->disabled) {
-            return new GradeError("Cannot modify grade.");
+            return new GradeError("Cannot modify grade");
         } else if ($info->pc_view) {
             return true;
         } else if ($this->visible === false || !$this->answer) {
-            return new GradeError("Cannot modify grade.");
+            return new GradeError("Cannot modify grade");
         } else if ($this->pset->frozen) {
-            return new GradeError("You can’t edit your answers further.");
+            return new GradeError("You can’t edit your answers further");
         } else if ($this->type === "timermark" && $oldv) {
-            return new GradeError("Time already started.");
+            return new GradeError("Time already started");
         } else {
             return true;
         }
@@ -723,6 +723,6 @@ class GradeError {
 
     /** @param ?string $m */
     function __construct($m = null) {
-        $this->message = $m ?? "Invalid grade.";
+        $this->message = $m ?? "Invalid grade";
     }
 }
