@@ -2,8 +2,8 @@
 // Peteramati is Copyright (c) 2006-2020 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-const ee_re = /[&<>\"']/g,
-    ee_rep = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "\'": "&#39;"};
+const ee_re = /[&<>"']/g,
+    ee_rep = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"};
 
 export function escape_entities(s) {
     if (s !== null && typeof s !== "number")
@@ -47,9 +47,9 @@ export function text_to_html(text) {
 
 export function regexp_quote(s, charclass) {
     if (!charclass) {
-        s = String(s).replace(/([$()*+.\/?\[\\\]^{|}])/g, '\\$1');
+        s = String(s).replace(/([$()*+./?[\\\]^{|}])/g, '\\$1');
     } else {
-        s = String(s).replace(/([-$()*+.\/?\[\\\]^{|}])/g, '\\$1');
+        s = String(s).replace(/([-$()*+./?[\\\]^{|}])/g, '\\$1');
     }
     return s.replace(/\x08/g, '\\x08');
 }

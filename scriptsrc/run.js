@@ -586,7 +586,7 @@ export function run(button, opts) {
                     }
                     ok = true;
                 }
-            } catch (e) {
+            } catch {
             }
         }
         ok || error_eventsource();

@@ -55,7 +55,7 @@ function draw_grgraph() {
                     && plotarg.at >= new Date().getTime() - 7200000) {
                     plot_type = plotarg.type;
                 }
-            } catch (e) {
+            } catch {
             }
         }
     }

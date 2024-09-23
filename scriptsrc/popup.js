@@ -92,7 +92,7 @@ function focus_at(felt) {
         } else if (felt.setSelectionRange) {
             try {
                 felt.setSelectionRange(felt.value.length, felt.value.length);
-            } catch (e) { // ignore errors
+            } catch { // ignore errors
             }
         }
         felt.hotcrp_ever_focused = true;

@@ -18,11 +18,11 @@ try {
                     return s.setItem(key, JSON.stringify(value));
                 else
                     return s.setItem(key, value);
-            } catch (err) {
+            } catch {
                 return false;
             }
         };
-} catch (err) {
+} catch {
 }
 wstorage.json = function (is_session, key) {
     var x = wstorage(is_session, key);
@@ -276,7 +276,7 @@ export class ImmediatePromise {
     finally(executor) {
         try {
             executor();
-        } catch (e) {
+        } catch {
         }
         return this;
     }
@@ -296,7 +296,6 @@ export function text_eq(a, b) {
 
 export function string_utf8_index(str, index) {
     let r = 0, pos = 0;
-    // eslint-disable-next-line no-control-regex
     const re = /([\x00-\x7F]*)([\u0080-\u07FF]*)([\u0800-\uD7FF\uE000-\uFFFF]*)((?:[\uD800-\uDBFF][\uDC00-\uDFFF])*)/y, len = str.length;
     while (pos < len && index > 0) {
         re.lastIndex = pos;

@@ -19,7 +19,7 @@ handle_ui.on("js-repo-copy", function () {
     window.getSelection().addRange(range);
     try {
         document.execCommand("copy");
-    } catch (err) {
+    } catch {
     }
     window.getSelection().removeAllRanges();
     bub.remove();

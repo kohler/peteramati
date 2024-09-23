@@ -92,7 +92,7 @@ function ptable_diffdialog(ptconf, sus) {
                 if (name !== "" && /^[-A-Z a-z]*$/.test(name)) {
                     us.push(name.concat(" <", su.email, ">"));
                 } else if (name !== "") {
-                    name = name.replace(/\"/g, "\\\"");
+                    name = name.replace(/"/g, "\\\"");
                     us.push("\"".concat(name, "\" <", su.email, ">"));
                 } else {
                     us.push(su.email);

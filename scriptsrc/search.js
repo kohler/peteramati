@@ -47,7 +47,7 @@ class SearchOperator {
     }
 }
 
-const REGEXP_TERMINATOR = /[\s\(\)\[\]\{\}]/y;
+const REGEXP_TERMINATOR = /[\s()[\]{}]/y;
 
 class SearchOperatorSet {
     #a;
@@ -94,7 +94,7 @@ class SearchOperatorSet {
             if ((op.flags & (OP_SUBTYPE | OP_UNNAMED)) !== 0) {
                 continue;
             }
-            if (/^[-!"#$%&'()*+,.\/:;<=>?@\[\\\]^_`{|}~]+$/.test(name)) {
+            if (/^[-!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~]+$/.test(name)) {
                 if (name.length === 1) {
                     ch += regexp_quote(name, true);
                 } else {

@@ -42,7 +42,7 @@ function add_format(r) {
 
 
 function link_urls(t) {
-    var re = /((?:https?|ftp):\/\/(?:[^\s<>\"&]|&amp;)*[^\s<>\"().,:;&])([\"().,:;]*)(?=[\s<>&]|$)/g;
+    var re = /((?:https?|ftp):\/\/(?:[^\s<>"&]|&amp;)*[^\s<>"().,:;&])(["().,:;]*)(?=[\s<>&]|$)/g;
     return t.replace(re, function (m, a, b) {
         return '<a href="' + a + '" rel="noreferrer">' + a + '</a>' + b;
     });
@@ -96,7 +96,7 @@ function try_highlight(str, lang, langAttr, token) {
                 hlstr = lines.join("\n") + "\n";
             }
             return hlstr;
-        } catch (ex) {
+        } catch {
         }
     }
     return "";
@@ -153,7 +153,7 @@ export function render_onto(context, format, text) {
     }
     try {
         render_with(context, renderers[format] || renderers[0], text);
-    } catch (err) {
+    } catch {
         render_with(context, renderers[0], text);
         delete renderers[format];
     }

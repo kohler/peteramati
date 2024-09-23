@@ -207,7 +207,7 @@ function fold(which, dofold, foldtype) {
         if (document.recalc)
             try {
                 which.innerHTML = which.innerHTML + "";
-            } catch (err) {
+            } catch {
             }
     }
 

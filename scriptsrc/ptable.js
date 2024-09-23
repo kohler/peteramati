@@ -1202,7 +1202,7 @@ function pa_render_pset_table(ptconf) {
                     sort = ptconf.sort = x;
                     delete sort.override_anonymous; // XXX backward compat 21-Dec-2022
                 }
-            } catch (e) {
+            } catch {
             }
         }
         if (!sort.f || !/^\w+$/.test(sort.f)) {

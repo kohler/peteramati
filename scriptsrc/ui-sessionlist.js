@@ -62,7 +62,7 @@ function list_digest_resolve(info) {
 }
 
 function set_prevnext(info, sitehref) {
-    var m = /(?:^|\/)(~[^\/]+)\/pset(?:|\.php)\/([^\/]+)((?:\/[0-9a-f]+)?)(?=[\/?#]|$)/.exec(sitehref), want1, want2;
+    var m = /(?:^|\/)(~[^/]+)\/pset(?:|\.php)\/([^/]+)((?:\/[0-9a-f]+)?)(?=[/?#]|$)/.exec(sitehref), want1, want2;
     if (m) {
         info = JSON.parse(info);
         if (!info.pset) {
@@ -96,7 +96,7 @@ function set_cookie(info, sitehref) {
     }
     cookie_set_at = new Date().getTime();
     let cookie = `hotlist-info-${cookie_set_at}=${encodeURIComponent(digest)}${siteinfo.cookie_params}; Max-Age=20`, m;
-    if (siteinfo.site_relative && (m = /^[a-z]+:\/\/[^\/]*(\/.*)/.exec(hoturl_absolute_base()))) {
+    if (siteinfo.site_relative && (m = /^[a-z]+:\/\/[^/]*(\/.*)/.exec(hoturl_absolute_base()))) {
         cookie += "; Path=" + m[1];
     }
     document.cookie = cookie;

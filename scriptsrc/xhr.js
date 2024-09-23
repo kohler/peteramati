@@ -57,7 +57,7 @@ $(document).ajaxError(function (event, jqxhr, settings, httperror) {
     if (jqxhr.responseText && jqxhr.responseText.charAt(0) === "{") {
         try {
             data = JSON.parse(jqxhr.responseText);
-        } catch (e) {
+        } catch {
         }
     }
     check_message_list(data, settings);
@@ -90,7 +90,7 @@ $.ajaxPrefilter(function (options /* originalOptions, jqxhr */) {
         if (typeof data === "object"
             && data.sessioninfo
             && options.url.startsWith(siteinfo.site_relative)
-            && (siteinfo.site_relative !== "" || !/^(?:[a-z][-a-z0-9+.]*:|\/|\.\.(?:\/|\z))/i.test(options.url))) {
+            && (siteinfo.site_relative !== "" || !/^(?:[a-z][-a-z0-9+.]*:|\/|\.\.(?:\/|$))/i.test(options.url))) {
             check_sessioninfo(data, options);
         }
     }
@@ -100,7 +100,7 @@ $.ajaxPrefilter(function (options /* originalOptions, jqxhr */) {
             && jqxhr.responseText) {
             try {
                 rjson = JSON.parse(jqxhr.responseText);
-            } catch (e) {
+            } catch {
             }
         }
         if (!rjson

@@ -382,7 +382,7 @@ export class GradeEntry {
             let m, gch;
             if (note.text
                 && ((m = /^[\s❮→]*(\+)(\d+(?:\.\d+)?|\.\d+)((?![.,]\w|[\w%$*])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text))
-                    || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*\/])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text)))) {
+                    || (m = /^[\s❮→]*()(\d+(?:\.\d+)?|\.\d+)(\/[\d.]+(?![.,]\w|[\w%$*/])\S*?)[.,;:❯]?(?:\s|$)/.exec(note.text)))) {
                 if (sum === null) {
                     sum = 0.0;
                 }
@@ -752,7 +752,7 @@ export class GradeSheet {
             try {
                 let x = JSON.parse(element.getAttribute("data-pa-gradeinfo") || "{}");
                 gi.assign(x);
-            } catch (err) {
+            } catch {
             }
         }
         Object.defineProperty(element, "pa__gradesheet", {

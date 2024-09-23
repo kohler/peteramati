@@ -8,7 +8,7 @@ import { push_history_state } from "./ui-history.js";
 
 function hash_parse(hash) {
     hash = hash.replace(/^[^#]*/, "");
-    let regex = /([^#=\/]+)[=\/]?([^\/]*)/g, m, h = {};
+    let regex = /([^#=/]+)[=/]?([^/]*)/g, m, h = {};
     while ((m = regex.exec(hash))) {
         h[m[1]] = decodeURIComponent(m[2].replace(/\+/g, " "));
     }

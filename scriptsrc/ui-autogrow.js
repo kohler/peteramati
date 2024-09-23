@@ -98,7 +98,7 @@ function make_input_autogrower(self) {
         var width = 0;
         try {
             width = self.offsetWidth;
-        } catch (e) { // IE11 is annoying here
+        } catch { // IE11 is annoying here
         }
         if (width <= 0) {
             return;

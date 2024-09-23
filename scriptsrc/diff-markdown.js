@@ -18,7 +18,7 @@ function hljs_line(lang, s, hlstate) {
             result.value = ns.substring(0, ns.length - 1);
         }
         return result;
-    } catch (exc) {
+    } catch {
         return null;
     }
 }
@@ -85,17 +85,17 @@ function modify_landmark_image(base) {
             && (pi = mdcontext.closest(".pa-psetinfo"))) {
             if (!/\/\//.test(src)) {
                 var fd = Filediff.closest(mdcontext),
-                    dir = fd ? fd.file.replace(/^(.*)\/[^\/]*$/, '$1') : "";
+                    dir = fd ? fd.file.replace(/^(.*)\/[^/]*$/, '$1') : "";
                 while (true) {
                     if (src.startsWith("./")) {
                         src = src.substring(2).replace(/^\/+/, "");
                     } else if (src.startsWith("../") && dir !== "") {
                         src = src.substring(3).replace(/^\/+/, "");
-                        dir = dir.replace(/(?:^|\/)[^\/]+\/*$/, "");
+                        dir = dir.replace(/(?:^|\/)[^/]+\/*$/, "");
                     } else if (src.startsWith("../") || src.startsWith("/")) {
                         src = null;
                         break;
-                    } else if ((m = src.match(/(^|\/+)[^\/]+\/\.\.(?:\/+|$)(.*)$/))) {
+                    } else if ((m = src.match(/(^|\/+)[^/]+\/\.\.(?:\/+|$)(.*)$/))) {
                         src = m[1] + m[2];
                     } else {
                         break;
@@ -106,7 +106,7 @@ function modify_landmark_image(base) {
                 } else {
                     token.attrs[srci][1] = "data:image/jpg,";
                 }
-            } if ((m = src.match(/^https:\/\/github\.com\/([^\/]+\/[^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.*)$/))
+            } if ((m = src.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:blob|raw)\/([^/]+)\/(.*)$/))
                   && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
                   && m2[1] == m[1]
                   && pi.getAttribute("data-pa-branch") == m[2]) {

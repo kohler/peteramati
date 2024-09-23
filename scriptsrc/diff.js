@@ -43,7 +43,7 @@ export class Filediff {
         return e ? new Filediff(e) : null;
     }
     static by_href(href) {
-        const m = href.match(/^[^#]*#(?:L[ab]\d+|)([UF][-A-Za-z0-9_.@\/]+)$/),
+        const m = href.match(/^[^#]*#(?:L[ab]\d+|)([UF][-A-Za-z0-9_.@/]+)$/),
             e = m && m[1] ? document.getElementById(m[1]) : null;
         return e ? new Filediff(e) : null;
     }
@@ -473,7 +473,7 @@ handle_ui.on("pa-filenav-all", function () {
 });
 
 function goto_hash(hash) {
-    const m = hash.match(/^[^#]*#(L[ab]\d+|)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@\/]+)$/),
+    const m = hash.match(/^[^#]*#(L[ab]\d+|)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@/]+)$/),
         lineid = m && m[1] ? m[1].substring(1) : null,
         fd = m ? Filediff.by_hash("#" + m[2]) : null;
     if (!fd) {

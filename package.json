@@ -3,7 +3,7 @@
     "email": "ekohler@gmail.com",
     "repository": "github:kohler/peteramati",
     "scripts": {
-        "build": "rollup -c"
+        "build": "npx webpack"
     },
     "dependencies": {
         "linkify-it": "latest",
@@ -14,49 +14,9 @@
         "xterm": "^5.3.0"
     },
     "devDependencies": {
-        "@rollup/plugin-commonjs": "^23.0.2",
-        "@rollup/plugin-eslint": "^9.0.1",
-        "@rollup/plugin-node-resolve": "^15.0.1",
-        "@rollup/plugin-terser": "^0.1.0",
-        "rollup": "^2.79.1",
+        "@eslint/js": "^9.11.0",
+        "eslint": "^9.11.0",
+        "globals": "^15.9.0",
         "webpack-cli": "^5.1.4"
-    },
-    "eslintConfig": {
-        "env": {
-            "browser": true,
-            "es6": true,
-            "jquery": true
-        },
-        "parserOptions": {
-            "ecmaVersion": 6,
-            "sourceType": "module"
-        },
-        "extends": [
-            "eslint:recommended"
-        ],
-        "rules": {
-            "no-empty": [
-                "error",
-                {
-                    "allowEmptyCatch": true
-                }
-            ],
-            "no-control-regex": "off",
-            "no-useless-escape": "off",
-            "no-constant-condition": [
-                "error",
-                {
-                    "checkLoops": false
-                }
-            ]
-        },
-        "globals": {
-            "$pa": "writeable",
-            "Terminal": "readonly",
-            "hljs": "readonly",
-            "markdownit": "readonly",
-            "markdownit_katex": "readonly",
-            "siteinfo": "readonly"
-        }
     }
 }
