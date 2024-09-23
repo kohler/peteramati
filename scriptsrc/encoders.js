@@ -45,8 +45,13 @@ export function text_to_html(text) {
     return n.innerHTML;
 }
 
-export function regexp_quote(s) {
-    return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').replace(/\x08/g, '\\x08');
+export function regexp_quote(s, charclass) {
+    if (!charclass) {
+        s = String(s).replace(/([$()*+.\/?\[\\\]^{|}])/g, '\\$1');
+    } else {
+        s = String(s).replace(/([-$()*+.\/?\[\\\]^{|}])/g, '\\$1');
+    }
+    return s.replace(/\x08/g, '\\x08');
 }
 
 export function html_id_encode(s) {

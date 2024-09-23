@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { escape_entities } from "./encoders.js";
+import { escape_entities, regexp_quote } from "./encoders.js";
 import { hoturl } from "./hoturl.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
@@ -394,10 +394,6 @@ handle_ui.on("pa-use-suggestion", function () {
         e.remove();
     }
 });
-
-function regexp_quote(s) {
-    return String(s).replace(/([-()\[\]{}+?*.$\^|,:#<!\\])/g, '\\$1').replace(/\x08/g, '\\x08');
-}
 
 handle_ui.on("pa-search-suggestions", function (event) {
     if (event.type === "input") {
