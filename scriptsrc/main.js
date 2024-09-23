@@ -36,6 +36,7 @@ import "./ptable-grades.js";
 import "./ptable-diff.js";
 import "./ptable-run.js";
 import { pa_pset_table } from "./ptable.js";
+import { SearchParser, SearchExpr } from "./search.js";
 import LinkifyIt from "linkify-it";
 window.markdownit.linkify = LinkifyIt();
 window.markdownit.linkify.set({fuzzyEmail: false, "---": true});
@@ -1381,5 +1382,7 @@ window.$pa = {
     runmany: pa_runmany,
     gradesheet_store: GradeSheet.store,
     text_eq: text_eq,
-    string_utf8_index: string_utf8_index
+    string_utf8_index: string_utf8_index,
+    SearchParser: SearchParser,
+    SearchExpr: SearchExpr
 };
