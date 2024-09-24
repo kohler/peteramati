@@ -1918,7 +1918,7 @@ class Conf {
         if ($this->opt("katexUrl") === "local") {
             echo $this->make_css_link("stylesheets/katex.min.css"), "\n";
         } else {
-            echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css", null, "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV");
+            echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css", null, "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+");
         }
         foreach ($this->opt["stylesheets"] as $css) {
             echo $this->make_css_link($css), "\n";
