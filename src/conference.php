@@ -1918,7 +1918,7 @@ class Conf {
         if ($this->opt("katexUrl") === "local") {
             echo $this->make_css_link("stylesheets/katex.min.css"), "\n";
         } else {
-            echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css", null, "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV");
+            echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css", null, "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV");
         }
         foreach ($this->opt["stylesheets"] as $css) {
             echo $this->make_css_link($css), "\n";
@@ -1935,13 +1935,13 @@ class Conf {
                 }
             }
             if (substr($favicon, -4) == ".png") {
-                echo "<link rel=\"icon\" type=\"image/png\" href=\"$favicon\" />\n";
+                echo "<link rel=\"icon\" type=\"image/png\" href=\"{$favicon}\" />\n";
             } else if (substr($favicon, -4) == ".ico") {
-                echo "<link rel=\"shortcut icon\" href=\"$favicon\" />\n";
+                echo "<link rel=\"shortcut icon\" href=\"{$favicon}\" />\n";
             } else if (substr($favicon, -4) == ".gif") {
-                echo "<link rel=\"icon\" type=\"image/gif\" href=\"$favicon\" />\n";
+                echo "<link rel=\"icon\" type=\"image/gif\" href=\"{$favicon}\" />\n";
             } else {
-                echo "<link rel=\"icon\" href=\"$favicon\" />\n";
+                echo "<link rel=\"icon\" href=\"{$favicon}\" />\n";
             }
         }
 
@@ -1992,7 +1992,7 @@ class Conf {
         if ($this->opt("katexUrl") === "local") {
             Ht::stash_html($this->make_script_file("scripts/katex.min.js", true) . "\n");
         } else {
-            Ht::stash_html('<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>');
+            Ht::stash_html('<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>');
         }
         foreach ($this->opt["javascripts"] as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
