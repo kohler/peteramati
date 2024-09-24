@@ -130,7 +130,7 @@ function popup_near(elt, anchor) {
         }
         for (const e of elt.querySelector("form").elements) {
             if (e.type !== "hidden"
-                && !hasClass(e, "dangerous")
+                && !hasClass(e, "btn-danger")
                 && !hasClass(e, "no-focus")
                 && e.offsetWidth > 0) {
                 focus_at(e);

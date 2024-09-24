@@ -151,5 +151,3 @@ $.fn.unautogrow = function () {
     });
     return this;
 };
-
-$(function () { $(".need-autogrow").autogrow(); });

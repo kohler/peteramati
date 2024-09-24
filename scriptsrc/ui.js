@@ -143,6 +143,19 @@ export function input_is_checkboxlike(elt) {
     return elt.type === "checkbox" || elt.type === "radio";
 }
 
+export function input_is_buttonlike(elt) {
+    return elt.type === "button" || elt.type === "submit" || elt.type === "reset";
+}
+
+export function input_successful(elt) {
+    if (elt.disabled || !elt.name)
+        return false;
+    else if (elt.type === "checkbox" || elt.type === "radio")
+        return elt.checked;
+    else
+        return elt.type !== "button" && elt.type !== "submit" && elt.type !== "reset";
+}
+
 export function input_default_value(elt) {
     if (elt.hasAttribute("data-default-value")) {
         return elt.getAttribute("data-default-value");
@@ -302,3 +315,27 @@ export function $e(tag, attr) {
     }
     return e;
 }
+
+function awakenf() {
+    /*if (hasClass(this, "need-diff-check")) {
+        hotcrp.add_diff_check(this);
+    }*/
+    if (hasClass(this, "need-autogrow")) {
+        $(this).autogrow();
+    }
+    /*if (hasClass(this, "need-suggest")) {
+        hotcrp.suggest.call(this);
+    }*/
+    if (hasClass(this, "need-tooltip")) {
+        $pa.tooltip.call(this);
+    }
+}
+
+$.fn.awaken = function () {
+    this.each(awakenf);
+    //this.find(".need-diff-check, .need-autogrow, .need-suggest, .need-tooltip").each(awakenf);
+    this.find(".need-autogrow, .need-tooltip").each(awakenf);
+    return this;
+};
+
+$(function () { $(document.body).awaken(); });

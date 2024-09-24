@@ -592,5 +592,3 @@ tooltip.enter = function (e, info) {
 tooltip.leave = function (e) {
     ttleave.call(e);
 };
-
-$(function () { $(".need-tooltip").each(tooltip); });

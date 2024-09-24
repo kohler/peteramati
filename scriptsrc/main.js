@@ -1,5 +1,5 @@
 // main.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { sprintf, strftime, text_eq, string_utf8_index } from "./utils.js";
@@ -1382,6 +1382,7 @@ window.$pa = {
     runmany: pa_runmany,
     gradesheet_store: GradeSheet.store,
     text_eq: text_eq,
+    tooltip: tooltip,
     string_utf8_index: string_utf8_index,
     SearchParser: SearchParser,
     SearchExpr: SearchExpr

@@ -4,6 +4,7 @@
 
 import { hasClass, addClass, removeClass, toggleClass,
          handle_ui } from "./ui.js";
+import { event_key } from "./ui-key.js";
 import { wstorage, sprintf, strftime } from "./utils.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities, regexp_quote } from "./encoders.js";
@@ -1747,7 +1748,7 @@ function ptable_search(search) {
             trs = ptbodies.map((tb) => tb.firstChild);
         let trx = trs[0], last_boring;
         search_target_success = false;
-        while (trx !== null) {
+        while (trx) {
             const hide = !!pexpr && !ptable_search_check(ptconf, trx, pexpr);
             if (hide !== trx.hidden) {
                 changed = true;
@@ -1766,7 +1767,10 @@ function ptable_search(search) {
     };
 }
 
-handle_ui.on("js-ptable-search", function () {
+handle_ui.on("js-ptable-search", function (evt) {
+    if (evt.type === "keydown" && event_key(evt) === "Enter") {
+        evt.preventDefault();
+    }
     let ptconf = this.closest("form").pa__ptconf;
     ptconf.input_timeout && clearTimeout(ptconf.input_timeout);
     ptconf.input_timeout = setTimeout(ptable_search(this), 300);

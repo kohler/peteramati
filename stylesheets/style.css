@@ -1002,8 +1002,7 @@ button:hover, button:focus, button:active, button:focus-within,
 .alert .btn-primary,
 .alert .btn-alertable,
 .btn-highlight,
-.btn-danger,
-button.dangerous {
+.btn-danger {
 	border-color: #cc0000;
 	background: #ff0000;
 	background-image: linear-gradient(#ff4040, #ff0000);
