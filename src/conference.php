@@ -164,10 +164,8 @@ class Conf {
     private $_site_contact;
     /** @var array<string,Repository> */
     private $_handout_repos = [];
-    /** @var array<int,array<string,CommitRecord>> */
+    /** @var array<int,CommitList> */
     private $_handout_commits = [];
-    /** @var array<int,?CommitRecord> */
-    private $_handout_latest_commit = [];
     /** @var array<string,string> */
     private $_repodir_refs = [];
     private $_api_map;
@@ -2181,9 +2179,16 @@ class Conf {
         }
         $hpcj = $list = [];
         foreach ($this->pc_members_and_admins() as $pcm) {
-            $hpcj[$pcm->contactId] = $j = (object) ["name" => Text::name_html($pcm), "email" => $pcm->email];
-            if ($pcm->lastName) {
-                $r = Text::analyze_name($pcm);
+            $r = Text::analyze_name($pcm);
+            $n = $r->name ? : $r->email;
+            if ($r->nameAmbiguous && $r->name && $r->email) {
+                $n = "{$n} <{$r->email}>";
+            }
+            $hpcj[$pcm->contactId] = $j = (object) [
+                "name" => htmlspecialchars($n),
+                "email" => $pcm->email
+            ];
+            if ($r->lastName) {
                 if (strlen($r->lastName) !== strlen($r->name)) {
                     $j->lastpos = strlen(htmlspecialchars($r->firstName)) + 1;
                 }
@@ -2512,7 +2517,7 @@ class Conf {
 
     private function populate_handout_commits(Pset $pset) {
         if (!($hrepo = $this->handout_repo($pset))) {
-            $this->_handout_commits[$pset->id] = [];
+            $this->_handout_commits[$pset->id] = new CommitList;
             return;
         }
         $hrepoid = $hrepo->repoid;
@@ -2533,16 +2538,14 @@ class Conf {
             $this->save_setting($key, 1, $hset);
             $this->qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'", $key, $pset->id);
         }
-        $commits = [];
+        $commits = new CommitList;
         foreach ($hset->commits as $c) {
-            $commits[$c[0]] = new CommitRecord($c[1], $c[0], $c[2], CommitRecord::HANDOUTHEAD);
+            $commits->add(new CommitRecord($c[1], $c[0], $c[2], CommitRecord::HANDOUTHEAD));
         }
         $this->_handout_commits[$pset->id] = $commits;
-        reset($commits);
-        $this->_handout_latest_commit[$pset->id] = current($commits);
     }
 
-    /** @return array<string,CommitRecord> */
+    /** @return CommitList */
     function handout_commits(Pset $pset) {
         if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
@@ -2554,15 +2557,14 @@ class Conf {
     function handout_commit(Pset $pset, $hash) {
         $commits = $this->handout_commits($pset);
         if (strlen($hash) === 40 || strlen($hash) === 64) {
-            return $commits[$hash] ?? null;
-        } else {
-            $matches = [];
-            foreach ($commits as $h => $c) {
-                if (str_starts_with($h, $hash))
-                    $matches[] = $c;
-            }
-            return count($matches) === 1 ? $matches[0] : null;
+            return $commits[$hash];
         }
+        $matches = [];
+        foreach ($commits as $h => $c) {
+            if (str_starts_with($h, $hash))
+                $matches[] = $c;
+        }
+        return count($matches) === 1 ? $matches[0] : null;
     }
 
     /** @return ?array<string,CommitRecord> */
@@ -2585,10 +2587,10 @@ class Conf {
 
     /** @return ?CommitRecord */
     function latest_handout_commit(Pset $pset) {
-        if (!array_key_exists($pset->id, $this->_handout_latest_commit)) {
+        if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
         }
-        return $this->_handout_latest_commit[$pset->id] ?? null;
+        return $this->_handout_commits[$pset->id]->latest();
     }
 
 

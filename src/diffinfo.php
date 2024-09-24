@@ -91,7 +91,7 @@ class DiffInfo implements Iterator {
         }
     }
 
-    function set_repoa(Repository $repoa, ?Pset $pset = null, $hasha, $filenamea,
+    function set_repoa(Repository $repoa, ?Pset $pset, $hasha, $filenamea,
                        $hasha_hrepo = null) {
         $this->_repoa = $repoa;
         $this->_pset = $pset;

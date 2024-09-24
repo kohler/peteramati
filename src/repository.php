@@ -748,31 +748,28 @@ class Repository {
     }
 
     /** @param string $hashpart
-     * @param array<string,CommitRecord> $commitlist
+     * @param array<string,CommitRecord>|CommitList $commitlist
      * @return array{?CommitRecord,bool} */
     static function find_listed_commit($hashpart, $commitlist) {
         if (strlen($hashpart) < 5) {
             // require at least 5 characters
             return [null, true];
-        } else if (strlen($hashpart) === 40) {
-            if (isset($commitlist[$hashpart])) {
-                return [$commitlist[$hashpart], true];
-            } else {
-                return [null, false];
-            }
-        } else {
-            $match = null;
-            foreach ($commitlist as $h => $cx) {
-                if (str_starts_with($h, $hashpart)) {
-                    if ($match !== null) {
-                        return [null, true];
-                    } else {
-                        $match = $cx;
-                    }
+        }
+        if (strlen($hashpart) === 40 || strlen($hashpart) === 64) {
+            $commit = $commitlist[$hashpart] ?? null;
+            return [$commit, $commit !== null];
+        }
+        $match = null;
+        foreach ($commitlist as $h => $cx) {
+            if (str_starts_with($h, $hashpart)) {
+                if ($match !== null) {
+                    return [null, true];
+                } else {
+                    $match = $cx;
                 }
             }
-            return $match ? [$match, true] : [null, false];
         }
+        return $match ? [$match, true] : [null, false];
     }
 
     /** @param string $hashpart

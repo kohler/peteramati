@@ -481,7 +481,8 @@ class PsetView {
 
     /** @return bool */
     function is_handout_commit() {
-        return $this->_hash && $this->_hash === $this->derived_handout_hash();
+        return $this->_hash !== null
+            && $this->pset->handout_commits()->contains($this->_hash);
     }
 
     /** @return bool */
@@ -503,6 +504,12 @@ class PsetView {
     function is_do_not_grade() {
         return ($rpi = $this->rpi())
             && $rpi->placeholder === 2;
+    }
+
+    /** @return bool */
+    function is_user_grading_commit() {
+        return ($rpi = $this->rpi())
+            && $rpi->placeholder === -1;
     }
 
     /** @return bool */

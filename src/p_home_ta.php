@@ -249,14 +249,19 @@ class Home_TA_Page {
             }
             if (($h = $info->grading_hash()) !== null) {
                 $j["grade_commit"] = $h;
+                $j["grade_status"] = $info->is_user_grading_commit() ? 1 : 2;
             } else if (($h = $info->hash()) !== null) {
                 $j["commit"] = $h;
+                if ($info->is_do_not_grade()) {
+                    $j["grade_status"] = -1;
+                }
             }
-            if ($info->is_do_not_grade()) {
-                $j["do_not_grade"] = true;
-            }
-            if ($h && $info->empty_diff_likely()) {
-                $j["emptydiff"] = true;
+            if ($h) {
+                if ($info->is_handout_commit()) {
+                    $j["emptydiff"] = "handout";
+                } else if ($info->empty_diff_likely()) {
+                    $j["emptydiff"] = true;
+                }
             }
         }
         if ($pset->has_timermark) {

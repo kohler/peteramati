@@ -655,7 +655,7 @@ class Pset {
         return $this->conf->handout_repo($this, $inrepo);
     }
 
-    /** @return array<string,CommitRecord> */
+    /** @return CommitList */
     function handout_commits() {
         return $this->conf->handout_commits($this);
     }

@@ -914,7 +914,7 @@ const gcoldef = {
                 && this.ptconf.flagged_commits) {
                 t += 'G⃝';
             }
-            if (s.do_not_grade) {
+            if (s.grade_status < 0) {
                 t += ' ⃠';
             }
             if (s.has_notes) {
@@ -1252,7 +1252,7 @@ function pa_render_pset_table(ptconf) {
                 s.boringness = 2;
             } else if (s.emptydiff
                        || (!s.grade_commit && !s.commit && !ptconf.gitless_grades)
-                       || s.do_not_grade) {
+                       || s.grade_status < 0) {
                 s.boringness = 1;
             } else {
                 s.boringness = 0;
@@ -1273,7 +1273,7 @@ function pa_render_pset_table(ptconf) {
                 ngrades_expected = -2;
             }
             has_late_hours = has_late_hours || !!s.late_hours;
-            any_visible = any_visible || s.scores_visible_pinned || s.do_not_grade;
+            any_visible = any_visible || s.scores_visible_pinned || s.grade_status < 0;
         }
         const need_ngrades = ngrades_expected === -2;
 
@@ -1715,11 +1715,28 @@ function ptable_recolor(tb) {
     }
 }
 
-let search_target, search_target_success;
+let search_target;
+
+const search_keywords = {
+    grade: function (se, su) {
+        if (se.text === "no") {
+            return su.grade_status < 0 || (!su.grade_status && su.emptydiff);
+        } else if (se.text === "yes") {
+            return su.grade_status > 0;
+        } else if (se.text === "user") {
+            return su.grade_status === 1;
+        } else if (se.text === "none") {
+            return !su.grade_status;
+        } else {
+            return false;
+        }
+    }
+};
 
 function evaluate_search(se) {
     if (se.kword) {
-        return false;
+        const sk = search_keywords[se.kword];
+        return sk ? sk(se, search_target) : false;
     }
     if (!se.info) {
         se.info = new RegExp(regexp_quote(se.text), "i");
@@ -1740,14 +1757,14 @@ function ptable_search(search) {
         const form = search.closest("form");
         let ptconf = form.pa__ptconf,
             pexpr = new SearchParser(search.value).parse_expression();
+        ptconf.input_timeout = null;
         if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
             pexpr = null;
         }
         let changed = false;
         const ptbodies = $(form).find("table.gtable > tbody").toArray(),
             trs = ptbodies.map((tb) => tb.firstChild);
-        let trx = trs[0], last_boring;
-        search_target_success = false;
+        let trx = trs[0];
         while (trx) {
             const hide = !!pexpr && !ptable_search_check(ptconf, trx, pexpr);
             if (hide !== trx.hidden) {
@@ -1768,12 +1785,13 @@ function ptable_search(search) {
 }
 
 handle_ui.on("js-ptable-search", function (evt) {
+    let ptconf = this.closest("form").pa__ptconf, timeout = 300;
     if (evt.type === "keydown" && event_key(evt) === "Enter") {
         evt.preventDefault();
+        timeout = 0;
     }
-    let ptconf = this.closest("form").pa__ptconf;
     ptconf.input_timeout && clearTimeout(ptconf.input_timeout);
-    ptconf.input_timeout = setTimeout(ptable_search(this), 300);
+    ptconf.input_timeout = setTimeout(ptable_search(this), timeout);
 });
 
 
