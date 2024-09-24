@@ -1,6 +1,6 @@
 <?php
 // getopt.php -- HotCRP helper function for extended getopt
-// Copyright (c) 2009-2023 Eddie Kohler; see LICENSE.
+// Copyright (c) 2009-2024 Eddie Kohler; see LICENSE.
 
 class Getopt {
     /** @var array<string,GetoptOption> */
@@ -17,8 +17,12 @@ class Getopt {
     private $allmulti = false;
     /** @var ?bool */
     private $otheropt = false;
+    /** @var ?bool */
+    private $dupopt = true;
     /** @var bool */
     private $interleave = false;
+    /** @var bool */
+    private $require_subcommand = false;
     /** @var ?int */
     private $minarg;
     /** @var ?int */
@@ -86,9 +90,17 @@ class Getopt {
             if (($sp = strpos($s, " ")) !== false) {
                 $help = substr($s, $sp + 1);
                 $s = substr($s, 0, $sp);
-                if ($help !== "" && $help[0] === "{" && ($rbr = strpos($help, "}")) !== false) {
-                    $type = substr($help, 1, $rbr - 1);
-                    $help = $rbr === strlen($help) - 1 ? "" : ltrim(substr($help, $rbr + 1));
+                $p = 0;
+                while ($p < strlen($help)
+                       && ($help[$p] === "=" || $help[$p] === "!")
+                       && ($sp = strpos($help, " ", $p + 1)) !== false) {
+                    $p = $sp + 1;
+                }
+                if ($p < strlen($help)
+                    && $help[$p] === "{"
+                    && ($rbr = strpos($help, "}", $p + 1)) !== false) {
+                    $type = substr($help, $p + 1, $rbr - $p - 1);
+                    $help = substr($help, 0, $p) . ltrim(substr($help, $rbr + 1));
                 }
             }
             $po = null;
@@ -144,6 +156,13 @@ class Getopt {
         return $this;
     }
 
+    /** @param ?bool $dupopt
+     * @return $this */
+    function dupopt($dupopt) {
+        $this->dupopt = $dupopt;
+        return $this;
+    }
+
     /** @param bool $interleave
      * @return $this */
     function interleave($interleave) {
@@ -179,12 +198,13 @@ class Getopt {
         return $this;
     }
 
-    /** @param string|list<string> ...$subcommands
+    /** @param string|list<string>|true ...$subcommands
      * @return $this */
     function subcommand(...$subcommands) {
-        $this->subcommand = [];
         foreach ($subcommands as $s) {
-            if (is_array($s)) {
+            if ($s === true) {
+                $this->require_subcommand = true;
+            } else if (is_array($s)) {
                 array_push($this->subcommand, ...$s);
             } else {
                 $this->subcommand[] = $s;
@@ -232,6 +252,9 @@ class Getopt {
     /** @param null|string|array<string,mixed> $arg
      * @return string */
     function help($arg = null) {
+        if (($subcommand = $arg["_subcommand"] ?? "") === "{help}") {
+            $subcommand = "";
+        }
         if (is_string($arg)) {
             $subtype = $arg;
             $arg = null;
@@ -242,8 +265,8 @@ class Getopt {
         }
         if (($subtype === false || $subtype === "")
             && !empty($this->subcommand)
-            && isset($arg["_subcommand"])) {
-            $subtype = $arg["_subcommand"];
+            && $subcommand !== "") {
+            $subtype = $subcommand;
         }
         $s = [];
         if ($this->description) {
@@ -255,7 +278,7 @@ class Getopt {
             }
         }
         if (!empty($this->subcommand)
-            && !isset($arg["_subcommand"])) {
+            && $subcommand === "") {
             $s[] = "Subcommands:\n";
             foreach ($this->subcommand as $sc) {
                 if (($space = strpos($sc, " ")) !== false) {
@@ -393,15 +416,16 @@ class Getopt {
     }
 
     /** @param list<string> $argv
+     * @param ?int $first_arg
      * @return array<string,string|int|float|list<string>> */
-    function parse($argv) {
+    function parse($argv, $first_arg = null) {
         $res = [];
         $rest = [];
         $pot = 0;
         $active_po = null;
         $oname = $name = "";
         $odone = false;
-        for ($i = 1; $i !== count($argv); ++$i) {
+        for ($i = $first_arg ?? 1; $i !== count($argv); ++$i) {
             $arg = $argv[$i];
             $po = null;
             $wantpo = $value = false;
@@ -412,7 +436,8 @@ class Getopt {
                 $odone = true;
                 continue;
             } else if ($arg[0] !== "-" || $arg === "-") { // non-option
-                if ($this->subcommand !== null
+                if ($arg !== "-"
+                    && $this->subcommand !== null
                     && !array_key_exists("_subcommand", $res)
                     && ($x = $this->find_subcommand($arg)) !== null) {
                     $res["_subcommand"] = $x;
@@ -495,7 +520,7 @@ class Getopt {
                 throw new CommandLineException("Missing argument for `{$oname}`", $this);
             }
 
-            $poty = $po->argtype;
+            $poty = $value !== false ? $po->argtype : null;
             if ($poty === "n" || $poty === "i") {
                 if (!ctype_digit($value) && !preg_match('/\A[-+]\d+\z/', $value)) {
                     throw new CommandLineException("`{$oname}` requires integer", $this);
@@ -519,6 +544,9 @@ class Getopt {
             if (!array_key_exists($name, $res)) {
                 $res[$name] = $pot >= self::MARG ? [$value] : $value;
             } else if ($pot < self::MARG && !$this->allmulti) {
+                if (!$this->dupopt) {
+                    throw new CommandLineException("`{$oname}` was given multiple times", $this);
+                }
                 $res[$name] = $value;
             } else if (is_array($res[$name])) {
                 $res[$name][] = $value;
@@ -533,6 +561,9 @@ class Getopt {
             && (isset($res[$this->helpopt]) || ($res["_subcommand"] ?? null) === "{help}")) {
             fwrite(STDOUT, $this->help($res));
             exit(0);
+        }
+        if ($this->require_subcommand && !isset($res["_subcommand"])) {
+            throw (new CommandLineException("Subcommand required", $this))->add_context("Subcommands are " . join(", ", $this->subcommand));
         }
         if ($this->maxarg !== null && count($rest) > $this->maxarg) {
             throw new CommandLineException("Too many arguments", $this);
@@ -599,14 +630,14 @@ class CommandLineException extends Exception {
     /** @param string $message
      * @param ?Getopt $getopt
      * @param ?int $exit_status */
-    function __construct($message, $getopt = null, $exit_status = null) {
+    function __construct($message = "", $getopt = null, $exit_status = null) {
         parent::__construct($message);
         $this->getopt = $getopt;
         $this->exitStatus = $exit_status ?? self::$default_exit_status;
     }
     /** @param int $exit_status
      * @return $this */
-    function exit_status($exit_status) {
+    function set_exit_status($exit_status) {
         $this->exitStatus = $exit_status;
         return $this;
     }

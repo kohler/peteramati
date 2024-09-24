@@ -70,7 +70,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
             } else if ($ef === self::DROPPED) {
                 $w[] = "dropped";
             }
-            if (!($flags & self::TF)) {
+            if (($flags & self::TF) === 0) {
                 $w[] = "roles=0";
             } else if ($flags === self::TF) {
                 $w[] = "roles!=0 and (roles&1)!=0";

@@ -52,12 +52,12 @@ class GitHubResponse implements JsonSerializable {
             if (($metadata = stream_get_meta_data($stream))
                 && ($w = $metadata["wrapper_data"] ?? null)
                 && is_array($w)) {
-                if (preg_match(',\AHTTP/[\d.]+\s+(\d+)\s+(.+)\z,', $w[0], $m)) {
+                if (preg_match('/\AHTTP\/[\d.]+\s+(\d+)\s+(.+)\z/', $w[0], $m)) {
                     $this->status = (int) $m[1];
                     $this->status_text = $m[2];
                 }
                 for ($i = 1; $i != count($w); ++$i) {
-                    if (preg_match(',\A(.*?):\s*(.*)\z,', $w[$i], $m))
+                    if (preg_match('/\A(.*?):\s*(.*)\z/', $w[$i], $m))
                         $this->headers[strtolower($m[1])] = $m[2];
                 }
             }
@@ -118,14 +118,32 @@ class GitHub_RepositorySite extends RepositorySite {
         return Ht::link($html, self::MAINURL);
     }
 
+    /** @return GitHubResponse */
     static function graphql(Conf $conf, $post_data, $preencoded = false) {
         $response = new GitHubResponse("https://api.github.com/graphql");
         $token = $conf->opt("githubOAuthToken");
         if ($token && !$conf->opt("disableRemote")) {
             if (is_string($post_data) && !$preencoded) {
-                $post_data = json_encode(["query" => $post_data]);
+                $post_data = ["query" => $post_data];
             }
-            $response->run_post($conf, "application/json", $post_data, "Authorization: token {$token}\r\n");
+            if (!is_string($post_data)) {
+                $post_data = json_encode($post_data);
+            }
+            $response->run_post($conf, "application/json", $post_data, "Authorization: Bearer {$token}\r\n");
+        }
+        return $response;
+    }
+
+    /** @return GitHubResponse */
+    static function restapi(Conf $conf, $url, $method, $data = "") {
+        $response = new GitHubResponse("https://api.github.com/{$url}");
+        $token = $conf->opt("githubOAuthToken");
+        if ($token && !$conf->opt("disableRemote")) {
+            $h = "Authorization: Bearer {$token}\r\nAccept: application/vnd.github+json\r\nX-GitHub-Api-Version: 2022-11-28\r\n";
+            if (!is_string($data)) {
+                $data = json_encode($data);
+            }
+            $response->run_post($conf, "application/json", $data, $h);
         }
         return $response;
     }
@@ -144,6 +162,7 @@ class GitHub_RepositorySite extends RepositorySite {
                                 . "  " . Ht::submit("Save"), $notes);
         echo "</div></form>";
     }
+
     /** @param string $username
      * @return bool */
     static function save_username(Contact $user, $username) {
@@ -239,6 +258,11 @@ class GitHub_RepositorySite extends RepositorySite {
     /** @return string */
     function friendly_url() {
         return $this->base ? : $this->url;
+    }
+    /** @return ?string */
+    function organization() {
+        $slash = strpos($this->base, "/");
+        return $slash !== false && $slash !== 0 ? substr($this->base, 0, $slash) : null;
     }
     /** @param string $branch
      * @param string $subdir
