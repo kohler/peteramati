@@ -204,90 +204,50 @@ function text_eq(a, b) {
 }
 
 export function input_differs(elt) {
-    const expected = input_default_value(elt);
-    if (input_is_checkboxlike(elt)) {
-        const val = elt.checked ? elt.value : "";
-        return val !== expected;
-    } else if (elt.type === "button" || elt.type === "submit" || elt.type === "reset") {
+    const type = elt.type;
+    if (!type) {
+        if (elt instanceof RadioNodeList) {
+            for (let i = 0; i !== elt.length; ++i) {
+                if (input_differs(elt[i]))
+                    return true;
+            }
+        }
         return false;
+    } else if (type === "button" || type === "submit" || type === "reset") {
+        return false;
+    } else if (type === "checkbox" || type === "radio") {
+        return elt.checked !== input_default_value(elt);
     } else {
-        return !text_eq(elt.value, expected);
+        return !text_eq(elt.value, input_default_value(elt));
     }
 }
 
-
-// HtmlCollector
-
-export class HtmlCollector {
-    constructor() {
-        this.clear();
+export function form_differs(form) {
+    let coll;
+    if (form instanceof HTMLFormElement) {
+        coll = form.elements;
+    } else {
+        coll = $(form).find("input, select, textarea");
+        coll.length || (coll = $(form).filter("input, select, textarea"));
     }
-
-    clear() {
-        this.open = [];
-        this.close = [];
-        this.html = "";
-        return this;
+    const colllen = coll.length;
+    for (let i = 0; i !== colllen; ++i) {
+        const e = coll[i];
+        if (e.name
+            && !hasClass(e, "ignore-diff")
+            && !e.disabled
+            && input_differs(e))
+            return e;
     }
+    return null;
+}
 
-    push(open, close) {
-        if (open && close) {
-            this.open.push(this.html + open);
-            this.close.push(close);
-            this.html = "";
-            return this.open.length - 1;
-        } else {
-            this.html += open;
-        }
-        return this;
-    }
-
-    pop(pos) {
-        let n = this.open.length;
-        if (pos == null) {
-            pos = Math.max(0, n - 1);
-        }
-        while (n > pos) {
-            --n;
-            this.html = this.open[n] + this.html + this.close[n];
-            this.open.pop();
-            this.close.pop();
-        }
-        return this;
-    }
-
-    pop_n(n) {
-        return this.pop(Math.max(0, this.open.length - n));
-    }
-
-    push_pop(text) {
-        this.html += text;
-        return this.pop();
-    }
-
-    pop_push(open, close) {
-        this.pop();
-        return this.push(open, close);
-    }
-
-    pop_collapse(pos) {
-        if (pos == null) {
-            pos = this.open.length ? this.open.length - 1 : 0;
-        }
-        while (this.open.length > pos) {
-            if (this.html !== "") {
-                this.html = this.open[this.open.length - 1] + this.html +
-                    this.close[this.open.length - 1];
-            }
-            this.open.pop();
-            this.close.pop();
-        }
-        return this;
-    }
-
-    render() {
-        this.pop(0);
-        return this.html;
+function check_form_differs(form, elt) {
+    (form instanceof HTMLElement) || (form = $(form)[0]);
+    const differs = (elt && form_differs(elt)) || form_differs(form);
+    toggleClass(form, "differs", !!differs);
+    if (form.hasAttribute("data-differs-toggle")) {
+        $("." + form.getAttribute("data-differs-toggle")).toggleClass("hidden", !differs);
     }
 }
 

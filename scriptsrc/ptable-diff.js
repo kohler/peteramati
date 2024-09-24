@@ -4,8 +4,7 @@
 
 import { hasClass, addClass, handle_ui, $e } from "./ui.js";
 import { hoturl_get_go } from "./hoturl.js";
-import { escape_entities } from "./encoders.js";
-import { popup_skeleton } from "./popup.js";
+import { $popup } from "./popup.js";
 
 
 function gdialog_section_click(event) {
@@ -215,27 +214,19 @@ function ptable_diffdialog(ptconf, sus) {
     }
 
     function show() {
-        const hc = popup_skeleton();
-        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Diffs</h2>');
-        hc.push('<h3 class="gdialog-userids hidden"></h3>');
-        hc.push('<div class="pa-messages"></div>');
-
-        hc.push('<div class="nav-pills">', '</div>');
-        hc.push('<button type="button" class="btn btn-primary no-focus is-mode" name="mode-diff">Diff</button>');
-        hc.push('<button type="button" class="btn no-focus is-mode" name="mode-gradesheet">Gradesheet</button>');
-        hc.push('<button type="button" class="btn no-focus is-mode" name="mode-report">Reports</button>');
-        hc.pop();
-
-        hc.push('<div class="pa-gdialog-tab pa-gdialog-diff is-modal"></div>');
-        hc.push('<div class="pa-gdialog-tab pa-gdialog-gradesheet multicol-3 hidden"></div>');
-        hc.push('<div class="pa-gdialog-tab pa-gdialog-report hidden"></div>');
-
-        hc.push_actions();
-        hc.push('<button type="button" name="bsubmit" class="btn-primary">Save</button>');
-        hc.push('<button type="button" name="cancel">Cancel</button>');
-        $gdialog = hc.show(false);
-        $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
-        gdform = $gdialog.find("form")[0];
+        $gdialog = $popup({className: "modal-dialog-wide"})
+            .append($e("h2", "pa-home-pset", ptconf.title + " Diffs"),
+                $e("h3", "gdialog-userids hidden"),
+                $e("div", "pa-messages"),
+                $e("div", "nav-pills",
+                    $e("button", {type: "button", class: "btn btn-primary no-focus is-mode", name: "mode-diff"}, "Diff"),
+                    $e("button", {type: "button", class: "btn no-focus is-mode", name: "mode-gradesheet"}, "Gradesheet"),
+                    $e("button", {type: "button", class: "btn no-focus is-mode", name: "mode-report"}, "Reports")),
+                $e("div", "pa-gdialog-tab pa-gdialog-diff is-modal"),
+                $e("div", "pa-gdialog-tab pa-gdialog-gradesheet multicol-3 hidden"),
+                $e("div", "pa-gdialog-tab pa-gdialog-report hidden"))
+            .append_actions($e("button", {type: "button", name: "bsubmit", class: "btn-primary"}, "Save"), "Cancel");
+        gdform = $gdialog.form();
         addClass(gdform, "pa-psetinfo");
         gdform.pa__gradesheet = ptconf.gradesheet;
         mode_diff();
@@ -244,7 +235,7 @@ function ptable_diffdialog(ptconf, sus) {
         $gdialog.on("keydown", "input, textarea, select", do_key);
         $(gdform.elements.bsubmit).on("click", do_submit);
         $gdialog.find("button.is-mode").on("click", do_mode);
-        hc.show();
+        $gdialog.show();
     }
 
     show();

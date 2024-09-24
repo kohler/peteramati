@@ -3,13 +3,13 @@
 // See LICENSE for open-source distribution terms
 
 import { hasClass, addClass, removeClass, toggleClass,
-         handle_ui } from "./ui.js";
+         handle_ui, $e } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import { wstorage, sprintf, strftime } from "./utils.js";
 import { hoturl } from "./hoturl.js";
-import { escape_entities, regexp_quote } from "./encoders.js";
+import { regexp_quote } from "./encoders.js";
 import { GradeSheet } from "./gradeentry.js";
-import { popup_skeleton } from "./popup.js";
+import { $popup } from "./popup.js";
 import { tooltip } from "./tooltip.js";
 import { ptable_gdialog } from "./ptable-grades.js";
 import { SearchParser } from "./search.js";
@@ -43,7 +43,7 @@ function grader_name(p) {
     return p.__nickname;
 }
 
-function render_year(yr, html) {
+function render_year(yr) {
     if (!yr) {
         return "";
     } else if (typeof yr === "number") {
@@ -55,7 +55,7 @@ function render_year(yr, html) {
     } else if (yr.length === 1 && yr >= "A" && yr <= "Z") {
         return String.fromCharCode(9333 + yr.charCodeAt(0));
     } else {
-        return html ? escape_entities(yr) : yr;
+        return yr;
     }
 }
 
@@ -1801,34 +1801,23 @@ handle_ui.on("js-pset-gconfig", function () {
     }
 
     function gdialog() {
-        const hc = popup_skeleton();
-        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Settings</h2>');
-        hc.push('<div class="pa-messages"></div>');
-        hc.push('<div class="d-grid-1 grid-gap-2">', '</div>');
-
-        hc.push('<span class="select"><select name="state">', '</select></span>');
-        hc.push('<option value="disabled">Disabled</option>');
-        hc.push('<option value="hidden">Hidden</option>');
-        hc.push('<option value="visible">Visible without grades</option>');
-        hc.push('<option value="scores_visible">Visible with grades</option>');
-        hc.pop();
-
-        hc.push('<span class="select"><select name="frozen">', '</select></span>');
-        hc.push('<option value="no">Student updates allowed</option>');
-        hc.push('<option value="yes">Submissions frozen</option>');
-        hc.pop();
-
-        hc.push('<span class="select"><select name="anonymous">', '</select></span>');
-        hc.push('<option value="no">Open grading</option>');
-        hc.push('<option value="yes">Anonymous grading</option>');
-        hc.pop();
-
-        hc.pop();
-        hc.push_actions();
-        hc.push('<button type="button" name="bsubmit" class="btn-primary">Save</button>');
-        hc.push('<button type="button" name="cancel">Cancel</button>');
-        $gdialog = hc.show(false);
-        form = $gdialog.find("form")[0];
+        $gdialog = $popup()
+            .append($e("h2", "pa-home-pset", ptconf.title + " Settings"),
+                $e("div", "pa-messages"),
+                $e("div", "d-grid-1 grid-gap-2",
+                    $e("span", "select", $e("select", {name: "state"},
+                        $e("option", {value: "disabled"}, "Disabled"),
+                        $e("option", {value: "hidden"}, "Hidden"),
+                        $e("option", {value: "visible"}, "Visible without grades"),
+                        $e("option", {value: "scores_visible"}, "Visible with grades"))),
+                    $e("span", "select", $e("select", {name: "frozen"},
+                        $e("option", {value: "no"}, "Student updates allowed"),
+                        $e("option", {value: "yes"}, "Submissions frozen"))),
+                    $e("span", "select", $e("select", {name: "anonymous"},
+                        $e("option", {value: "no"}, "Open grading"),
+                        $e("option", {value: "yes"}, "Anonymous grading")))))
+            .append_actions($e("button", {type: "button", name: "bsubmit", class: "btn-primary"}, "Save"), "Cancel");
+        form = $gdialog.form();
 
         let v;
         if (ptconf.disabled) {
@@ -1852,7 +1841,7 @@ handle_ui.on("js-pset-gconfig", function () {
         form.elements.anonymous.setAttribute("data-default-value", v);
 
         $gdialog.find("button[name=bsubmit]").on("click", submit);
-        hc.show();
+        $gdialog.show();
     }
     gdialog();
 });

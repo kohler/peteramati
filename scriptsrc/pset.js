@@ -6,7 +6,7 @@ import { handle_ui, fold61, addClass, hasClass, $e } from "./ui.js";
 import { event_key, event_modkey } from "./ui-key.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
-import { Bubble } from "./tooltip.js";
+import { Bubble, global_tooltip } from "./tooltip.js";
 
 
 handle_ui.on("js-repo-copy", function () {
@@ -23,8 +23,8 @@ handle_ui.on("js-repo-copy", function () {
     }
     window.getSelection().removeAllRanges();
     bub.remove();
-    if (window.global_tooltip && window.global_tooltip.elt == this) {
-        window.global_tooltip.text(this.getAttribute("data-pa-repo"));
+    if (global_tooltip && global_tooltip.elt == this) {
+        global_tooltip.text(this.getAttribute("data-pa-repo"));
     }
 });
 

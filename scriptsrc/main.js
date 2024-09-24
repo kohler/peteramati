@@ -19,7 +19,7 @@ import { Filediff } from "./diff.js";
 import "./diff-markdown.js";
 import { Note } from "./note.js";
 import "./note-edit.js";
-import { render_text, render_feedback_list } from "./render.js";
+import { render_text, feedback } from "./render.js";
 import "./render-terminal.js";
 import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
@@ -556,7 +556,7 @@ handle_ui.on("pa-grade-toggle-description", function (event) {
         $es = event.metaKey ? $(".pa-gsection") : $(me),
         show = hasClass(me, "pa-hide-description"),
         tep = button_position_delta(this);
-    tooltip.erase();
+    tooltip.close();
     $es.each(function () {
         toggleClass(this, "pa-hide-description", !show);
         $(this).find(".pa-grade-toggle-description > span").toggleClass("filter-gray", !show);
@@ -569,7 +569,7 @@ handle_ui.on("pa-grade-toggle-markdown", function (event) {
         $es = event.metaKey ? $(".pa-gsection") : $(me),
         show = hasClass(this.firstChild, "filter-gray"),
         tep = button_position_delta(this);
-    tooltip.erase();
+    tooltip.close();
     $es.each(function () {
         const gi = GradeSheet.closest(this);
         $(this).find(".pa-grade").each(function () {
@@ -593,7 +593,7 @@ handle_ui.on("pa-grade-toggle-answer", function (event) {
         $es = event.metaKey ? $(".pa-gsection") : $(me),
         mode = hasClass(this.firstChild, "filter-gray") ? 2 : 0,
         tep = button_position_delta(this);
-    tooltip.erase();
+    tooltip.close();
     $es.each(function () {
         const gi = GradeSheet.closest(this);
         $(this).find(".pa-grade").each(function () {
@@ -1215,7 +1215,7 @@ handle_ui.on("submit.pa-setrepo", function (evt) {
         success: function (data) {
             f.querySelector("button[type=submit]").disabled = false;
             if (data.message_list) {
-                f.insertBefore(render_feedback_list(data.message_list), f.firstChild);
+                f.insertBefore(feedback.render_list(data.message_list), f.firstChild);
             } else {
                 location.reload();
             }
@@ -1239,7 +1239,7 @@ handle_ui.on("submit.pa-setbranch", function (evt) {
         success: function (data) {
             f.querySelector("button[type=submit]").disabled = false;
             if (data.message_list) {
-                f.insertBefore(render_feedback_list(data.message_list), f.firstChild);
+                f.insertBefore(feedback.render_list(data.message_list), f.firstChild);
             } else {
                 location.reload();
             }

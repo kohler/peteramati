@@ -4,7 +4,7 @@
 
 import { escape_entities } from "./encoders.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
-import { hasClass } from "./ui.js";
+import { hasClass, addClass, removeClass, $e } from "./ui.js";
 import { string_utf8_index } from "./utils.js";
 
 function render_class(c, format) {
@@ -212,53 +212,68 @@ export function render_xmsg(status, msg) {
 }
 
 
-function message_list_status(ml) {
-    var i, status = 0;
-    for (i = 0; i !== (ml || []).length; ++i) {
-        if (ml[i].status === -3 && status === 0) {
-            status = -3;
-        } else if (ml[i].status >= 1 && ml[i].status > status) {
-            status = ml[i].status;
-        }
+function message_list_status(ml, field) {
+    let status = 0;
+    for (const mi of ml || []) {
+        if (((mi.status === -3 /*MessageSet::SUCCESS*/ && status === 0)
+             || (mi.status >= 1 && mi.status > status))
+            && (!field || mi.field === field))
+            status = mi.status;
     }
     return status;
 }
 
-export function render_message_list(ml) {
-    var status = message_list_status(ml),
-        div = document.createElement("div");
-    if (status === -3) {
-        div.className = "msg msg-success";
-    } else if (status >= 2) {
-        div.className = "msg msg-error";
-    } else if (status === 1) {
-        div.className = "msg msg-warning";
-    } else {
-        div.className = "msg msg-info";
-    }
-    div.appendChild(render_feedback_list(ml));
-    return div;
-}
-
-export function render_feedback_list(ml) {
+function render_list(ml) {
     const ul = document.createElement("ul");
     ul.className = "feedback-list";
-    for (let i = 0; i !== (ml || []).length; ++i) {
-        append_feedback_to(ul, ml[i]);
+    for (const mi of ml || []) {
+        append_item(ul, mi);
     }
     return ul;
 }
 
-function append_feedback_to(ul, mi) {
-    var sklass, li, div;
-    if (mi.message != null && mi.message !== "") {
-        if (ul.tagName !== "UL")
-            throw new Error("bad append_feedback");
-        sklass = "";
-        if (mi.status != null && mi.status >= -4 && mi.status <= 3)
-            sklass = ["warning-note", "success", "urgent-note", "note", "", "warning", "error", "error"][mi.status + 4];
+function maybe_render_list(ml) {
+    const ul = render_list(ml);
+    return ul.firstChild ? ul : null;
+}
+
+function render_alert_onto(elt, ml) {
+    addClass(elt, "msg");
+    elt.className = elt.className.replace(/(?:^| )msg-(?:success|error|warning|info)(?= |$)/, "");
+    const status = message_list_status(ml);
+    if (status === -3 /*MessageSet::SUCCESS*/) {
+        addClass(elt, "msg-success");
+    } else if (status >= 2) {
+        addClass(elt, "msg-error");
+    } else if (status === 1) {
+        addClass(elt, "msg-warning");
+    } else {
+        addClass(elt, "msg-info");
+    }
+    elt.replaceChildren(render_list(ml));
+    return elt;
+}
+
+function render_alert(ml) {
+    return render_alert_onto(document.createElement("div"), ml);
+}
+
+function redundant_item(mi, ul) {
+    return mi.message == null
+        || mi.message === ""
+        || (!mi.landmark
+            && mi.context
+            && ul.getAttribute("data-last-mi") === mi.status + " " + mi.message);
+}
+
+function append_item(ul, mi) {
+    let li, div;
+    if (!redundant_item(mi, ul)) {
+        let sklass = "";
+        if (mi.status != null && mi.status >= -4 /*MessageSet::MARKED_NOTE*/ && mi.status <= 3)
+            sklass = ["note", "success", "warning-note", "urgent-note", "", "warning", "error", "error"][mi.status + 4];
         div = document.createElement("div");
-        if (mi.status !== -5 || !ul.firstChild) {
+        if (mi.status !== -5 /*MessageSet::INFORM*/ || !ul.firstChild) {
             li = document.createElement("li");
             ul.appendChild(li);
             div.className = sklass ? "is-diagnostic format-inline is-" + sklass : "is-diagnostic format-inline";
@@ -267,20 +282,65 @@ function append_feedback_to(ul, mi) {
             div.className = "msg-inform format-inline";
         }
         li.appendChild(div);
-        render_onto(div, "f", mi.message);
+        render_text.ftext_onto(div, mi.message, 5);
+        if (!mi.landmark) {
+            ul.setAttribute("data-last-mi", mi.status + " " + mi.message);
+        } else {
+            ul.removeAttribute("data-last-mi");
+        }
     }
     if (mi.context) {
-        div = document.createElement("div");
-        div.className = "msg-context";
-        var s = mi.context[0],
+        const s = mi.context[0],
             p1 = string_utf8_index(s, mi.context[1]),
-            p2 = string_utf8_index(s, mi.context[2]),
-            span = document.createElement("span");
-        sklass = mi.status > 1 ? "is-error" : "is-warning";
-        span.className = (p2 > p1 + 2 ? "context-mark " : "context-caret-mark ") +
-            (mi.status > 1 ? "is-error" : "is-warning");
-        span.append(s.substring(p1, p2));
-        div.append(s.substring(0, p1), span, s.substring(p2));
-        ul.lastChild.appendChild(div);
+            p2 = string_utf8_index(s, mi.context[2]);
+        let sklass = p2 > p1 + 2 ? "context-mark" : "context-caret-mark";
+        if (mi.status > 0)
+            sklass += mi.status > 1 ? " is-error" : " is-warning";
+        ul.lastChild || ul.appendChild(document.createElement("li"));
+        ul.lastChild.appendChild($e("div", "msg-context",
+            s.substring(0, p1), $e("span", sklass, s.substring(p1, p2)), s.substring(p2)));
     }
 }
+
+function append_item_near(elt, mi) {
+    if (elt instanceof RadioNodeList) {
+        elt = elt.item(0);
+    }
+    if (mi.status === 1 && !hasClass(elt, "has-error")) {
+        addClass(elt, "has-warning");
+    } else if (mi.status >= 2) {
+        removeClass(elt, "has-warning");
+        addClass(elt, "has-error");
+    }
+    if (mi.message == null || mi.message === "") {
+        return true;
+    }
+    let owner = elt && elt.closest(".f-i, .entry, .entryi, fieldset");
+    if (owner && hasClass(owner, "entryi")) {
+        owner = owner.querySelector(".entry");
+    }
+    if (!owner) {
+        return false;
+    }
+    let fl = owner.firstElementChild;
+    while (fl && (fl.tagName === "LABEL" || fl.tagName === "LEGEND" || hasClass(fl, "feedback"))) {
+        fl = fl.nextElementSibling;
+    }
+    if (!fl || !hasClass(fl, "feedback-list")) {
+        let nfl = render_list();
+        owner.insertBefore(nfl, fl);
+        fl = nfl;
+    }
+    append_item(fl, mi);
+    return true;
+}
+
+export let feedback = {
+    append_item: append_item,
+    append_item_near: append_item_near,
+    list_status: message_list_status,
+    render_list: render_list,
+    maybe_render_list: maybe_render_list,
+    render_alert: render_alert,
+    render_alert_onto: render_alert_onto
+};

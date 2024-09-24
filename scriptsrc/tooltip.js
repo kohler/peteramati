@@ -307,7 +307,7 @@ export function Bubble(content, bubopt) {
         bubdiv = null;
     }
 
-    var bubble = {
+    let bubble = {
         near: function (epos, reference) {
             if (typeof epos === "string" || epos.tagName || epos.jquery) {
                 epos = $(epos);
@@ -404,6 +404,7 @@ export function Bubble(content, bubopt) {
 
 
 let builders = {};
+export let global_tooltip = null;
 
 function prepare_info(elt, info) {
     var xinfo = elt.getAttribute("data-tooltip-info");
@@ -461,12 +462,12 @@ function show_tooltip(info) {
     var tt, bub = null, to = null, near = null, delayto = null,
         refcount = 1, content = info.content;
 
-    function erase() {
+    function close() {
         to = clearTimeout(to);
         bub && bub.remove();
         $(self).removeData("tooltipState");
-        if (window.global_tooltip === tt) {
-            window.global_tooltip = null;
+        if (global_tooltip === tt) {
+            global_tooltip = null;
         }
     }
 
@@ -503,11 +504,11 @@ function show_tooltip(info) {
             var delay = info.type === "focus" ? 0 : 200;
             to = clearTimeout(to);
             if (--refcount <= 0 && info.type !== "sticky") {
-                to = setTimeout(erase, delay);
+                to = setTimeout(close, delay);
             }
             return tt;
         },
-        erase: erase,
+        close: close,
         _element: self,
         html: function (new_content) {
             if (new_content === undefined) {
@@ -530,13 +531,13 @@ function show_tooltip(info) {
     };
 
     {
-        let tx = window.global_tooltip;
+        let tx = global_tooltip;
         if (tx
             && tx._element === info.element
             && tx.html() === content) {
             tt = tx;
         } else {
-            tx && tx.erase();
+            tx && tx.close();
             $(self).data("tooltipState", tt);
             if (info.delay
                 && (!info.noDelayClass
@@ -549,7 +550,7 @@ function show_tooltip(info) {
             } else {
                 show_bub();
             }
-            window.global_tooltip = tt;
+            global_tooltip = tt;
         }
     }
     return tt;
@@ -561,7 +562,7 @@ function ttenter() {
 }
 
 function ttleave() {
-    var tt = $(this).data("tooltipState");
+    const tt = $(this).data("tooltipState");
     tt && tt.exit();
 }
 
@@ -575,9 +576,15 @@ export function tooltip() {
     }
 }
 
-tooltip.erase = function () {
-    var tt = this === tooltip ? window.global_tooltip : $(this).data("tooltipState");
-    tt && tt.erase();
+tooltip.close = function (e) {
+    const tt = e ? $(e).data("tooltipState") : global_tooltip;
+    tt && tt.close();
+};
+
+tooltip.close_under = function (e) {
+    if (global_tooltip && e.contains(global_tooltip.near())) {
+        global_tooltip.close();
+    }
 };
 
 tooltip.add_builder = function (name, f) {

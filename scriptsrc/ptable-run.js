@@ -2,10 +2,9 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { handle_ui } from "./ui.js";
+import { handle_ui, $e } from "./ui.js";
 import { hoturl_post_go } from "./hoturl.js";
-import { escape_entities } from "./encoders.js";
-import { popup_skeleton, popup_close } from "./popup.js";
+import { $popup } from "./popup.js";
 
 
 handle_ui.on("js-ptable-run", function () {
@@ -33,36 +32,37 @@ handle_ui.on("js-ptable-run", function () {
             }
             hoturl_post_go("=run", param, data);
         } else {
-            popup_close.call(form);
+            $gdialog.close();
         }
     }
 
     function gdialog() {
         slist = ptconf.users_in(f, ptconf.SOME_USERS);
 
-        const hc = popup_skeleton();
-        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Commands</h2>');
-        hc.push('<h3 class="gdialog-userids"></h3>');
-        hc.push('<div class="pa-messages"></div>');
-
-        hc.push('<div class="mt-1 multicol-2">', '</div>');
+        const ru = $e("div", "mt-1 multicol-2");
         for (let rn in ptconf.runners) {
-            hc.push('<label class="checki"><span class="checkc"><input type="radio" name="runner" value="' + rn + '"></span>' + escape_entities(ptconf.runners[rn]) + '</label>');
+            ru.append($e("label", "checki",
+                $e("span", "checkc", $e("input", {type: "radio", name: "runner", value: rn})),
+                ptconf.runners[rn]));
         }
-        hc.pop();
 
-        hc.push('<label class="checki mt-2"><span class="checkc"><input type="checkbox" name="ifneeded"></span>Use prerecorded runs when available</label>');
-
-        hc.push('<label class="checki mt-2 has-fold foldc"><span class="checkc"><input type="checkbox" name="selectcommits" class="uic js-foldup" data-fold-target="#U"></span>Select commits<span class="fx">: <input type="text" name="commitq" placeholder="grading" class="ml-1"></span></label>');
-
-        hc.push_actions();
-        hc.push('<button type="button" name="run" class="btn-primary">Run</button>');
-        hc.push('<button type="button" name="cancel">Cancel</button>');
-        $gdialog = hc.show(false);
-        ptconf.render_gdialog_users($gdialog.find("h3")[0], slist);
-        form = $gdialog.find("form")[0];
+        $gdialog = $popup()
+            .append($e("h2", "pa-home-pset", ptconf.title + " Commands"),
+                $e("h3", "gdialog-userids"),
+                $e("div", "pa-messages"),
+                ru,
+                $e("label", "checki mt-2",
+                    $e("span", "checkc", $e("input", {type: "checkbox", name: "ifneeded"})),
+                    "Use prerecorded runs when available"),
+                $e("label", "checki mt-2 has-fold foldc",
+                    $e("span", "checkc", $e("input", {type: "checkbox", name: "selectcommits", class: "uic js-foldup", "data-fold-target": "#U"})),
+                    "Select commits",
+                    $e("span", "fx", ": ", $e("input", {type: "text", name: "commitq", placeholder: "grading", class: "ml-1"}))))
+            .append_actions($e("button", {type: "button", name: "run", class: "btn-primary"}, "Run"), "Cancel");
+        ptconf.render_gdialog_users($gdialog.querySelector("h3"), slist);
+        form = $gdialog.form();
         $(form.elements.run).on("click", submit);
-        hc.show();
+        $gdialog.show();
     }
 
     gdialog();

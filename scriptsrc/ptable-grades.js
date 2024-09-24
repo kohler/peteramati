@@ -6,7 +6,7 @@ import { addClass, removeClass, toggleClass, $e, input_differs, handle_ui } from
 import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { escape_entities } from "./encoders.js";
-import { popup_skeleton } from "./popup.js";
+import { $popup } from "./popup.js";
 import { render_xmsg } from "./render.js";
 import { GradeSheet } from "./gradeentry.js";
 
@@ -516,27 +516,22 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
     }
 
     function show() {
-        const hc = popup_skeleton();
-        hc.push('<h2 class="pa-home-pset">' + escape_entities(ptconf.title) + ' Grades</h2>');
-        hc.push('<h3 class="gdialog-userids hidden"></h3>');
-        hc.push('<div class="pa-messages"></div>');
-
-        hc.push('<div class="nav-pills">', '</div>');
-        hc.push('<button type="button" class="btn btn-primary no-focus is-mode" name="mode-values">Values</button>');
-        hc.push('<button type="button" class="btn no-focus is-mode" name="mode-settings">Settings</button>');
-        hc.pop();
-
-        hc.push('<div class="pa-gdialog-tab pa-gradelist is-modal"></div>');
-        hc.push('<div class="pa-gdialog-tab pa-gdialog-settings hidden"></div>');
-
-        hc.push_actions();
-        hc.push('<button type="button" name="bsubmit" class="btn-primary">Save</button>');
-        hc.push('<button type="button" name="cancel">Cancel</button>');
-        hc.push('<span class="btnbox btnl"><button type="button" name="prev" class="btnl">&lt;</button><button type="button" name="next" class="btnl">&gt;</button></span>');
-        hc.push('<button type="button" name="clearauto" class="btnl">Clear autogrades</button>');
-        $gdialog = hc.show(false);
-        $gdialog.children(".modal-dialog").addClass("modal-dialog-wide");
-        form = $gdialog.find("form")[0];
+        $gdialog = $popup({className: "modal-dialog-wide"})
+            .append($e("h2", "pa-home-pset", ptconf.title + " Grades"),
+                $e("h3", "gdialog-userids hidden"),
+                $e("div", "pa-messages"),
+                $e("div", "nav-pills",
+                    $e("button", {type: "button", class: "btn btn-primary no-focus is-mode", name: "mode-values"}, "Values"),
+                    $e("button", {type: "button", class: "btn no-focus is-mode", name: "mode-settings"}, "Settings")),
+                $e("div", "pa-gdialog-tab pa-gradelist is-modal"),
+                $e("div", "pa-gdialog-tab pa-gdialog-settings hidden"))
+            .append_actions($e("button", {type: "button", name: "bsubmit", class: "btn-primary"}, "Save"),
+                "Cancel",
+                $e("span", "btnbox btnl",
+                    $e("button", {type: "button", name: "prev", class: "btnl"}, "<"),
+                    $e("button", {type: "button", name: "next", class: "btnl"}, ">")),
+                $e("button", {type: "button", name: "clearauto", class: "btnl"}, "Clear autogrades"));
+        form = $gdialog.form();
         addClass(form, "pa-psetinfo");
         form.pa__gradesheet = ptconf.gradesheet;
         gdialog_mode_values();
@@ -556,7 +551,7 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
             addClass(form.elements[hlgrade], "want-focus");
             addClass(form.elements[hlgrade], "want-select");
         }
-        hc.show();
+        $gdialog.show();
     }
 
     show();
