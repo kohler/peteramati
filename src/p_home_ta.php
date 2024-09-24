@@ -443,28 +443,29 @@ class Home_TA_Page {
         $jx = [];
         $gradercounts = [];
         foreach ($sset as $s) {
-            if (!$s->user->visited) {
-                $j = $this->pset_row_json($pset, $sset, $s, $gexp);
-                if (!$s->user->dropped && isset($j["gradercid"])) {
-                    $gradercounts[$j["gradercid"]] = ($gradercounts[$j["gradercid"]] ?? 0) + 1;
+            if ($s->user->visited) {
+                continue;
+            }
+            $j = $this->pset_row_json($pset, $sset, $s, $gexp);
+            if (!$s->user->dropped && isset($j["gradercid"])) {
+                $gradercounts[$j["gradercid"]] = ($gradercounts[$j["gradercid"]] ?? 0) + 1;
+            }
+            if (!$pset->partner_repo) {
+                foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
+                    if (($ss = $sset->info($pcid)))
+                        $j["partners"][] = $this->pset_row_json($pset, $sset, $ss, $gexp);
                 }
-                if (!$pset->partner_repo) {
-                    foreach ($s->user->links(LINK_PARTNER, $pset->id) as $pcid) {
-                        if (($ss = $sset->info($pcid)))
-                            $j["partners"][] = $this->pset_row_json($pset, $sset, $ss, $gexp);
-                    }
+            }
+            $jx[] = $j;
+            if ($s->user->incomplete) {
+                $u = $this->viewer->user_linkpart($s->user);
+                $t = '<a href="' . $sset->conf->hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
+                    . htmlspecialchars($u);
+                if ($s->user->incomplete !== true) {
+                    $t .= " (" . $s->user->incomplete . ")";
                 }
-                $jx[] = $j;
-                if ($s->user->incomplete) {
-                    $u = $this->viewer->user_linkpart($s->user);
-                    $t = '<a href="' . $sset->conf->hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
-                        . htmlspecialchars($u);
-                    if ($s->user->incomplete !== true) {
-                        $t .= " (" . $s->user->incomplete . ")";
-                    }
-                    $incomplete[] = $t . '</a>';
-                    $incompleteu[] = "~" . urlencode($u);
-                }
+                $incomplete[] = $t . '</a>';
+                $incompleteu[] = "~" . urlencode($u);
             }
         }
 

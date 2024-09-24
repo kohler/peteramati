@@ -495,6 +495,29 @@ function ptable_body_click(evt) {
     }
 }
 
+function ptable_make_hotlist(evt) {
+    const ptconf = this.closest("form").pa__ptconf, j = [];
+    for (let tr = this.firstChild; tr; tr = tr.nextElementSibling) {
+        if (tr.hidden) {
+            continue;
+        }
+        const su = ptconf.user_at(tr);
+        if (!su) {
+            continue;
+        }
+        let t = "~" + encodeURIComponent(ptconf.ukey(su));
+        if (ptconf.flagged_commits) {
+            t = t.concat("/pset/", su.pset);
+            if (su.commit) {
+                t = t.concat("/", su.commit);
+            }
+        }
+        j.push(t);
+    }
+    event.detail.hotlist = {pset: ptconf.flagged_commits ? null : ptconf.key, items: j};
+}
+
+
 function ptable_body_scroller(ctrh) {
     return function () {
         ctrh.scrollLeft = this.scrollLeft;
@@ -1340,20 +1363,6 @@ function pa_render_pset_table(ptconf) {
     }
 
 
-    function make_hotlist(event) {
-        const j = [];
-        for (const s of data) {
-            let t = "~".concat(encodeURIComponent(ptconf.ukey(s)));
-            if (ptconf.flagged_commits) {
-                t = t.concat("/pset/", s.pset);
-                if (s.commit)
-                    t = t.concat("/", s.commit);
-            }
-            j.push(t);
-        }
-        event.detail.hotlist = {pset: ptconf.flagged_commits ? null : ptconf.key, items: j};
-    }
-
     function assign_slist() {
         var j = [];
         for (var i = 0; i !== data.length; ++i) {
@@ -1631,7 +1640,7 @@ function pa_render_pset_table(ptconf) {
 
     function events() {
         const f = table.closest("form");
-        table.tBodies[0].addEventListener("pa-hotlist", make_hotlist);
+        table.tBodies[0].addEventListener("pa-hotlist", ptable_make_hotlist);
         table.tBodies[0].addEventListener("click", ptable_body_click);
         table.addEventListener("mouseenter", user_hover, true);
         table.addEventListener("mouseleave", user_hover, true);
