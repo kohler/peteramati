@@ -704,8 +704,8 @@ class GradeEntry {
         if ($this->concealed) {
             $gej["concealed"] = true;
         }
-        if ($this->required) {
-            $gej["required"] = true;
+        if ($this->required !== null) {
+            $gej["required"] = $this->required;
         }
         if ($this->answer)  {
             $gej["answer"] = true;

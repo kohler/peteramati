@@ -845,42 +845,43 @@ class PsetView {
     }
 
     private function ensure_formulas() {
-        if ($this->pset->has_formula && !$this->_has_formula) {
-            $this->_has_formula = true;
-            $this->_g = $this->_g ?? $this->blank_values();
-            $this->_has_fg = [];
-            $jn = $this->grade_jxnotes();
-            $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
-            //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$jn->formula_at}");
-            if (!$jn || ($jn->formula_at ?? null) !== $t) {
-                $fs = [];
-                foreach ($this->pset->formula_grades() as $ge) {
-                    $f = $ge->formula();
-                    $v = $f->evaluate($this->user);
+        if (!$this->pset->has_formula || $this->_has_formula) {
+            return;
+        }
+        $this->_has_formula = true;
+        $this->_g = $this->_g ?? $this->blank_values();
+        $this->_has_fg = [];
+        $jn = $this->grade_jxnotes();
+        $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
+        //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$jn->formula_at}");
+        if (!$jn || ($jn->formula_at ?? null) !== $t) {
+            $fs = [];
+            foreach ($this->pset->formula_grades() as $ge) {
+                $f = $ge->formula();
+                $v = $f->evaluate($this->user);
+                if ($v !== null) {
+                    $this->_g[$ge->pcview_index] = $v;
+                } else {
+                    $this->_has_fg[$ge->pcview_index] = true;
+                }
+                if ($f->cacheable) {
+                    $fs[$ge->key] = $v;
+                }
+            }
+            if ($this->pset->gitless_grades || $this->_hash) {
+                $this->update_grade_xnotes([
+                    "formula_at" => $t,
+                    "formula" => new JsonReplacement(empty($fs) ? null : $fs)
+                ]);
+            }
+        } else if (($g = $jn->formula ?? null)) {
+            foreach ($this->pset->formula_grades() as $ge) {
+                if (property_exists($g, $ge->key)) {
+                    $v = $g->{$ge->key};
                     if ($v !== null) {
                         $this->_g[$ge->pcview_index] = $v;
                     } else {
                         $this->_has_fg[$ge->pcview_index] = true;
-                    }
-                    if ($f->cacheable) {
-                        $fs[$ge->key] = $v;
-                    }
-                }
-                if ($this->pset->gitless_grades || $this->_hash) {
-                    $this->update_grade_xnotes([
-                        "formula_at" => $t,
-                        "formula" => new JsonReplacement(empty($fs) ? null : $fs)
-                    ]);
-                }
-            } else if (($g = $jn->formula ?? null)) {
-                foreach ($this->pset->formula_grades() as $ge) {
-                    if (property_exists($g, $ge->key)) {
-                        $v = $g->{$ge->key};
-                        if ($v !== null) {
-                            $this->_g[$ge->pcview_index] = $v;
-                        } else {
-                            $this->_has_fg[$ge->pcview_index] = true;
-                        }
                     }
                 }
             }
@@ -888,46 +889,49 @@ class PsetView {
     }
 
     private function ensure_visible_total() {
-        if ($this->_gtottime !== $this->user->gradeUpdateTime) {
-            $this->ensure_grades();
-            $this->_gtottime = $this->user->gradeUpdateTime;
-            $this->_gtot = $this->_gtotne = $this->_gutot = $this->_gmaxtot = null;
-            $this->_gallreq = true;
-            $vf = $this->vf();
-            foreach ($this->visible_grades(VF_TF) as $ge) {
-                if ($ge->no_total) {
-                    continue;
-                }
-                $v = $this->_g[$ge->pcview_index] ?? null;
-                $gvf = $this->_grades_vf[$ge->pcview_index];
-                if ($v !== null
-                    && ($gvf & $vf) !== 0) {
-                    $this->_gtot = ($this->_gtot ?? 0) + $v;
-                    if (!$ge->is_extra) {
-                        $this->_gtotne = ($this->_gtotne ?? 0) + $v;
-                    }
-                }
-                if ($v !== null
-                    && ($gvf & $vf & ~VF_TF) !== 0) {
-                    $this->_gutot = ($this->_gutot ?? 0) + $v;
-                }
-                if (!$ge->is_extra
-                    && $ge->max_visible
-                    && ($gvf & $vf) !== 0) {
-                    $this->_gmaxtot = ($this->_gmaxtot ?? 0) + $ge->max;
-                }
-                if (!$ge->is_extra
-                    && $ge->required
-                    && $v === null
-                    && ($gvf & ~VF_TF) !== 0) {
-                    // A required non-extra-credit score is missing
-                    $this->_gallreq = false;
+        if ($this->_gtottime === $this->user->gradeUpdateTime) {
+            return;
+        }
+        $this->ensure_grades();
+        $this->_gtottime = $this->user->gradeUpdateTime;
+        $this->_gtot = $this->_gtotne = $this->_gutot = $this->_gmaxtot = null;
+        $this->_gallreq = true;
+        $vf = $this->vf();
+        foreach ($this->visible_grades(VF_TF) as $ge) {
+            if ($ge->no_total) {
+                continue;
+            }
+            $v = $this->_g[$ge->pcview_index] ?? null;
+            $gvf = $this->_grades_vf[$ge->pcview_index];
+            error_log(json_encode([$ge->name, $v, $gvf, $vf]));
+            if ($v !== null
+                && ($gvf & $vf) !== 0) {
+                $this->_gtot = ($this->_gtot ?? 0) + $v;
+                if (!$ge->is_extra) {
+                    $this->_gtotne = ($this->_gtotne ?? 0) + $v;
                 }
             }
-            $this->_gtot = round_grade($this->_gtot);
-            $this->_gutot = round_grade($this->_gutot);
-            $this->_gtotne = round_grade($this->_gtotne);
+            if ($v !== null
+                && ($gvf & $vf & ~VF_TF) !== 0) {
+                $this->_gutot = ($this->_gutot ?? 0) + $v;
+            }
+            if (!$ge->is_extra
+                && $ge->max_visible
+                && ($gvf & $vf) !== 0) {
+                $this->_gmaxtot = ($this->_gmaxtot ?? 0) + $ge->max;
+            }
+            if ($v === null
+                && !$ge->is_extra
+                && !$ge->no_total
+                && $ge->required !== false
+                && ($gvf & ~VF_TF) !== 0) {
+                // A required non-extra-credit score is missing
+                $this->_gallreq = false;
+            }
         }
+        $this->_gtot = round_grade($this->_gtot);
+        $this->_gutot = round_grade($this->_gutot);
+        $this->_gtotne = round_grade($this->_gtotne);
     }
 
     /** @return null|int|float */
