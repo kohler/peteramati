@@ -282,7 +282,7 @@ function append_item(ul, mi) {
             div.className = "msg-inform format-inline";
         }
         li.appendChild(div);
-        render_text.ftext_onto(div, mi.message, 5);
+        render_onto(div, "f", mi.message);
         if (!mi.landmark) {
             ul.setAttribute("data-last-mi", mi.status + " " + mi.message);
         } else {
