@@ -53,12 +53,12 @@ if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq, $Me))) {
     $Conf->redirect_self($Qreq, ["u" => null]);
 }
-if (!$Me->isPC || !$User) {
+if (!$Me->isPC) {
     $User = $Me;
 }
 
 // check problem set openness
-if (!$Me->is_empty()
+if ($User
     && ($Me === $User || $Me->isPC)
     && $Qreq->set_username
     && $Qreq->valid_post()
@@ -69,11 +69,13 @@ if (!$Me->is_empty()
     }
 }
 
-if ($Qreq->set_partner !== null) {
+if ($User
+    && $Qreq->set_partner !== null) {
     ContactView::set_partner_action($User, $Me, $Qreq);
 }
 
-if ((isset($Qreq->set_drop) || isset($Qreq->set_undrop))
+if ($User
+    && (isset($Qreq->set_drop) || isset($Qreq->set_undrop))
     && $Me->isPC
     && $User->is_student()
     && $Qreq->valid_post()) {
@@ -162,7 +164,7 @@ echo "<noscript><div class='homeinside'>",
 echo "</div>\n";
 
 // Conference management
-if ($Me->privChair && (!$User || $User === $Me)) {
+if ($Me->privChair && !$User) {
     echo "<div id='homeadmin'>
   <h3>administration</h3>
   <ul>
@@ -206,7 +208,7 @@ if ($Me->privChair && (!$User || $User === $Me)) {
 </div>\n";
 }
 
-if ($Me->isPC && $User === $Me) {
+if ($Me->isPC && !$User) {
     $a = [];
     foreach ($Conf->psets_newest_first() as $pset) {
         if ($Me->can_view_pset($pset) && !$pset->disabled)
@@ -281,7 +283,7 @@ Sign in to tell us about your code.';
 
 
 // Top: user info
-if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
+if (!$Me->is_empty() && $User) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
     if ($User !== $Me && !$User->is_anonymous && $User->contactImageId) {
@@ -309,10 +311,12 @@ if (!$Me->is_empty() && (!$Me->isPC || $User !== $Me)) {
 
     echo '<hr class="c" />', "</div>\n";
 }
-if (!$Me->is_empty() && $User->is_student()) {
+if ($Me->is_empty()) {
+    // render nothing
+} else if ($User) {
     $hp = new Home_Student_Page($User, $Me);
     $hp->render_default();
-} else if (!$Me->is_empty() && $Me->isPC && $User === $Me) {
+} else if ($Me->isPC) {
     $hp = new Home_TA_Page($Me, $Qreq);
     $hp->profile = $Me->privChair && $Qreq->profile;
     $hp->render_default();
