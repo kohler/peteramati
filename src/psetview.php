@@ -903,7 +903,6 @@ class PsetView {
             }
             $v = $this->_g[$ge->pcview_index] ?? null;
             $gvf = $this->_grades_vf[$ge->pcview_index];
-            error_log(json_encode([$ge->name, $v, $gvf, $vf]));
             if ($v !== null
                 && ($gvf & $vf) !== 0) {
                 $this->_gtot = ($this->_gtot ?? 0) + $v;

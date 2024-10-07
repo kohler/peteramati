@@ -410,7 +410,7 @@ class PsetRequest {
     }
 
     private function echo_grader() {
-        if (!$this->info->is_grading_commit()
+        if ((!$this->pset->gitless && !$this->info->is_grading_commit())
             || !$this->viewer->can_view_grader($this->pset, $this->user)) {
             return;
         }
