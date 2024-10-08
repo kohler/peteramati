@@ -1987,13 +1987,14 @@ class Conf {
         }
         Ht::stash_html($this->make_script_file("scripts/jquery.color-2.1.2.min.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/markdown-it.min.js", true) . "\n");
+        // Ht::stash_html($this->make_script_file("scripts/markdown-it-attrs.browser.js", true) . "\n");
         Ht::stash_html($this->make_script_file("scripts/highlight.min.js", true) . "\n");
-        Ht::stash_html($this->make_script_file("scripts/markdown-it-katexx.min.js", true) . "\n");
         if ($this->opt("katexUrl") === "local") {
             Ht::stash_html($this->make_script_file("scripts/katex.min.js", true) . "\n");
         } else {
-            Ht::stash_html('<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>');
+            Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>');
         }
+        Ht::stash_html($this->make_script_file("scripts/markdown-it-katex.js", true) . "\n");
         foreach ($this->opt["javascripts"] as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
         }

@@ -4,6 +4,7 @@
 
 import { escape_entities } from "./encoders.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
+import { markdownit_attributes } from "./markdown-attributes.js";
 import { hasClass, addClass, removeClass, $e } from "./ui.js";
 import { string_utf8_index } from "./utils.js";
 
@@ -116,7 +117,7 @@ add_format({
     format: 3,
     render: function (text) {
         if (!md2) {
-            md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true, attributes: true}).use(markdownit_katex);
+            md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true}).use(markdownit_katex).use(markdownit_attributes);
         }
         return md2.render(text);
     }
