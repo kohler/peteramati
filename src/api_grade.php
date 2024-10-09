@@ -16,12 +16,12 @@ class Grade_API {
         assert(!empty($this->errf));
         $j["ok"] = false;
         if (isset($this->errf["!invalid"])) {
-            $j["error"] = "Invalid request.";
+            $j["error"] = "Invalid request";
         } else {
             if (count($this->errf) === 1) {
                 $j["error"] = (array_values($this->errf))[0];
             } else {
-                $j["error"] = "Invalid grades.";
+                $j["error"] = "Invalid grades";
             }
             $j["errf"] = $this->errf;
         }
@@ -63,7 +63,7 @@ class Grade_API {
                 if ($ge->value_differs($oldgv, $og[$k])
                     && (!array_key_exists($k, $g)
                         || $ge->value_differs($oldgv, $g[$k]))) {
-                    $this->errf[$k] = "Edit conflict.";
+                    $this->errf[$k] = "Edit conflict";
                 }
             }
             $has_agv = false;
@@ -73,32 +73,33 @@ class Grade_API {
                 $v["autogrades"][$k] = $agv = $ag[$k];
                 $has_agv = true;
             }
-            if (array_key_exists($k, $g)) {
-                $gv = $g[$k];
-                if (!$has_agv
-                    && ($notes = $info->grade_jnotes())
-                    && isset($notes->autogrades)) {
-                    $agv = $notes->autogrades->$k ?? null;
-                }
-                if ($agv === false) {
-                    $agv = null;
-                }
-                if ($gv === null) {
-                    $gv = $agv;
-                } else if ($gv === false && $agv === null) {
-                    $gv = null;
-                }
-                $allowed = $ge->allow_edit($gv, $oldgv, $agv, $info);
-                if ($allowed === true) {
-                    $v["grades"][$k] = $gv;
-                    if ($ge->answer) {
-                        $v["linenotes"]["/g/{$ge->key}"] = null;
-                    }
-                    $this->diff = $this->diff || $ge->value_differs($gv, $oldgv);
-                } else {
-                    $this->errf[$k] = $allowed->message;
-                }
+            if (!array_key_exists($k, $g)) {
+                continue;
             }
+            $gv = $g[$k];
+            if (!$has_agv
+                && ($notes = $info->grade_jnotes())
+                && isset($notes->autogrades)) {
+                $agv = $notes->autogrades->$k ?? null;
+            }
+            if ($agv === false) {
+                $agv = null;
+            }
+            if ($gv === null) {
+                $gv = $agv;
+            } else if ($gv === false && $agv === null) {
+                $gv = null;
+            }
+            $allowed = $ge->allow_edit($gv, $oldgv, $agv, $info);
+            if ($allowed !== true) {
+                $this->errf[$k] = $allowed->message;
+                continue;
+            }
+            $v["grades"][$k] = $gv;
+            if ($ge->answer) {
+                $v["linenotes"]["/g/{$ge->key}"] = null;
+            }
+            $this->diff = $this->diff || $ge->value_differs($gv, $oldgv);
         }
         if (array_key_exists("late_hours", $g) && $info->pc_view) {
             // XXX separate permission check?
@@ -135,13 +136,13 @@ class Grade_API {
         // XXX match commit with grading commit
         if ($qreq->is_post()) {
             if (!$qreq->valid_post()) {
-                return ["ok" => false, "error" => "Missing credentials."];
+                return ["ok" => false, "error" => "Missing credentials"];
             } else if ($info->is_handout_commit()) {
-                return ["ok" => false, "error" => "Cannot set grades on handout commit."];
+                return ["ok" => false, "error" => "Cannot set grades on handout commit"];
             } else if (!$info->pset->gitless_grades
                        && $qreq->commit_is_grade
                        && $info->grading_hash() !== $info->commit_hash()) {
-                return ["ok" => false, "error" => "The grading commit has changed."];
+                return ["ok" => false, "error" => "The grading commit has changed"];
             }
 
             // parse grade elements
@@ -160,7 +161,7 @@ class Grade_API {
                 $info->update_grade_notes($v);
             }
         } else if (!$info->can_view_some_grade()) {
-            return ["ok" => false, "error" => "Permission error."];
+            return ["ok" => false, "error" => "Permission error"];
         }
         $j = (array) $info->grade_json(0, $known_entries);
         $j["ok"] = true;
@@ -203,11 +204,11 @@ class Grade_API {
         }
         $us = $api->conf->users_by_id($uidlist);
         if (count($us) !== count($uids)) {
-            throw new Error("Invalid users.");
+            throw new Error("Invalid users");
         }
         foreach ($us as $u) {
             if ($u->contactId !== $viewer->contactId && !$viewer->isPC)
-                throw new Error("Permission error.");
+                throw new Error("Permission error");
         }
         return StudentSet::make_for($us, $viewer);
     }
@@ -223,9 +224,9 @@ class Grade_API {
 
     static function multigrade(Contact $viewer, Qrequest $qreq, APIData $api) {
         if (($ugs = self::parse_users($qreq->us)) === null) {
-            return ["ok" => false, "error" => "Missing parameter."];
+            return ["ok" => false, "error" => "Missing parameter"];
         } else if ($qreq->is_post() && !$qreq->valid_post()) {
-            return ["ok" => false, "error" => "Missing credentials."];
+            return ["ok" => false, "error" => "Missing credentials"];
         }
         try {
             $sset = self::student_set(array_keys($ugs), $viewer, $api);
@@ -240,7 +241,7 @@ class Grade_API {
             // XXX branch nonsense
             if (!$info->can_view_some_grade()
                 || ($qreq->is_post() && !$info->can_edit_scores())) {
-                return ["ok" => false, "error" => "Permission error for user " . $info->user_linkpart() . "."];
+                return ["ok" => false, "error" => "Permission error for user " . $info->user_linkpart()];
             }
             if (!$api->pset->gitless_grades) {
                 if (!$info->repo) {
@@ -305,7 +306,7 @@ class Grade_API {
             }
             if (!empty($gapi->errf)) {
                 $jx["ok"] = false;
-                $jx["error"] = "Grade edit conflict, your update was ignored.";
+                $jx["error"] = "Grade edit conflict, your update was ignored";
             } else {
                 foreach ($ugs as $uid => $gx) {
                     if (!empty($v[$uid]))
