@@ -21,6 +21,9 @@ class GradeEntry {
     public $description;
     /** @var string
      * @readonly */
+    public $label;
+    /** @var string
+     * @readonly */
     public $type;
     /** @var int
      * @readonly */
@@ -29,7 +32,7 @@ class GradeEntry {
      * @readonly */
     public $vtype;
     /** @var bool
-     * @readonlg */
+     * @readonly */
     public $type_tabular;
     /** @var bool
      * @readonly */
@@ -59,6 +62,11 @@ class GradeEntry {
     private $visible_if;
     /** @var ?GradeFormula */
     private $_visible_if;
+    /** @var ?string
+     * @readonly */
+    private $suppress_if;
+    /** @var ?GradeFormula */
+    private $_suppress_if;
     /** @var bool
      * @readonly */
     public $concealed;
@@ -153,6 +161,7 @@ class GradeEntry {
             $this->title = $this->key;
         }
         $this->description = Pset::cstr($loc, $g, "description", "edit_description");
+        $this->label = Pset::cstr($loc, $g, "label");
         $this->removed = Pset::cbool($loc, $g, "removed");
         $this->disabled = Pset::cbool($loc, $g, "disabled");
         if (isset($g->disabled_if)) {
@@ -257,6 +266,9 @@ class GradeEntry {
         if (isset($g->visible_if)) {
             $this->visible_if = Pset::cstr($loc, $g, "visible_if");
         }
+        if (isset($g->suppress_if)) {
+            $this->suppress_if = Pset::cstr($loc, $g, "suppress_if");
+        }
         $this->concealed = Pset::cbool($loc, $g, "concealed");
         $this->required = Pset::cbool($loc, $g, "required");
         if (isset($g->max_visible)) {
@@ -359,18 +371,33 @@ class GradeEntry {
         return $x;
     }
 
+    /** @param string $formula
+     * @return GradeFormula */
+    private function compile($formula) {
+        $fc = new GradeFormulaCompiler($this->pset->conf);
+        return $fc->parse($formula, $this) ?? new Error_GradeFormula;
+    }
+
 
     /** @param ?PsetView $info
-     * @return 4|5|6 */
+     * @return 0|4|5|6 */
     function vf($info) {
         $visible = $this->visible;
-        if ($this->visible !== false && $this->visible_if !== null && $info) {
-            if ($this->_visible_if === null) {
-                $fc = new GradeFormulaCompiler($this->pset->conf);
-                $this->_visible_if = $fc->parse($this->visible_if, $this) ?? new Error_GradeFormula;
+        if ($info) {
+            if ($this->suppress_if !== null) {
+                if ($this->_suppress_if === null) {
+                    $this->_suppress_if = $this->compile($this->suppress_if);
+                }
+                if ($this->_suppress_if->evaluate($info->user, $info)) {
+                    return 0;
+                }
             }
-            $x = $this->_visible_if->evaluate($info->user, $info);
-            $visible = !!$x;
+            if ($visible !== false && $this->visible_if !== null) {
+                if ($this->_visible_if === null) {
+                    $this->_visible_if = $this->compile($this->visible_if);
+                }
+                $visible = !!$this->_visible_if->evaluate($info->user, $info);
+            }
         }
         if ($visible === true
             || ($this->answer && $visible !== false)
@@ -385,7 +412,7 @@ class GradeEntry {
 
     /** @return bool */
     function has_visible_if() {
-        return $this->visible_if !== null;
+        return $this->visible_if !== null || $this->suppress_if !== null;
     }
 
 
@@ -611,9 +638,8 @@ class GradeEntry {
         if ($this->disabled || !$this->disabled_if) {
             return $this->disabled;
         }
-        if (!$this->_disabled_if) {
-            $fc = new GradeFormulaCompiler($this->pset->conf);
-            $this->_disabled_if = $fc->parse($this->disabled_if, $this) ?? new Error_GradeFormula;
+        if ($this->_disabled_if === null) {
+            $this->_disabled_if = $this->compile($this->disabled_if);
         }
         return !!$this->_disabled_if->evaluate($info->user, $info);
     }
@@ -665,8 +691,7 @@ class GradeEntry {
     function formula() {
         if ($this->_formula === null) {
             if ($this->formula !== null) {
-                $fc = new GradeFormulaCompiler($this->pset->conf);
-                $this->_formula = $fc->parse($this->formula, $this) ?? new Error_GradeFormula;
+                $this->_formula = $this->compile($this->formula);
                 $this->vtype = $this->_formula->vtype;
             } else {
                 $this->_formula = new GradeEntry_GradeFormula($this);
@@ -701,6 +726,9 @@ class GradeEntry {
             } else {
                 $gej["type"] = $this->type;
             }
+        }
+        if ($this->label !== null) {
+            $gej["label"] = $this->label;
         }
         if ($this->round) {
             $gej["round"] = $this->round;

@@ -116,7 +116,7 @@ GradeClass.add("timermark", {
         but.name = this.key + ":b";
         but.value = 1;
         but.disabled = this.disabled;
-        but.append("Press to start");
+        but.append(this.label || "Press to start");
         const fr = new DocumentFragment;
         fr.append(but);
         if (siteinfo.user.is_pclike) {

@@ -176,7 +176,11 @@ export class GradeEntry {
             render_onto(de, "f", this.description);
             pge.appendChild(de);
         }
-        pde.className = mode === 2 ? "ui-submit pa-pv" : "pa-pv";
+        if (mode === 2) {
+            pde.className = "ui-submit pa-pv" + (this.description ? " pa-textv" : "");
+        } else {
+            pde.className = "pa-pv";
+        }
         pge.appendChild(pde);
         this.mount_at(pde, id, mode);
         return pge;
@@ -615,7 +619,11 @@ export class GradeSheet {
                 mode = mode ? 2 : 0;
             }
             const pdx = document.createElement(mode === 2 ? "form" : "div");
-            pdx.className = mode === 2 ? "ui-submit pa-pv" : "pa-pv";
+            if (mode === 2) {
+                pdx.className = "ui-submit pa-pv" + (this.description ? " pa-textv" : "");
+            } else {
+                pdx.className = "pa-pv";
+            }
             toggleClass(elt, "e", mode !== 0);
             elt.replaceChild(pdx, pde);
             mode === 2 && removeClass(elt, "hidden");

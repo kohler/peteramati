@@ -122,8 +122,6 @@ class Pset {
      * @readonly */
     private $_grades_vf = [];
     /** @var bool */
-    private $has_visible_if;
-    /** @var bool */
     public $scores_visible;
     /** @var int */
     public $scores_visible_at;
@@ -153,6 +151,8 @@ class Pset {
     public $has_answers = false;
     /** @var bool */
     public $has_timermark = false;
+    /** @var bool */
+    private $has_visible_if = false;
     /** @var ?bool */
     private $_has_uncacheable_formula;
     /** @var ?array<null|int|float> */
@@ -369,34 +369,37 @@ class Pset {
         $grades = $p->grades ?? null;
         if (is_array($grades) || is_object($grades)) {
             foreach ((array) $p->grades as $k => $v) {
-                $g = new GradeEntry(is_int($k) ? $k + 1 : $k, $v, $this);
-                if (isset($this->all_grades[$g->key])
-                    || $g->key === "late_hours") {
-                    throw new PsetConfigException("grade `$g->key` reused", "grades", $k);
+                $ge = new GradeEntry(is_int($k) ? $k + 1 : $k, $v, $this);
+                if (isset($this->all_grades[$ge->key])
+                    || $ge->key === "late_hours") {
+                    throw new PsetConfigException("grade `{$ge->key}` reused", "grades", $k);
                 }
-                $this->all_grades[$g->key] = $g;
-                if ($g->removed) {
+                $this->all_grades[$ge->key] = $ge;
+                if ($ge->removed) {
                     continue;
                 }
-                $this->grades[$g->key] = $g;
-                if ($g->collate) {
+                $this->grades[$ge->key] = $ge;
+                if ($ge->collate) {
                     $this->has_grade_collate = true;
                 }
-                if ($g->landmark_file || $g->landmark_range_file) {
+                if ($ge->landmark_file || $ge->landmark_range_file) {
                     $this->has_grade_landmark = true;
                 }
-                if ($g->landmark_range_file) {
+                if ($ge->landmark_range_file) {
                     $this->has_grade_landmark_range = true;
                 }
-                if ($g->formula !== null) {
+                if ($ge->formula !== null) {
                     $this->has_formula = true;
                 }
-                if ($g->is_extra) {
+                if ($ge->is_extra) {
                     $this->has_extra = true;
                 }
-                if ($g->type === "timermark"
-                    && (isset($g->timeout) || isset($g->timeout_entry))) {
+                if ($ge->type === "timermark"
+                    && (isset($ge->timeout) || isset($ge->timeout_entry))) {
                     $this->has_timermark = true;
+                }
+                if ($ge->has_visible_if()) {
+                    $this->has_visible_if = true;
                 }
             }
         } else if ($grades) {
@@ -414,7 +417,6 @@ class Pset {
         $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->scores_visible_at = is_int($gv) ? $gv : 0;
         $vf_mask = $this->visible_student() ? ~0 : ~VF_STUDENT_ANY;
-        $this->has_visible_if = false;
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
             $vf = $ge->vf(null) & $vf_mask;
@@ -425,9 +427,6 @@ class Pset {
                 } else if ($ge->formula === null) {
                     $this->has_assigned = true;
                 }
-            }
-            if ($ge->has_visible_if()) {
-                $this->has_visible_if = true;
             }
         }
 
