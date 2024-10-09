@@ -1253,7 +1253,7 @@ class PsetView {
     private function grades_vf() {
         if ($this->_grades_suppressed === 0) {
             $this->_grades_suppressed = 3;
-            $this->_grades_vf = $this->pset->grades_vf();
+            $this->_grades_vf = $this->pset->grades_vf($this);
             if ($this->pset->grades_selection_function) {
                 call_user_func($this->pset->grades_selection_function, $this);
             }

@@ -414,7 +414,7 @@ class Home_TA_Page {
         $gexp->export_entries();
         $vf = [];
         foreach ($pset->grades as $ge) {
-            $vf[] = $ge->type_tabular ? $ge->vf() : 0;
+            $vf[] = $ge->type_tabular ? $ge->vf(null) : 0;
         }
         $gexp->set_fixed_values_vf($vf);
 

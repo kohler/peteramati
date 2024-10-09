@@ -81,7 +81,7 @@ class GradeExport implements JsonSerializable {
         $this->pset = $pset;
         $this->info = $info;
         $this->vf = $vf ?? (VF_TF | $pset->default_student_vf());
-        $this->_grades_vf = $pset->grades_vf();
+        $this->_grades_vf = $pset->grades_vf($info);
     }
 
     /** @return $this */

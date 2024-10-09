@@ -122,6 +122,8 @@ class Pset {
      * @readonly */
     private $_grades_vf = [];
     /** @var bool */
+    private $has_visible_if;
+    /** @var bool */
     public $scores_visible;
     /** @var int */
     public $scores_visible_at;
@@ -412,9 +414,10 @@ class Pset {
         $this->scores_visible = $gv === true || (is_int($gv) && $gv > 0 && $gv <= Conf::$now);
         $this->scores_visible_at = is_int($gv) ? $gv : 0;
         $vf_mask = $this->visible_student() ? ~0 : ~VF_STUDENT_ANY;
+        $this->has_visible_if = false;
         foreach (array_values($this->grades) as $i => $ge) {
             $ge->pcview_index = $i;
-            $vf = $ge->vf() & $vf_mask;
+            $vf = $ge->vf(null) & $vf_mask;
             $this->_grades_vf[] = $vf;
             if (($vf & VF_STUDENT_ANY) !== 0) {
                 if ($ge->answer) {
@@ -422,6 +425,9 @@ class Pset {
                 } else if ($ge->formula === null) {
                     $this->has_assigned = true;
                 }
+            }
+            if ($ge->has_visible_if()) {
+                $this->has_visible_if = true;
             }
         }
 
@@ -644,9 +650,18 @@ class Pset {
         }
     }
 
-    /** @return list<4|5|6> */
-    function grades_vf() {
-        return $this->_grades_vf;
+    /** @param ?PsetView $info
+     * @return list<4|5|6> */
+    function grades_vf($info = null) {
+        if (!$info || !$this->has_visible_if) {
+            return $this->_grades_vf;
+        }
+        $gvf = $this->_grades_vf;
+        foreach (array_values($this->grades) as $i => $ge) {
+            if ($ge->has_visible_if())
+                $gvf[$i] = $ge->vf($info);
+        }
+        return $gvf;
     }
 
 

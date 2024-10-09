@@ -54,6 +54,11 @@ class GradeEntry {
     /** @var ?bool
      * @readonly */
     private $visible;
+    /** @var ?string
+     * @readonly */
+    private $visible_if;
+    /** @var ?GradeFormula */
+    private $_visible_if;
     /** @var bool
      * @readonly */
     public $concealed;
@@ -249,6 +254,9 @@ class GradeEntry {
         } else if (isset($g->hidden)) {
             $this->visible = !Pset::cbool($loc, $g, "hidden");
         }
+        if (isset($g->visible_if)) {
+            $this->visible_if = Pset::cstr($loc, $g, "visible_if");
+        }
         $this->concealed = Pset::cbool($loc, $g, "concealed");
         $this->required = Pset::cbool($loc, $g, "required");
         if (isset($g->max_visible)) {
@@ -352,17 +360,32 @@ class GradeEntry {
     }
 
 
-    /** @return 4|5|6 */
-    function vf() {
-        if ($this->visible === true
-            || ($this->answer && $this->visible !== false)
+    /** @param ?PsetView $info
+     * @return 4|5|6 */
+    function vf($info) {
+        $visible = $this->visible;
+        if ($this->visible !== false && $this->visible_if !== null && $info) {
+            if ($this->_visible_if === null) {
+                $fc = new GradeFormulaCompiler($this->pset->conf);
+                $this->_visible_if = $fc->parse($this->visible_if, $this) ?? new Error_GradeFormula;
+            }
+            $x = $this->_visible_if->evaluate($info->user, $info);
+            $visible = !!$x;
+        }
+        if ($visible === true
+            || ($this->answer && $visible !== false)
             || $this->concealed) {
             return VF_TF | VF_STUDENT_ALWAYS;
-        } else if ($this->visible === null) {
+        } else if ($visible === null) {
             return VF_TF | VF_STUDENT_ALLOWED;
         } else {
             return VF_TF;
         }
+    }
+
+    /** @return bool */
+    function has_visible_if() {
+        return $this->visible_if !== null;
     }
 
 
@@ -709,7 +732,7 @@ class GradeEntry {
         if ($this->landmark_range_file) {
             $gej["landmark_range"] = $this->landmark_range_file . ":" . $this->landmark_range_first . ":" . $this->landmark_range_last;
         }
-        if (($this->vf() & $vf & ~VF_TF) === 0) {
+        if (($this->vf($info) & $vf & ~VF_TF) === 0) {
             $gej["visible"] = false;
         } else if (!$this->answer && ($vf & VF_STUDENT_ALLOWED) === 0) {
             $gej["visible"] = true;
