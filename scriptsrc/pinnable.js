@@ -30,6 +30,7 @@ function dragstart(evt) {
     drag_dy = evt.clientY - br.y;
     evt.dataTransfer.dropEffect = "move";
     evt.dataTransfer.effectAllowed = "move";
+    evt.dataTransfer.setData("application/x-pa-dragging-pinnable", "N/A")
     evt.dataTransfer.setDragImage(this, drag_dx, drag_dy);
     document.body.addEventListener("dragover", dragover);
     document.body.addEventListener("drop", drop);
@@ -66,6 +67,9 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
     // pin: copy this element
     const ecopy = e.cloneNode(true);
     addClass(ecopy, "pinned");
+    for (const img of ecopy.querySelectorAll("img")) {
+        img.draggable = false;
+    }
     let par = e.parentElement, pine = ecopy;
     while (!hasClass(par, "pa-gsection")) {
         for (let k of par.classList) {
