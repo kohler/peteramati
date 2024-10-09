@@ -33,13 +33,14 @@ function attribute_block(state, startLine, endLine, silent) {
     }
     const last_token = state.tokens[state.tokens.length - 1],
         t = last_token.type;
-    console.log(last_token);
     let dest = null;
     if (t === "paragraph_close"
         || t === "blockquote_close"
         || t === "ordered_list_close"
         || t === "bullet_list_close") {
         dest = find_opener(state, state.tokens.length - 1);
+    } else if (t === "fence") {
+        dest = last_token;
     }
     if (!dest) {
         return false;
@@ -48,7 +49,6 @@ function attribute_block(state, startLine, endLine, silent) {
     for (let mm of text.matchAll(/\.([^#.=\s}]+)|#([^#.=\s}]+)|([^.#="{}]+)="([^"]*)"/g)) {
         if (mm[1]) {
             let c = dest.attrGet("class") || "";
-            console.log("class", c);
             dest.attrSet("class", c ? c + " " + mm[1] : mm[1]);
         } else if (mm[2]) {
             dest.attrSet("id", mm[2]);
@@ -62,6 +62,5 @@ function attribute_block(state, startLine, endLine, silent) {
 }
 
 export function markdownit_attributes(md) {
-    md.block.ruler.after("lheading", "mdattribute", attribute_block, {alt: ["list", "blockquote", "paragraph"]});
-    console.log(md.block.ruler.getRules("list"))
+    md.block.ruler.after("lheading", "mdattribute", attribute_block, {alt: ["list", "blockquote", "paragraph", "fence"]});
 }

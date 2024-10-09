@@ -12,7 +12,7 @@ let md, mdcontext;
 
 function hljs_line(lang, s, hlstate) {
     try {
-        const result = hljs.highlight(lang, s, true, hlstate),
+        const result = hljs.highlight(s, {language: lang, ignoreIllegals: true}),
             ns = result.value;
         if (s.endsWith("\r\n") && ns.endsWith("\n\n")) {
             result.value = ns.substring(0, ns.length - 1);

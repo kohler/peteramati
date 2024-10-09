@@ -534,6 +534,30 @@ ol.upper-alpha {
 	list-style-type: upper-alpha;
 }
 
+.gridlist-m, .gridlist-s {
+	display: grid;
+	padding-left: 0;
+	gap: 1rem;
+}
+.gridlist-m > li, .gridlist-s > li {
+	list-style-type: none;
+}
+@media (min-width: 50em) {
+.gridlist-m {
+	grid-template-columns: repeat(2, 1fr);
+}
+}
+@media (min-width: 50em) {
+.gridlist-s {
+	grid-template-columns: repeat(3, 1fr);
+}
+}
+@media (min-width: 30em) and (max-width: 50em) {
+.gridlist-s {
+	grid-template-columns: repeat(2, 1fr);
+}
+}
+
 
 /* body */
 div.body {
@@ -3504,6 +3528,52 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-viewoptions {
 	display: inline-block;
 	margin-left: 2em;
+}
+
+.pa-pinnable {
+	max-width: 800px;
+	border: 1px solid lightgray;
+	border-radius: 4px;
+	padding: 4px 8px;
+	position: relative;
+	margin-bottom: 1rem;
+}
+.pa-pinnable > * {
+	margin-bottom: 0;
+}
+.pa-pinnable.pinned {
+	background-color: #f8f8f8;
+}
+.pa-pinnable.pinned:hover {
+	border-color: mediumslateblue;
+}
+.pa-pinnable-fixed {
+	z-index: 4;
+}
+.pa-pinnable-pin {
+	font-size: smaller;
+	padding: 2px 2px;
+	background: none;
+	border: none;
+	position: absolute;
+	top: 0;
+	right: 0;
+}
+.pa-pinnable.pinned > .pa-pinnable-pin {
+	background: #aab0ff;
+}
+.pa-pinnable-title {
+	font-size: 65%;
+	background-color: #aab0ff;
+	color: black;
+	font-weight: 500;
+	margin: 2px -8px -4px -8px;
+	padding: 2px 8px;
+	border-bottom-left-radius: 3px;
+	border-bottom-right-radius: 3px;
+}
+.pa-pinnable-title > p {
+	margin: 0;
 }
 
 .pa-gradewidth {

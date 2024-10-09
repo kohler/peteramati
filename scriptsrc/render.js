@@ -77,7 +77,7 @@ let md, md2;
 function try_highlight(str, lang, langAttr, token) {
     if (lang && hljs.getLanguage(lang)) {
         try {
-            var hlstr = hljs.highlight(lang, str, true).value,
+            var hlstr = hljs.highlight(str, {language: lang, ignoreIllegals: true}).value,
                 classIndex = token ? token.attrIndex("class") : -1,
                 lineIndex = token ? token.attrIndex("data-lineno-start") : -1;
             if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
