@@ -148,7 +148,7 @@ class Home_Student_Page {
         foreach ($this->conf->formulas_by_home_position() as $fc) {
             if (($this->viewer->isPC || $fc->visible)
                 && ($gf = $fc->formula())
-                && ($v = $gf->evaluate($this->user)) !== null
+                && ($v = $gf->evaluate($this->user, null)) !== null
                 && (!($fc->nonzero ?? false) || (float) $v !== 0.0)) {
                 ContactView::echo_group(htmlspecialchars($fc->title), $v);
             }

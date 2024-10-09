@@ -8,7 +8,7 @@ class Rank_GradeFormula extends Function_GradeFormula {
         parent::__construct("rank");
         $this->cacheable = false;
     }
-    function evaluate(Contact $user) {
+    function evaluate(Contact $user, ?PsetView $info) {
         $allv = $this->_allv ?? $this->compute_all($user->conf);
         return $allv[$user->contactId];
     }

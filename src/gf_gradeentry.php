@@ -14,8 +14,12 @@ class GradeEntry_GradeFormula extends GradeFormula {
         $this->vtype = $ge->vtype;
         assert(!$ge->formula);
     }
-    function evaluate(Contact $student) {
-        $v = $student->gcache_entry($this->ge->pset, $this->ge);
+    function evaluate(Contact $student, ?PsetView $info) {
+        if ($info && $info->pset === $this->ge->pset && $info->user === $student) {
+            $v = $info->grade_value($this->ge);
+        } else {
+            $v = $student->gcache_entry($this->ge->pset, $this->ge);
+        }
         return $v !== null ? (float) $v : null;
     }
     function export_grade_names(&$v) {

@@ -70,7 +70,7 @@ class Report_Page {
                     $x[$f->key] = $f->unparse_value($v);
                 }
             } else if (is_array($f)) {
-                $x[$f[0]] = $f[1]->evaluate($info->user);
+                $x[$f[0]] = $f[1]->evaluate($info->user, $info);
             } else if ($f === "first") {
                 if (!$info->user->is_anonymous) {
                     $x[$f] = $info->user->firstName;

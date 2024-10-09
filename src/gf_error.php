@@ -8,7 +8,7 @@ class Error_GradeFormula extends GradeFormula {
         parent::__construct("error", []);
         $this->cacheable = false;
     }
-    function evaluate(Contact $student) {
+    function evaluate(Contact $student, ?PsetView $info) {
         return null;
     }
 }

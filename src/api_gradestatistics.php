@@ -200,7 +200,7 @@ class GradeStatistics_API {
             }
         }
         if ($nge === 1) {
-            $r->entry = $lastge->json($vf);
+            $r->entry = $lastge->json($vf, null);
         }
 
         return $r;

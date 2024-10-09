@@ -39,7 +39,12 @@ class GradeEntry {
     public $removed;
     /** @var bool
      * @readonly */
-    public $disabled;
+    private $disabled;
+    /** @var ?string
+     * @readonly */
+    private $disabled_if;
+    /** @var ?GradeFormula */
+    private $_disabled_if;
     /** @var bool
      * @readonly */
     public $answer;
@@ -145,6 +150,9 @@ class GradeEntry {
         $this->description = Pset::cstr($loc, $g, "description", "edit_description");
         $this->removed = Pset::cbool($loc, $g, "removed");
         $this->disabled = Pset::cbool($loc, $g, "disabled");
+        if (isset($g->disabled_if)) {
+            $this->disabled_if = Pset::cstr($loc, $g, "disabled_if");
+        }
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority)) {
             $this->position = -Pset::cnum($loc, $g, "priority");
@@ -574,16 +582,29 @@ class GradeEntry {
         }
     }
 
+    /** @param PsetView $info
+     * @return bool */
+    function disabled_at($info) {
+        if ($this->disabled || !$this->disabled_if) {
+            return $this->disabled;
+        }
+        if (!$this->_disabled_if) {
+            $fc = new GradeFormulaCompiler($this->pset->conf);
+            $this->_disabled_if = $fc->parse($this->disabled_if, $this) ?? new Error_GradeFormula;
+        }
+        return !!$this->_disabled_if->evaluate($info->user, $info);
+    }
+
     /** @return true|GradeError */
     function allow_edit($newv, $oldv, $autov, PsetView $info) {
         if (!$this->value_differs($newv, $oldv)) {
             return true;
-        } else if ($this->disabled) {
-            return new GradeError("Cannot modify grade");
+        } else if ($this->disabled_at($info)) {
+            return new GradeError("Cannot modify");
         } else if ($info->pc_view) {
             return true;
         } else if ($this->visible === false || !$this->answer) {
-            return new GradeError("Cannot modify grade");
+            return new GradeError("Cannot modify");
         } else if ($this->pset->frozen) {
             return new GradeError("You can’t edit your answers further");
         } else if ($this->type === "timermark" && $oldv) {
@@ -593,17 +614,11 @@ class GradeEntry {
         }
     }
 
-    /** @return bool */
-    function student_can_edit() {
-        return $this->visible !== false
-            && $this->answer
-            && !$this->disabled;
-    }
-
-    /** @return bool */
-    function grader_entry_required() {
+    /** @param PsetView $info
+     * @return bool */
+    function grader_entry_required($info) {
         return !$this->answer
-            && !$this->disabled
+            && !$this->disabled_at($info)
             && !$this->is_extra
             && !$this->no_total
             && $this->type_numeric
@@ -638,8 +653,9 @@ class GradeEntry {
     }
 
     /** @param 0|1|3|4|5|7 $vf
+     * @param ?PsetView $info
      * @return array<string,mixed> */
-    function json($vf) {
+    function json($vf, $info) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
             if ($this->type === "select") {
@@ -698,7 +714,7 @@ class GradeEntry {
         } else if (!$this->answer && ($vf & VF_STUDENT_ALLOWED) === 0) {
             $gej["visible"] = true;
         }
-        if ($this->disabled) {
+        if ($info ? $this->disabled_at($info) : $this->disabled) {
             $gej["disabled"] = true;
         }
         if ($this->concealed) {

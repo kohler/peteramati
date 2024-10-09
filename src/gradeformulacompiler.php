@@ -257,9 +257,12 @@ class GradeFormulaCompiler {
         } else if (preg_match('/\G(?:pi|π|m_pi)\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Number_GradeFormula((float) M_PI);
-        } else if (preg_match('/\G(?:null)\b/si', $s, $m, 0, $p)) {
+        } else if (preg_match('/\Gnull\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Null_GradeFormula;
+        } else if (preg_match('/\Gnow\b/si', $s, $m, 0, $p)) {
+            $p += strlen($m[0]);
+            $e = new Now_GradeFormula;
         } else if (preg_match('/\G(?:log10|log|ln|lg|exp)\b/s', $s, $m, 0, $p)) {
             list($e, $p) = $this->parse_prefix($p + strlen($m[0]), self::UNARY_PRECEDENCE);
             if ($e !== null) {
@@ -267,9 +270,19 @@ class GradeFormulaCompiler {
             }
         } else if (preg_match('/\G(?:min|max)\b/s', $s, $m, 0, $p)) {
             list($e, $p) = $this->parse_arguments(new MinMax_GradeFormula($m[0]), $p + strlen($m[0]));
-        } else if (preg_match('/\G(?:rank)\b/s', $s, $m, 0, $p)) {
+        } else if (preg_match('/\Grank\b/s', $s, $m, 0, $p)) {
             list($e, $p) = $this->parse_arguments(new Rank_GradeFormula, $p + strlen($m[0]), 1, 1);
             $e = $e ? $e->canonicalize($this->conf) : null;
+        } else if (preg_match('/\G@[2-9]\d\d\d(?:[-\/]\d\d?[-\/]\d\d?|\d{4})(?:[-T:]\d\d?:?\d\d?(?::\d\d|)[-+:A-Z0-9]*|)\b/s', $s, $m, 0, $p)) {
+            if (ctype_digit(substr($m[0], 1)) && strlen($m[0]) >= 10) {
+                $e = new Time_GradeFormula(intval(substr($m[0], 1)));
+            } else if (($t = date_create_immutable(substr($m[0], 1)))) {
+                $e = new Time_GradeFormula($t->getTimestamp());
+            } else {
+                $this->error_near($p, "<0>Syntax error");
+                $e = null;
+            }
+            $p += strlen($m[0]);
         } else if (preg_match('/\G(\w+)\s*\.\s*(\w+)/s', $s, $m, 0, $p)) {
             $this->state->pos1 = $p;
             $p = $this->state->pos2 = $p + strlen($m[0]);

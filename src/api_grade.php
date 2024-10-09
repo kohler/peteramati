@@ -266,17 +266,17 @@ class Grade_API {
         }
 
         if (count($sset) === 0) {
-            return ["ok" => false, "error" => "No users."];
+            return ["ok" => false, "error" => "No users"];
         } else if ($error[0] === 5) {
-            return ["ok" => false, "error" => "Missing repository (" . join(", ", $error[1]) . ")."];
+            return ["ok" => false, "error" => "Missing repository (" . join(", ", $error[1]) . ")"];
         } else if ($error[0] === 4) {
-            return ["ok" => false, "error" => "Disconnected commit."];
+            return ["ok" => false, "error" => "Disconnected commit"];
         } else if ($error[0] === 3) {
-            return ["ok" => false, "error" => "Missing commit (" . join(", ", $error[1]) . ")."];
+            return ["ok" => false, "error" => "Missing commit (" . join(", ", $error[1]) . ")"];
         } else if ($error[0] === 2) {
-            return ["ok" => false, "error" => "The grading commit has changed."];
+            return ["ok" => false, "error" => "The grading commit has changed"];
         } else if ($error[0] === 1) {
-            return ["ok" => false, "error" => "Cannot set grades on handout commit."];
+            return ["ok" => false, "error" => "Cannot set grades on handout commit"];
         }
 
         // XXX match commit with grading commit

@@ -300,7 +300,7 @@ class Home_TA_Page {
                 foreach ($gexp->value_entries() as $i => $ge) {
                     if ($want_incomplete
                         && !isset($gv[$i])
-                        && $ge->grader_entry_required()) {
+                        && $ge->grader_entry_required($info)) {
                         $info->user->incomplete = "grade missing";
                     }
                     if (isset($agv[$i])

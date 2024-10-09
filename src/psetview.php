@@ -1001,7 +1001,7 @@ class PsetView {
                     $gv = $this->_g[$ge->pcview_index] ?? null;
                 }
                 if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
-                    $gv = $ge->formula()->evaluate($this->user);
+                    $gv = $ge->formula()->evaluate($this->user, $this);
                     if ($gv !== null) {
                         $this->_g[$ge->pcview_index] = $gv;
                     } else {
@@ -2019,7 +2019,7 @@ class PsetView {
         if ($override_view || ($flags & self::GRADEJSON_SLICE) !== 0) {
             $vf |= VF_TF;
         }
-        $gexp = new GradeExport($this->pset, $vf);
+        $gexp = new GradeExport($this->pset, $vf, $this);
         $gexp->uid = $this->user->contactId;
         $gexp->user = $this->user_linkpart();
         if (($flags & self::GRADEJSON_SLICE) !== 0) {

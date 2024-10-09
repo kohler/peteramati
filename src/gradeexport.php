@@ -10,6 +10,8 @@ class GradeExport implements JsonSerializable {
     /** @var 1|4
      * @readonly */
     public $vf;
+    /** @var ?PsetView */
+    private $info;
     /** @var bool */
     public $slice = false;
     /** @var bool */
@@ -73,9 +75,11 @@ class GradeExport implements JsonSerializable {
     /** @var bool */
     private $_export_entries = false;
 
-    /** @param null|1|3|4|5|7 $vf */
-    function __construct(Pset $pset, $vf = null) {
+    /** @param null|1|3|4|5|7 $vf
+     * @param ?PsetView $info */
+    function __construct(Pset $pset, $vf = null, $info = null) {
         $this->pset = $pset;
+        $this->info = $info;
         $this->vf = $vf ?? (VF_TF | $pset->default_student_vf());
         $this->_grades_vf = $pset->grades_vf();
     }
@@ -348,7 +352,7 @@ class GradeExport implements JsonSerializable {
                     && ($this->_known_entries === null
                         || $this->_known_entries[$i] === false)) {
                     $ge = $this->pset->grade_by_pcindex($i);
-                    $entries[$ge->key] = $ge->json($vf & $this->vf);
+                    $entries[$ge->key] = $ge->json($vf & $this->vf, $this->info);
                 }
             }
             $r["entries"] = empty($entries) ? (object) [] : $entries;

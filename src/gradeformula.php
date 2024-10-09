@@ -26,7 +26,7 @@ abstract class GradeFormula implements JsonSerializable {
         $this->_a = $a;
     }
 
-    abstract function evaluate(Contact $student);
+    abstract function evaluate(Contact $student, ?PsetView $info);
 
     /** @param list<string> &$v */
     function export_grade_names(&$v) {
@@ -40,7 +40,7 @@ abstract class GradeFormula implements JsonSerializable {
         if ($this->_allv === null) {
             $this->_allv = [];
             foreach (StudentSet::make_all($conf)->users() as $u) {
-                $this->_allv[$u->contactId] = $this->evaluate($u);
+                $this->_allv[$u->contactId] = $this->evaluate($u, null);
             }
         }
         return $this->_allv;
@@ -75,8 +75,8 @@ class Unary_GradeFormula extends GradeFormula {
     function __construct($op, $e) {
         parent::__construct($op, [$e]);
     }
-    function evaluate(Contact $student) {
-        if (($v0 = $this->_a[0]->evaluate($student)) === null) {
+    function evaluate(Contact $student, ?PsetView $info) {
+        if (($v0 = $this->_a[0]->evaluate($student, $info)) === null) {
             return null;
         }
         switch ($this->_op) {
@@ -101,8 +101,8 @@ class Not_GradeFormula extends GradeFormula {
         parent::__construct("!", [$e]);
         $this->vtype = GradeEntry::VTBOOL;
     }
-    function evaluate(Contact $student) {
-        $v0 = $this->_a[0]->evaluate($student);
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
         return !$v0;
     }
 }
@@ -121,9 +121,9 @@ class Bin_GradeFormula extends GradeFormula {
             }
         }
     }
-    function evaluate(Contact $student) {
-        if (($v0 = $this->_a[0]->evaluate($student)) === null
-            || ($v1 = $this->_a[1]->evaluate($student)) === null) {
+    function evaluate(Contact $student, ?PsetView $info) {
+        if (($v0 = $this->_a[0]->evaluate($student, $info)) === null
+            || ($v1 = $this->_a[1]->evaluate($student, $info)) === null) {
             return null;
         }
         switch ($this->_op) {
@@ -151,9 +151,9 @@ class Relation_GradeFormula extends GradeFormula {
         parent::__construct($op, [$e1, $e2]);
         $this->vtype = GradeEntry::VTBOOL;
     }
-    function evaluate(Contact $student) {
-        $v0 = $this->_a[0]->evaluate($student);
-        $v1 = $this->_a[1]->evaluate($student);
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
+        $v1 = $this->_a[1]->evaluate($student, $info);
         switch ($this->_op) {
         case "==":
             return $v0 == $v1;
@@ -183,9 +183,9 @@ class NullableBin_GradeFormula extends GradeFormula {
             $this->vtype = $e2->vtype;
         }
     }
-    function evaluate(Contact $student) {
-        $v0 = $this->_a[0]->evaluate($student);
-        $v1 = $this->_a[1]->evaluate($student);
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
+        $v1 = $this->_a[1]->evaluate($student, $info);
         switch ($this->_op) {
         case "+?":
             if ($v0 === null && $v1 === null) {
@@ -213,9 +213,9 @@ class Ternary_GradeFormula extends GradeFormula {
             $this->vtype = $et->vtype;
         }
     }
-    function evaluate(Contact $student) {
-        $v0 = $this->_a[0]->evaluate($student);
-        return $this->_a[$v0 ? 1 : 2]->evaluate($student);
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
+        return $this->_a[$v0 ? 1 : 2]->evaluate($student, $info);
     }
 }
 
@@ -237,11 +237,11 @@ class MinMax_GradeFormula extends Function_GradeFormula {
     function __construct($op) {
         parent::__construct($op);
     }
-    function evaluate(Contact $student) {
+    function evaluate(Contact $student, ?PsetView $info) {
         $cur = null;
         $ismax = $this->_op === "max";
         foreach ($this->_a as $e) {
-            $v = $e->evaluate($student);
+            $v = $e->evaluate($student, $info);
             if ($v !== null
                 && ($cur === null
                     || ($ismax ? $cur < $v : $cur > $v))) {
@@ -260,7 +260,7 @@ class Number_GradeFormula extends GradeFormula {
         parent::__construct("n", []);
         $this->v = $v;
     }
-    function evaluate(Contact $student) {
+    function evaluate(Contact $student, ?PsetView $info) {
         return $this->v;
     }
     function jsonSerialize(): float {
@@ -285,7 +285,7 @@ class PsetTotal_GradeFormula extends GradeFormula {
         $this->noextra = $noextra;
         $this->norm = $norm;
     }
-    function evaluate(Contact $student) {
+    function evaluate(Contact $student, ?PsetView $info) {
         return $student->gcache_total($this->pset, $this->noextra, $this->norm);
     }
     function export_grade_names(&$v) {
@@ -313,7 +313,7 @@ class CategoryTotal_GradeFormula extends GradeFormula {
         $this->noextra = $noextra;
         $this->norm = $norm;
     }
-    function evaluate(Contact $student) {
+    function evaluate(Contact $student, ?PsetView $info) {
         return $student->gcache_category_total($this->category, $this->noextra, $this->norm);
     }
     function export_grade_names(&$v) {
