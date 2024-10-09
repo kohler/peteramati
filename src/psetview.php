@@ -2051,17 +2051,29 @@ class PsetView {
                 $gexp->grade_commit = $this->grading_hash();
             }
         }
-        if (!($flags & self::GRADEJSON_NO_LATE_HOURS)) {
+        if (($flags & self::GRADEJSON_NO_LATE_HOURS) === 0) {
             $this->grade_export_late_hours($gexp);
+        }
+        if ($this->can_edit_scores()) {
+            $gexp->scores_editable;
         }
         if ($this->pset->gitless_grades) {
             if ($this->pset->gitless) {
-                if (($upi = $this->upi())) {
-                    $gexp->version = $upi->notesversion;
+                $vupi = $this->vupi();
+                if ($vupi) {
+                    $gexp->version = $vupi->notesversion;
+                }
+                if (!$gexp->scores_editable) {
+                    $gexp->answers_editable = !$this->pset->frozen
+                        && (!$vupi || $vupi === $this->upi());
                 }
             } else {
-                if (($rpi = $this->rpi())) {
+                $rpi = $this->rpi();
+                if ($rpi) {
                     $gexp->version = $rpi->rpnotesversion;
+                }
+                if (!$gexp->scores_editable) {
+                    $gexp->answers_editable = !$this->pset->frozen;
                 }
             }
         }
@@ -2072,11 +2084,6 @@ class PsetView {
             $gexp->scores_visible = $psv;
         } else if ($this->pset->scores_visible_student()) {
             $gexp->scores_visible = true;
-        }
-        if ($this->can_edit_scores()) {
-            $gexp->scores_editable = true;
-        } else {
-            $gexp->answers_editable = !$this->pset->frozen;
         }
         // maybe hide extra-credits that are missing
         if ($gexp->vf < VF_TF) {
