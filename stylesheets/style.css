@@ -3543,6 +3543,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 }
 .pa-pinnable.pinned {
 	background-color: #f8f8f8;
+	cursor: move;
 }
 .pa-pinnable.pinned:hover {
 	border-color: mediumslateblue;
