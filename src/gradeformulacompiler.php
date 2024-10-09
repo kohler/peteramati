@@ -35,6 +35,7 @@ class GradeFormulaCompiler {
     /** @var GradeFormulaCompilerState */
     private $state;
 
+    /** @readonly */
     static public $precedences = [
         "**" => 13,
         "*" => 11, "/" => 11, "%" => 11,
@@ -48,6 +49,11 @@ class GradeFormulaCompiler {
     ];
     const UNARY_PRECEDENCE = 12;
     const MIN_PRECEDENCE = -1;
+
+    /** @readonly */
+    static public $synonyms = [
+        "=" => "==", "≠" => "!=", "≤" => "<=", "≥" => ">="
+    ];
 
     static public $total_gkeys = [
         "total" => 0, "total_noextra" => 1,
@@ -302,8 +308,8 @@ class GradeFormulaCompiler {
 
         while (true) {
             $p = $this->skip_space($p);
-            if (preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==|<=?|>=?|!=|:)/s', $s, $m, 0, $p)) {
-                $op = $m[0];
+            if (preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==?|<=?|>=?|!=|≠|≤|≥|:)/s', $s, $m, 0, $p)) {
+                $op = self::$synonyms[$m[0]] ?? $m[0];
                 $prec = self::$precedences[$op];
                 if ($prec < $minprec) {
                     return [$e, $p];
@@ -311,13 +317,13 @@ class GradeFormulaCompiler {
                     $this->error_near($p, "<0>Syntax error");
                     return [null, $p];
                 }
-                list($e2, $p) = $this->parse_prefix($p + strlen($op), $op === "**" ? $prec : $prec + 1);
+                list($e2, $p) = $this->parse_prefix($p + strlen($m[0]), $op === "**" ? $prec : $prec + 1);
                 if ($e2 === null) {
                     return [null, $p];
                 }
                 if (in_array($op, ["+?", "??", "||", "&&"])) {
                     $e = new NullableBin_GradeFormula($op, $e, $e2);
-                } else if (in_array($op, ["<", "==", ">", "<=", ">=", "!="])) {
+                } else if (in_array($op, ["<", "=", "==", ">", "<=", ">=", "!=", "≠", "≤", "≥"])) {
                     $e = new Relation_GradeFormula($op, $e, $e2);
                 } else if ($op === "?") {
                     if (!preg_match('/\G\s*:/s', $s, $m, 0, $p)) {
