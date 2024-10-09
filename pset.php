@@ -71,7 +71,11 @@ class PsetRequest {
             } else if (isset($qreq->newersnv)) {
                 $this->info->adjust_user_snv(true);
                 if ($qreq->is_get() || $qreq->is_head()) {
-                    $this->conf->redirect_self($qreq, ["snv" => $this->info->studentnotesversion(), "oldersnv" => null, "newersnv" => null]);
+                    $snv = $this->info->studentnotesversion();
+                    if ($snv === $this->info->notesversion()) {
+                        $snv = null;
+                    }
+                    $this->conf->redirect_self($qreq, ["snv" => $snv, "oldersnv" => null, "newersnv" => null]);
                 }
             }
         }
@@ -358,7 +362,7 @@ class PsetRequest {
             $b = [];
             $snv = $this->info->studentnotesversion();
             $nv = $this->info->notesversion();
-            if ($snv > 1) {
+            if ($this->info->has_older_snv()) {
                 $b[] = Ht::link("←", $this->info->hoturl("pset", ["oldersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
             }
             if ($snv !== $this->info->pinsnv()

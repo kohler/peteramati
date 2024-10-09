@@ -1,6 +1,6 @@
 <?php
 // psetview.php -- CS61-monster helper class for pset view
-// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class PsetView {
@@ -665,6 +665,26 @@ class PsetView {
         $this->set_user_snv(min(max($nv, 0), $upi->notesversion));
     }
 
+    /** @return bool */
+    function has_older_snv() {
+        $vupi = $this->vupi();
+        if ($vupi->studentupdateat === null) {
+            return false;
+        }
+        $upi = $this->upi();
+        $nv = $vupi->notesversion - 1;
+        while ($nv > 0) {
+            $h = $upi->history_at($nv, true, $this->conf);
+            if (!$h || $h->studentupdateat === null) {
+                break;
+            } else if ($h->studentupdateat !== $vupi->studentupdateat) {
+                return true;
+            }
+            --$nv;
+        }
+        return false;
+    }
+
     /** @return ?object */
     function user_jxnotes() {
         return $this->vupi()->jxnotes();
@@ -1053,21 +1073,22 @@ class PsetView {
             $hasactiveflags = CommitPsetInfo::notes_hasactiveflags($new_notes);
             if ($upi->phantom) {
                 $result = Dbl::qx($this->conf->dblink, "insert ignore into ContactGrade
-                    set cid=?, pset=?, updateat=?, updateby=?, studentupdateat=?,
+                    set cid=?, pset=?,
+                    updateat=?, updateby=?, studentupdateat=?,
                     notes=?, notesOverflow=?, hasactiveflags=?",
                     $this->user->contactId, $this->pset->id,
-                    Conf::$now, $this->viewer->contactId,
-                    $is_student ? Conf::$now : null,
+                    Conf::$now, $this->viewer->contactId, $is_student ? Conf::$now : null,
                     $notesa, $notesb, $hasactiveflags);
             } else if ($upi->notes === $notes) {
                 return;
             } else {
                 $result = $this->conf->qe("update ContactGrade
-                    set notesversion=?, updateat=?, updateby=?, studentupdateat=?,
+                    set notesversion=?,
+                    updateat=?, updateby=?, studentupdateat=?,
                     notes=?, notesOverflow=?, hasactiveflags=?
                     where cid=? and pset=? and notesversion=?",
-                    $upi->notesversion + 1, Conf::$now, $this->viewer->contactId,
-                    $is_student ? Conf::$now : $upi->studentupdateat,
+                    $upi->notesversion + 1,
+                    Conf::$now, $this->viewer->contactId, $is_student ? Conf::$now : $upi->studentupdateat,
                     $notesa, $notesb, $hasactiveflags,
                     $this->user->contactId, $this->pset->id, $upi->notesversion);
             }
