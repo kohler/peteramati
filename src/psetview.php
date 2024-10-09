@@ -2055,7 +2055,7 @@ class PsetView {
             $this->grade_export_late_hours($gexp);
         }
         if ($this->can_edit_scores()) {
-            $gexp->scores_editable;
+            $gexp->scores_editable = true;
         }
         if ($this->pset->gitless_grades) {
             if ($this->pset->gitless) {
