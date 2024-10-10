@@ -7,7 +7,7 @@ class Null_GradeFormula extends GradeFormula {
     function __construct()  {
         parent::__construct("null", []);
     }
-    function evaluate(Contact $student) {
+    function evaluate(Contact $student, ?PsetView $info) {
         return null;
     }
     function jsonSerialize() {
