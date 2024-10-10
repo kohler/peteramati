@@ -382,7 +382,11 @@ class GradeEntry {
      * @return GradeFormula */
     private function compile($formula) {
         $fc = new GradeFormulaCompiler($this->pset->conf);
-        return $fc->parse($formula, $this) ?? new Error_GradeFormula;
+        $gf = $fc->parse($formula, $this) ?? new Error_GradeFormula;
+        if ($gf instanceof Error_GradeFormula) {
+            error_log($fc->ms()->full_feedback_text());
+        }
+        return $gf;
     }
 
 
