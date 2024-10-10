@@ -64,9 +64,9 @@ class GradeEntry {
     private $_visible_if;
     /** @var ?string
      * @readonly */
-    private $suppress_if;
+    private $suppressed_if;
     /** @var ?GradeFormula */
-    private $_suppress_if;
+    private $_suppressed_if;
     /** @var bool
      * @readonly */
     public $concealed;
@@ -270,8 +270,8 @@ class GradeEntry {
         if (isset($g->visible_if)) {
             $this->visible_if = Pset::cstr($loc, $g, "visible_if");
         }
-        if (isset($g->suppress_if)) {
-            $this->suppress_if = Pset::cstr($loc, $g, "suppress_if");
+        if (isset($g->suppressed_if)) {
+            $this->suppressed_if = Pset::cstr($loc, $g, "suppressed_if");
         }
         $this->concealed = Pset::cbool($loc, $g, "concealed");
         $this->required = Pset::cbool($loc, $g, "required");
@@ -395,11 +395,11 @@ class GradeEntry {
     function vf($info) {
         $visible = $this->visible;
         if ($info) {
-            if ($this->suppress_if !== null) {
-                if ($this->_suppress_if === null) {
-                    $this->_suppress_if = $this->compile($this->suppress_if);
+            if ($this->suppressed_if !== null) {
+                if ($this->_suppressed_if === null) {
+                    $this->_suppressed_if = $this->compile($this->suppressed_if);
                 }
-                if ($this->_suppress_if->evaluate($info->user, $info)) {
+                if ($this->_suppressed_if->evaluate($info->user, $info)) {
                     return 0;
                 }
             }
@@ -423,7 +423,7 @@ class GradeEntry {
 
     /** @return bool */
     function has_visible_if() {
-        return $this->visible_if !== null || $this->suppress_if !== null;
+        return $this->visible_if !== null || $this->suppressed_if !== null;
     }
 
 
