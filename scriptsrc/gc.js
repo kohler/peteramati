@@ -229,6 +229,20 @@ GradeClass.add("section", {
     type_tabular: false
 });
 
+GradeClass.add("none", {
+    mount_show: function (elt, id) {
+    },
+    mount_edit: function (elt) {
+    },
+    update_show: function () {
+        return false;
+    },
+    update_edit: function () {
+        return false;
+    },
+    type_tabular: false
+});
+
 
 function sidebar_tab_traverse(e, bwd) {
     let sb = e.closest(".pa-sidebar"),

@@ -110,6 +110,10 @@ class GradeEntry {
     public $timeout;
     /** @var ?string */
     public $timeout_entry;
+    /** @var ?string */
+    public $allow_edit_function;
+    /** @var ?string */
+    public $account_edit_function;
     /** @var object */
     public $config;
 
@@ -198,7 +202,7 @@ class GradeEntry {
         } else if ($type === "duration") {
             $this->type_tabular = $this->type_numeric = $allow_total = true;
             $this->vtype = self::VTDURATION;
-        } else if (in_array($type, ["text", "shorttext", "markdown", "section"], true)) {
+        } else if (in_array($type, ["text", "shorttext", "markdown", "section", "none"], true)) {
             $this->type_tabular = $this->type_numeric = $allow_total = false;
         } else if ($type === "select"
                    && isset($g->options)
@@ -334,6 +338,9 @@ class GradeEntry {
 
         $this->timeout = Pset::cinterval($loc, $g, "timeout");
         $this->timeout_entry = Pset::cstr($loc, $g, "timeout_entry");
+
+        $this->allow_edit_function = Pset::cstr($loc, $g, "allow_edit_function");
+        $this->account_edit_function = Pset::cstr($loc, $g, "account_edit_function");
 
         $this->config = $g;
     }
@@ -650,16 +657,26 @@ class GradeEntry {
             return true;
         } else if ($this->disabled_at($info)) {
             return new GradeError("Cannot modify");
-        } else if ($info->pc_view) {
-            return true;
-        } else if ($this->visible === false || !$this->answer) {
-            return new GradeError("Cannot modify");
-        } else if ($this->pset->frozen) {
-            return new GradeError("You can’t edit your answers further");
-        } else if ($this->type === "timermark" && $oldv) {
-            return new GradeError("Time already started");
-        } else {
-            return true;
+        }
+        if (!$info->pc_view) {
+            if ($this->visible === false || !$this->answer) {
+                return new GradeError("Cannot modify");
+            } else if ($this->pset->frozen) {
+                return new GradeError("You can’t edit your answers further");
+            } else if ($this->type === "timermark" && $oldv) {
+                return new GradeError("Time already started");
+            }
+        }
+        if (isset($this->allow_edit_function)) {
+            return call_user_func($this->allow_edit_function, $this, $newv, $oldv, $autov, $info);
+        }
+        return true;
+    }
+
+    function account_edit($newv, $oldv, $autov, PsetView $info, &$updates) {
+        if (isset($this->account_edit_function)) {
+            $a = [$this, $newv, $oldv, $autov, $info, &$updates];
+            call_user_func_array($this->account_edit_function, $a);
         }
     }
 

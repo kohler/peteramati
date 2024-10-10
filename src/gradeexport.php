@@ -160,31 +160,33 @@ class GradeExport implements JsonSerializable {
      * @return $this
      * @suppress PhanAccessReadOnlyProperty */
     function suppress_entry($ge) {
-        if (($this->_grades_vf[$ge->pcview_index] & $this->vf) !== 0) {
-            $this->_grades_vf[$ge->pcview_index] = 0;
-            if ($this->_value_entries !== null
-                && ($vi = $this->_value_indexes[$ge->pcview_index]) >= 0) {
-                if ($this->_fixed_values_vf === null) {
-                    array_splice($this->_value_entries, $vi, 1);
-                    if ($this->grades !== null) {
-                        array_splice($this->grades, $vi, 1);
-                    }
-                    if ($this->autogrades !== null) {
-                        array_splice($this->autogrades, $vi, 1);
-                    }
-                    $this->_value_indexes[$ge->pcview_index] = -1;
-                    while ($vi !== count($this->_value_entries)) {
-                        $this->_value_indexes[$this->_value_entries[$vi]->pcview_index] -= 1;
-                        ++$vi;
-                    }
-                } else {
-                    if ($this->grades !== null) {
-                        $this->grades[$vi] = null;
-                    }
-                    if ($this->autogrades !== null) {
-                        $this->autogrades[$vi] = null;
-                    }
-                }
+        if (($this->_grades_vf[$ge->pcview_index] & $this->vf) === 0) {
+            return $this;
+        }
+        $this->_grades_vf[$ge->pcview_index] = 0;
+        if ($this->_value_entries === null
+            || ($vi = $this->_value_indexes[$ge->pcview_index]) < 0) {
+            return $this;
+        }
+        if ($this->_fixed_values_vf === null) {
+            array_splice($this->_value_entries, $vi, 1);
+            if ($this->grades !== null) {
+                array_splice($this->grades, $vi, 1);
+            }
+            if ($this->autogrades !== null) {
+                array_splice($this->autogrades, $vi, 1);
+            }
+            $this->_value_indexes[$ge->pcview_index] = -1;
+            while ($vi !== count($this->_value_entries)) {
+                $this->_value_indexes[$this->_value_entries[$vi]->pcview_index] -= 1;
+                ++$vi;
+            }
+        } else {
+            if ($this->grades !== null) {
+                $this->grades[$vi] = null;
+            }
+            if ($this->autogrades !== null) {
+                $this->autogrades[$vi] = null;
             }
         }
         return $this;

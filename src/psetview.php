@@ -839,26 +839,27 @@ class PsetView {
     }
 
     private function ensure_grades() {
-        if ($this->_gtime !== $this->user->gradeUpdateTime) {
-            $this->_gtime = $this->user->gradeUpdateTime;
-            $this->_ag = $this->_gtottime = null;
-            $this->_has_formula = false;
-            $jn = $this->grade_jnotes();
-            if ($jn && ($ag = $jn->autogrades ?? null)) {
-                $this->_ag = $this->blank_values();
-                foreach ($this->pset->grades as $ge) {
-                    if (!$ge->is_formula() && isset($ag->{$ge->key})) {
-                        $this->_ag[$ge->pcview_index] = $ag->{$ge->key};
-                    }
+        if ($this->_gtime === $this->user->gradeUpdateTime) {
+            return;
+        }
+        $this->_gtime = $this->user->gradeUpdateTime;
+        $this->_ag = $this->_gtottime = null;
+        $this->_has_formula = false;
+        $jn = $this->grade_jnotes();
+        if ($jn && ($ag = $jn->autogrades ?? null)) {
+            $this->_ag = $this->blank_values();
+            foreach ($this->pset->grades as $ge) {
+                if (!$ge->is_formula() && isset($ag->{$ge->key})) {
+                    $this->_ag[$ge->pcview_index] = $ag->{$ge->key};
                 }
             }
-            $this->_g = $this->_ag;
-            if ($jn && ($g = $jn->grades ?? null)) {
-                $this->_g = $this->_g ?? $this->blank_values();
-                foreach ($this->pset->grades as $ge) {
-                    if (!$ge->is_formula() && property_exists($g, $ge->key)) {
-                        $this->_g[$ge->pcview_index] = $g->{$ge->key};
-                    }
+        }
+        $this->_g = $this->_ag;
+        if ($jn && ($g = $jn->grades ?? null)) {
+            $this->_g = $this->_g ?? $this->blank_values();
+            foreach ($this->pset->grades as $ge) {
+                if (!$ge->is_formula() && property_exists($g, $ge->key)) {
+                    $this->_g[$ge->pcview_index] = $g->{$ge->key};
                 }
             }
         }
@@ -1291,8 +1292,9 @@ class PsetView {
         } else {
             $g = [];
             foreach ($this->pset->visible_grades(VF_TF) as $i => $ge) {
-                if (($this->_grades_vf[$i] & $vf) !== 0)
+                if (($this->_grades_vf[$i] & $vf) !== 0) {
                     $g[] = $ge;
+                }
             }
             return $g;
         }

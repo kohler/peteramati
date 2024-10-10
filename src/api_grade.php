@@ -99,7 +99,10 @@ class Grade_API {
             if ($ge->answer) {
                 $v["linenotes"]["/g/{$ge->key}"] = null;
             }
-            $this->diff = $this->diff || $ge->value_differs($gv, $oldgv);
+            if ($ge->value_differs($gv, $oldgv)) {
+                $ge->account_edit($gv, $oldgv, $agv, $info, $v);
+                $this->diff = true;
+            }
         }
         if (array_key_exists("late_hours", $g) && $info->pc_view) {
             // XXX separate permission check?
