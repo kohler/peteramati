@@ -62,7 +62,7 @@ class DiffMany_Page {
                     $this->suppress_grades[] = $ge->key;
                     $this->values_vf[] = 0;
                 } else {
-                    $this->values_vf[] = $ge->vf();
+                    $this->values_vf[] = $ge->vf(null);
                 }
             }
         }
