@@ -177,9 +177,8 @@ class UserPsetInfo {
         }
         if ($version >= $this->_history_v0) {
             return $this->_history[$version - $this->_history_v0] ?? null;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param ?int $version
@@ -218,6 +217,19 @@ class UserPsetInfo {
         return $vupi;
     }
 
+    /** @return Generator<DOMElement> */
+    function student_note_versions(Conf $conf) {
+        assert(!$this->phantom);
+        if ($this->updateby === $this->cid) {
+            yield $this->notesversion;
+        }
+        for ($v1 = $this->notesversion - 1; $v1 >= 0; --$v1) {
+            if (($h = $this->history_at($v1, true, $conf))
+                && $h->antiupdateby === $this->cid) {
+                yield $v1;
+            }
+        }
+    }
 
     /** @return ?object */
     function jxnotes() {

@@ -760,12 +760,29 @@ class PsetView {
 
     /** @return ?int */
     function studentnotesversion() {
-        if ($this->pset->gitless) {
-            $vupi = $this->vupi();
-            return $vupi->studentnotesversion ?? $vupi->notesversion;
-        } else {
+        if (!$this->pset->gitless) {
             return $this->notesversion();
         }
+        $vupi = $this->vupi();
+        return $vupi->studentnotesversion ?? $vupi->notesversion;
+    }
+
+    /** @return ?int */
+    function latest_student_notesversion() {
+        if (!$this->pset->gitless) {
+            return $this->notesversion();
+        }
+        $upi = $this->upi();
+        foreach ($upi->student_note_versions($this->conf) as $nv) {
+            return $nv;
+        }
+        return $upi->noteversion;
+    }
+
+    /** @return bool */
+    function has_pinsnv() {
+        return $this->pset->gitless
+            && $this->upi()->pinsnv !== null;
     }
 
     /** @return ?int */
@@ -1969,9 +1986,9 @@ class PsetView {
             $xargs["commit"] = $this->commit_hash();
         }
         if ($this->pset->gitless) {
-            $vupi = $this->vupi();
-            if ($vupi->studentnotesversion !== null) {
-                $xargs["snv"] = $vupi->studentnotesversion;
+            $snv = $this->studentnotesversion();
+            if ($snv !== $this->notesversion() || $this->has_pinsnv()) {
+                $xargs["snv"] = $snv;
             }
         }
         foreach ($args ?? [] as $k => $v) {

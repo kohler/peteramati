@@ -72,11 +72,13 @@ class PsetRequest {
                 $this->info->adjust_user_snv(true);
                 if ($qreq->is_get() || $qreq->is_head()) {
                     $snv = $this->info->studentnotesversion();
-                    if ($snv === $this->info->notesversion()) {
+                    if ($snv === $this->info->notesversion() && !$this->info->has_pinsnv()) {
                         $snv = null;
                     }
                     $this->conf->redirect_self($qreq, ["snv" => $snv, "oldersnv" => null, "newersnv" => null]);
                 }
+            } else if (!isset($qreq->snv) && $this->info->has_pinsnv()) {
+                $this->conf->redirect_self($qreq, ["snv" => $this->info->pinsnv()]);
             }
         }
     }
@@ -361,16 +363,19 @@ class PsetRequest {
             && !$this->info->is_handout_commit()) {
             $b = [];
             $snv = $this->info->studentnotesversion();
-            $nv = $this->info->notesversion();
             if ($this->info->has_older_snv()) {
                 $b[] = Ht::link("←", $this->info->hoturl("pset", ["oldersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
             }
-            if ($snv !== $this->info->pinsnv()
-                && $this->info->pc_view) {
-                $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip", "aria-label" => "Mark these answers for grading"]);
+            if ($this->info->pc_view) {
+                $cl = $snv === $this->info->pinsnv() ? " btn-primary" : "";
+                $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading"]);
             }
-            if ($snv < $nv) {
-                $b[] = Ht::link("→", $this->info->hoturl("pset", ["newersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
+            if (!empty($b)) {
+                if ($snv < $this->info->latest_student_notesversion()) {
+                    $b[] = Ht::link("→", $this->info->hoturl("pset", ["newersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
+                } else {
+                    $b[] = Ht::button("→", ["type" => "button", "disabled" => true]);
+                }
             }
             if (!empty($b)) {
                 echo '<form class="float-right ml-4"><div class="btnbox">',
