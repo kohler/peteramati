@@ -355,32 +355,50 @@ class PsetRequest {
         }
     }
 
+    private function echo_pset_grades_history() {
+        $snv = $this->info->studentnotesversion();
+        $newer = $older = $match = null;
+        foreach ($this->info->student_notes_versions() as $nv) {
+            if ($nv > $snv) {
+                $newer = $nv;
+            } else if ($nv === $snv) {
+                $match = $nv;
+            } else {
+                $older = $nv;
+                break;
+            }
+        }
+
+        $b = [];
+        if ($newer || $older) {
+            if ($older !== null) {
+                $b[] = Ht::link("←", $this->info->hoturl("pset", ["snv" => $older]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
+            } else {
+                $b[] = Ht::button("←", ["type" => "button", "disabled" => true]);
+            }
+        }
+        if ($this->info->pc_view) {
+            $cl = $match === $this->info->pinsnv() ? " btn-primary" : "";
+            $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading"]);
+        }
+        if ($newer || $older) {
+            if ($newer !== null) {
+                $b[] = Ht::link("→", $this->info->hoturl("pset", ["snv" => $newer]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
+            } else {
+                $b[] = Ht::button("→", ["type" => "button", "disabled" => true]);
+            }
+        }
+        echo '<form class="float-right ml-4"><div class="btnbox">',
+            join("", $b), '</div></form>';
+    }
+
     private function echo_pset_info() {
         if ($this->pset->gitless_grades && $this->info->can_edit_scores()) {
             echo '<div class="float-right ml-4"><button type="button" class="ui js-pset-upload-grades">upload</button></div>';
         }
         if ($this->pset->grades_history
             && !$this->info->is_handout_commit()) {
-            $b = [];
-            $snv = $this->info->studentnotesversion();
-            if ($this->info->has_older_snv()) {
-                $b[] = Ht::link("←", $this->info->hoturl("pset", ["oldersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
-            }
-            if ($this->info->pc_view) {
-                $cl = $snv === $this->info->pinsnv() ? " btn-primary" : "";
-                $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading"]);
-            }
-            if (!empty($b)) {
-                if ($snv < $this->info->latest_student_notesversion()) {
-                    $b[] = Ht::link("→", $this->info->hoturl("pset", ["newersnv" => 1]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
-                } else {
-                    $b[] = Ht::button("→", ["type" => "button", "disabled" => true]);
-                }
-            }
-            if (!empty($b)) {
-                echo '<form class="float-right ml-4"><div class="btnbox">',
-                    join("", $b), '</div></form>';
-            }
+            $this->echo_pset_grades_history();
         }
         echo '<h2 class="pset-title">', htmlspecialchars($this->pset->title), "</h2>";
         ContactView::echo_partner_group($this->info);
