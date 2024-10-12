@@ -103,6 +103,8 @@ class GradeExport implements JsonSerializable {
      * @return $this */
     function set_fixed_values_vf($values_vf) {
         assert(count($values_vf) === $this->pset->ngrades);
+        assert($this->_value_entries === null);
+        assert($this->grades === null);
         assert($this->vf >= VF_TF);
         $this->_fixed_values_vf = $values_vf;
         return $this;
@@ -110,15 +112,16 @@ class GradeExport implements JsonSerializable {
 
     /** @return list<GradeEntry> */
     function value_entries() {
-        if ($this->_value_entries === null) {
-            $this->_value_entries = $this->_value_indexes = [];
-            foreach ($this->_fixed_values_vf ?? $this->_grades_vf as $i => $vf) {
-                if (($vf & $this->vf) !== 0) {
-                    $this->_value_entries[] = $this->pset->grade_by_pcindex($i);
-                    $this->_value_indexes[] = count($this->_value_entries) - 1;
-                } else {
-                    $this->_value_indexes[] = -1;
-                }
+        if ($this->_value_entries !== null) {
+            return $this->_value_entries;
+        }
+        $this->_value_entries = $this->_value_indexes = [];
+        foreach ($this->_fixed_values_vf ?? $this->_grades_vf as $i => $vf) {
+            if (($vf & $this->vf) !== 0) {
+                $this->_value_entries[] = $this->pset->grade_by_pcindex($i);
+                $this->_value_indexes[] = count($this->_value_entries) - 1;
+            } else {
+                $this->_value_indexes[] = -1;
             }
         }
         return $this->_value_entries;
