@@ -217,6 +217,10 @@ export class SearchExpr {
         return this.op && this.op.type === "(" && this.child.length === 0;
     }
 
+    unquoted_text() {
+        return SearchParser.unquote(this.text);
+    }
+
     complete(pos) {
         if (!this.is_complete) {
             this.pos2 = pos;
@@ -547,5 +551,13 @@ export class SearchParser {
             }
         }
         return cure;
+    }
+
+    static unquote(t) { // XXX does not align with hotcrp
+        if (!t.startsWith("\"")) {
+            return t;
+        }
+        t = t.substring(1, t.length - (t.endsWith("\"") ? 1 : 0));
+        return t.replace(/\\([\\"])/g, '$1');
     }
 }

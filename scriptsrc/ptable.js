@@ -1724,36 +1724,171 @@ function ptable_recolor(tb) {
     }
 }
 
-let search_target;
+let search_ptconf, search_target;
 
 const search_keywords = {
-    grade: function (se, su) {
-        if (se.text === "no") {
-            return su.grade_status < 0 || (!su.grade_status && su.emptydiff);
-        } else if (se.text === "yes") {
-            return su.grade_status > 0;
-        } else if (se.text === "user") {
-            return su.grade_status === 1;
-        } else if (se.text === "none") {
-            return !su.grade_status;
+    grade: (text) => {
+        if (text === "no") {
+            return (se, su) => su.grade_status < 0 || (!su.grade_status && su.emptydiff);
+        } else if (text === "yes") {
+            return (se, su) => su.grade_status > 0;
+        } else if (text === "user") {
+            return (se, su) => su.grade_status === 1;
+        } else if (text === "none") {
+            return (se, su) => !su.grade_status;
         } else {
-            return false;
+            return () => false;
+        }
+    },
+    grader: (text) => {
+        if (text === "any") {
+            return (se, su) => !!su.gradercid;
+        } else if (text === "none") {
+            return (se, su) => !su.gradercid;
+        }
+        const re = new RegExp(regexp_quote(SearchParser.unquote(text)), "i"),
+            mcids = [];
+        for (const cid in siteinfo.pc) {
+            const pc = siteinfo.pc[cid];
+            if (re.test(grader_name(pc)))
+                mcids.push(+cid);
+        }
+        if (mcids.length === 1) {
+            return (se, su) => su.gradercid === mcids[0];
+        } else {
+            return (se, su) => mcids.includes(su.gradercid);
         }
     }
 };
 
+function make_search_name(text) {
+    const re = new RegExp(regexp_quote(text), "i");
+    return () => {
+        if (search_ptconf.anonymous) {
+            return re.test(search_target.anon_user);
+        }
+        return re.test(search_target.first)
+            || re.test(search_target.last)
+            || re.test(search_target.email)
+            || re.test(search_target.user);
+    };
+}
+
+const grade_search_keywords = {
+    any: (gidx) => { return (se) => !!search_target.grades[gidx]; },
+    none: (gidx) => { return (se) => !search_target.grades[gidx]; },
+    eq: (gidx, v) => { return (se) => search_target.grades[gidx] == v; },
+    ne: (gidx, v) => { return (se) => search_target.grades[gidx] != v; },
+    gt: (gidx, v) => { return (se) => search_target.grades[gidx] > v; },
+    ge: (gidx, v) => { return (se) => search_target.grades[gidx] >= v; },
+    lt: (gidx, v) => { return (se) => search_target.grades[gidx] < v; },
+    le: (gidx, v) => { return (se) => search_target.grades[gidx] <= v; }
+};
+
+function parse_search_compar(text) {
+    const m = text.match(/^(<=?|>=?|==?|!=?|≤|≥|≠|(?=[\d\.]))\s*(\d+\.?\d*|\.\d+)$/);
+    if (!m) {
+        return null;
+    }
+    const gv = +m[2];
+    if (m[1] === "=" | m[1] === "==" || m[1] === "") {
+        return {op: "eq", value: gv};
+    } else if (m[1] === "!" || m[1] === "!=" || m[1] === "≠") {
+        return {op: "ne", value: gv};
+    } else if (m[1] === "<") {
+        return {op: "lt", value: gv};
+    } else if (m[1] === "<=" || m[1] === "≤") {
+        return {op: "le", value: gv};
+    } else if (m[1] === ">") {
+        return {op: "gt", value: gv};
+    } else {
+        return {op: "ge", value: gv};
+    }
+}
+
+function make_compare(op) {
+    if (op === "eq") {
+        return (a, b) => a == b;
+    } else if (op === "ne") {
+        return (a, b) => a != b;
+    } else if (op === "lt") {
+        return (a, b) => a < b;
+    } else if (op === "le") {
+        return (a, b) => a <= b;
+    } else if (op === "gt") {
+        return (a, b) => a > b;
+    } else if (op === "ge") {
+        return (a, b) => a >= b;
+    } else {
+        return (a, b) => false;
+    }
+}
+
+function make_search_keyword_compare(gi, ge, text) {
+    const gidx = ge.value_order_in(gi);
+    if (text === "any") {
+        return grade_search_keywords.any(gidx);
+    } else if (text === "none") {
+        return grade_search_keywords.none(gidx);
+    }
+    const compar = parse_search_compar(text);
+    if (compar) {
+        return grade_search_keywords[compar.op](gidx, compar.value);
+    }
+    return null;
+}
+
+function find_search_keyword(se, ptconf) {
+    let kw = se.kword, text = se.text;
+    if (!kw) {
+        let m = text.match(/^([a-zA-Z][-_a-zA-Z0-9]*)((?:<=?|>=?|==?|!=?|≤|≥|≠)[^<>=!]*)$/);
+        if (!m) {
+            return make_search_name(se.unquoted_text());
+        }
+        kw = m[1];
+        text = m[2];
+    }
+
+    const skw = search_keywords[kw];
+    if (skw) {
+        return skw(text);
+    }
+
+    const gi = ptconf.gradesheet,
+        collator = new Intl.Collator(undefined, {usage: "search", sensitivity: "accent"});
+    let matchge = null, titlege = [];
+    for (let i = 0; i !== gi.value_order.length; ++i) {
+        const ge = gi.entries[gi.value_order[i]];
+        if (ge.key === kw) {
+            matchge = ge;
+            break;
+        } else if (collator.compare(ge.title_text, kw) === 0
+                   || collator.compare(ge.abbr(), kw) === 0) {
+            titlege.push(ge);
+        }
+    }
+    if (!matchge && titlege.length === 1) {
+        matchge = titlege[0];
+    }
+    if (matchge) {
+        return make_search_keyword_compare(gi, matchge, text);
+    }
+    if ((kw === "tot" || kw === "total")
+        && ptconf.need_total) {
+        const compar = parse_search_compar(text);
+        if (compar) {
+            const f = make_compare(compar.op);
+            return (se, su) => f(su.total, compar.value);
+        }
+    }
+    return null;
+}
+
 function evaluate_search(se) {
-    if (se.kword) {
-        const sk = search_keywords[se.kword];
-        return sk ? sk(se, search_target) : false;
+    if (se.info === undefined) {
+        se.info = find_search_keyword(se, search_ptconf);
     }
-    if (!se.info) {
-        se.info = new RegExp(regexp_quote(se.text), "i");
-    }
-    return se.info.test(search_target.first)
-        || se.info.test(search_target.last)
-        || se.info.test(search_target.email)
-        || se.info.test(search_target.user);
+    return se.info ? se.info(se, search_target) : false;
 }
 
 function ptable_search_check(ptconf, trx, sexpr) {
@@ -1766,6 +1901,7 @@ function ptable_search(search) {
         const form = search.closest("form");
         let ptconf = form.pa__ptconf,
             pexpr = new SearchParser(search.value).parse_expression();
+        search_ptconf = ptconf;
         ptconf.input_timeout = null;
         if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
             pexpr = null;
@@ -1790,6 +1926,7 @@ function ptable_search(search) {
         if (changed) {
             ptbodies.forEach((tb) => ptable_recolor(tb));
         }
+        search_ptconf = null;
     };
 }
 
