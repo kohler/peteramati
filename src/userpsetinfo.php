@@ -163,13 +163,13 @@ class UserPsetInfo {
     }
 
     /** @param ?int $version
-     * @param ?bool $student_only
+     * @param bool $student_only
      * @return UserPsetInfo */
     function version_at($version, $student_only, Conf $conf) {
-        assert(!$this->phantom);
         if (($version ?? $this->notesversion) >= $this->notesversion) {
             return $this;
         }
+        assert(!$this->phantom);
         $this->history_at(max($version - 1, 0), $student_only, $conf);
         assert($this->_history !== null);
         $vupi = new UserPsetInfo($this->cid, $this->pset);
