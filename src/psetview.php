@@ -185,6 +185,19 @@ class PsetView {
         return $this->_vupi;
     }
 
+    /** @return bool */
+    private function older_answers() {
+        return $this->pset->grades_history
+            && $this->pset->gitless
+            && $this->vupi() !== $this->upi();
+    }
+
+    /** @param ?int $snv */
+    function set_answer_version($snv) {
+        $this->_vupi = null;
+        $this->_snv = $snv;
+    }
+
     /** @return ?RepositoryPsetInfo */
     function rpi() {
         if (!$this->_rpi && $this->repo) {
@@ -639,12 +652,6 @@ class PsetView {
     /** @return ?object */
     function user_jnotes() {
         return $this->vupi()->jnotes();
-    }
-
-    /** @param ?int $snv */
-    function set_answer_version($snv) {
-        $this->_vupi = null;
-        $this->_snv = $snv;
     }
 
     /** @return ?object */
@@ -1694,7 +1701,7 @@ class PsetView {
         }
     }
 
-    function set_pin_snv() {
+    function set_pinned_answer_version() {
         assert(!!$this->pset->gitless);
         $snv = $this->answer_version();
         $nv = $this->notesversion();
@@ -2078,15 +2085,9 @@ class PsetView {
         return $gexp;
     }
 
-    private function is_past() {
-        return $this->pset->grades_history
-            && $this->pset->gitless
-            && $this->vupi() !== $this->upi();
-    }
-
     private function export_grades_vf($uvf) {
         $gvf = $this->grades_vf();
-        if (!$this->is_past() || !$this->pset->has_visible_if()) {
+        if (!$this->older_answers() || !$this->pset->has_visible_if()) {
             return $gvf;
         }
         $clone = null;
@@ -2126,7 +2127,7 @@ class PsetView {
     }
 
     function grade_export_updates(GradeExport $gexp) {
-        if (!$this->is_past()) {
+        if (!$this->older_answers()) {
             return;
         }
         $gexp->answer_version = $this->vupi()->notesversion;

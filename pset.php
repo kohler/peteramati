@@ -172,7 +172,7 @@ class PsetRequest {
             && $this->viewer->isPC
             && $this->viewer !== $this->user
             && $this->pset->gitless) {
-            $this->info->set_pin_snv();
+            $this->info->set_pinned_answer_version();
             $this->conf->redirect($this->info->hoturl("pset"));
         }
     }

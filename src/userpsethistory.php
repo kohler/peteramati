@@ -55,8 +55,26 @@ class UserPsetHistory {
     }
 
     /** @param object $jnotes
+     * @param ?Pset $answers_only_pset
      * @return object */
-    function apply_revdelta($jnotes) {
-        return json_update($jnotes, $this->jantiupdate());
+    function apply_revdelta($jnotes, $answers_only_pset) {
+        $ja = $this->jantiupdate();
+        $jnotes1 = json_update($jnotes, $ja);
+        if (!$answers_only_pset || !isset($ja->grades)) {
+            return $jnotes1;
+        }
+        $grades = $jnotes->grades ?? (object) [];
+        $grades1 = $jnotes1->grades ?? (object) [];
+        foreach ($ja->grades as $k => $v) {
+            if (!($ge = $answers_only_pset->gradelike_by_key($k))
+                || !$ge->answer) {
+                if (property_exists($grades, $k)) {
+                    $grades1->$k = $grades->$k;
+                } else {
+                    unset($grades1->$k);
+                }
+            }
+        }
+        return $jnotes1;
     }
 }

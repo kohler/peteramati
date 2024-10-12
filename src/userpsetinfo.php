@@ -177,11 +177,12 @@ class UserPsetInfo {
         $vupi->studentupdateat = $this->studentupdateat;
         $vupi->notesversion = $this->notesversion;
         $jnotes = $this->jnotes();
+        $pset = $student_only ? $conf->pset_by_id($this->pset) : null;
         for ($v1 = $this->notesversion - 1; $v1 >= $version; --$v1) {
             if ($v1 >= $this->_history_v0
                 && ($h = $this->_history[$v1 - $this->_history_v0])
                 && (!$student_only || $h->antiupdateby === $this->cid)) {
-                $jnotes = $h->apply_revdelta($jnotes);
+                $jnotes = $h->apply_revdelta($jnotes, $pset);
                 $vupi->studentupdateat = $h->studentupdateat;
                 $vupi->notesversion = $v1;
             }
