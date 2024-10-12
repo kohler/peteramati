@@ -2005,8 +2005,9 @@ class PsetView {
     const GRADEJSON_NO_EDITABLE_ANSWERS = 32;
 
     /** @param int $flags
+     * @param ?list<0|4|5|7> $fixed_values_vf
      * @return ?GradeExport */
-    function grade_export($flags = 0) {
+    function grade_export($flags = 0, $fixed_values_vf = null) {
         $override_view = ($flags & self::GRADEJSON_OVERRIDE_VIEW) !== 0;
         if (!$override_view && !$this->can_view_some_grade()) {
             return null;
@@ -2026,6 +2027,9 @@ class PsetView {
         }
 
         $gexp->set_grades_vf($this->export_grades_vf($vf));
+        if ($fixed_values_vf !== null) {
+            $gexp->set_fixed_values_vf($fixed_values_vf);
+        }
 
         $this->ensure_grades();
         if ($this->_g !== null

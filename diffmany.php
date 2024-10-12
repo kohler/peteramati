@@ -94,10 +94,7 @@ class DiffMany_Page {
         }
         if ($info->can_edit_scores()
             || ($info->can_view_any_grade() && $info->is_grading_commit())) {
-            $gexp = $info->grade_export(PsetView::GRADEJSON_SLICE);
-            if ($this->values_vf !== null) {
-                $gexp->set_fixed_values_vf($this->values_vf);
-            }
+            $gexp = $info->grade_export(PsetView::GRADEJSON_SLICE, $this->values_vf);
             $gj = $gexp->jsonSerialize();
         } else {
             $gj = $info->info_json();
