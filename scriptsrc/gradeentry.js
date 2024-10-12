@@ -269,7 +269,6 @@ export class GradeEntry {
         // UI: sidebar tabbing, autogrow
         if (ve && opts.sidebar) {
             ve.tabIndex = -1;
-            ve.classList.add("uikd", "pa-sidebar-tab");
         }
         if (fresh) {
             removeClass(ve, "pa-fresh");

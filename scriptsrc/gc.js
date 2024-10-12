@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2021 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { addClass, handle_ui, input_set_default_value } from "./ui.js";
+import { addClass, hasClass, handle_ui, input_set_default_value } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import { strftime, sec2text } from "./utils.js";
 
@@ -244,9 +244,49 @@ GradeClass.add("none", {
 });
 
 
-function sidebar_tab_traverse(e, bwd) {
-    let sb = e.closest(".pa-sidebar"),
-        sbtabs = sb.querySelectorAll(".pa-sidebar-tab"),
+const DGSELECTOR = ".pa-dg, .pa-gradelist";
+
+function tabgroup_traverse(sb, bwd, sidebar) {
+    const dir = bwd ? "previousElementSibling" : "nextElementSibling",
+        childdir = bwd ? "lastElementChild" : "firstElementChild",
+        searchclass = sidebar ? ".pa-sidebar" : ".pa-gradevalue";
+    if (sidebar) {
+        sb = sb.closest(DGSELECTOR);
+    }
+    let parent = sb.parentElement, ch, down = false;
+    while (parent) {
+        if (!down) {
+            sb = sb[dir];
+        }
+        down = false;
+        if (!sb) {
+            sb = parent;
+            parent = sb.parentElement;
+        } else if (hasClass(sb, "pa-dg") || hasClass(sb, "pa-gradelist")) {
+            if (sidebar) {
+                if ((ch = sb.querySelector(".pa-sidebar"))) {
+                    return ch;
+                }
+            } else {
+                ch = sb.querySelectorAll(".pa-gradevalue");
+                if (ch.length > 0) {
+                    return ch[bwd ? ch.length - 1 : 0].closest(DGSELECTOR);
+                }
+            }
+        } else if (hasClass(sb, "pa-psetinfo")) {
+            if ((ch = sb[childdir])) {
+                parent = sb;
+                sb = ch;
+                down = true;
+            }
+        }
+    }
+    return null;
+}
+
+function tab_traverse(e, bwd, sidebar) {
+    let sb = e.closest(sidebar ? ".pa-sidebar" : DGSELECTOR),
+        sbtabs = sb.querySelectorAll(".pa-gradevalue"),
         pos = Array.prototype.indexOf.call(sbtabs, e);
     if (pos < 0) {
         return null;
@@ -255,39 +295,40 @@ function sidebar_tab_traverse(e, bwd) {
     while (true) {
         pos += bwd ? -1 : 1;
         if (pos < 0 || pos >= sbtabs.length) {
-            if (allsb == null) {
-                allsb = document.querySelectorAll(".pa-sidebar");
-                sbpos = Array.prototype.indexOf.call(allsb, sb);
-                if (sbpos < 0) {
-                    return null;
-                }
-            }
-            sbpos += bwd ? -1 : 1;
-            if (sbpos >= 0 && sbpos < allsb.length) {
-                sb = allsb[sbpos];
-                sbtabs = sb.querySelectorAll(".pa-sidebar-tab");
-                pos = bwd ? sbtabs.length : -1;
-            } else {
+            if (!(sb = tabgroup_traverse(sb, bwd, sidebar))) {
                 return null;
             }
-        } else if (sbtabs[pos].offsetParent) {
-            return sbtabs[pos];
+            sbtabs = sb.querySelectorAll(".pa-gradevalue");
+            pos = bwd ? sbtabs.length : -1;
+        } else {
+            const ch = sbtabs[pos], tn = ch.tagName;
+            if (ch.offsetParent
+                && (tn === "INPUT" || tn === "TEXTAREA" || tn === "SELECT" || tn === "BUTTON")
+                && (sidebar || !ch.closest(".pa-sidebar"))) {
+                return ch;
+            }
         }
     }
 }
 
-handle_ui.on("keydown.pa-sidebar-tab", function (event) {
-    if (event_key(event) === "Tab"
-        && !event.ctrlKey
-        && !event.altKey
-        && !event.metaKey) {
-        const e = sidebar_tab_traverse(this, event.shiftKey);
-        if (e) {
-            e.focus();
-            if (e.setSelectionRange) {
-                e.setSelectionRange(0, e.value.length);
-            }
-            event.preventDefault();
+document.body.addEventListener("keydown", function (evt) {
+    if (evt.key !== "Tab"
+        || !hasClass(evt.target, "pa-gradevalue")
+        || evt.ctrlKey
+        || evt.metaKey) {
+        return;
+    }
+    let dest;
+    if (evt.target.closest(".pa-sidebar")) {
+        dest = tab_traverse(evt.target, evt.shiftKey, true);
+    } else if (evt.altKey) {
+        dest = tab_traverse(evt.target, evt.shiftKey, false);
+    }
+    if (dest) {
+        dest.focus({focusVisible: true});
+        if (dest.type === "textarea" || dest.type === "text") {
+            dest.setSelectionRange(0, dest.value.length);
         }
+        evt.preventDefault();
     }
 });
