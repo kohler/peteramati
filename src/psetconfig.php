@@ -663,6 +663,11 @@ class Pset {
         return $gvf;
     }
 
+    /** @return bool */
+    function has_visible_if() {
+        return $this->has_visible_if;
+    }
+
 
     /** @return ?Repository */
     function handout_repo(?Repository $inrepo = null) {

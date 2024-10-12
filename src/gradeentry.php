@@ -721,10 +721,10 @@ class GradeEntry {
         return $this->_formula;
     }
 
-    /** @param 0|1|3|4|5|7 $vf
+    /** @param 0|1|3|4|5|7 $uvf
      * @param ?PsetView $info
      * @return array<string,mixed> */
-    function json($vf, $info) {
+    function json($uvf, $info) {
         $gej = ["key" => $this->key, "title" => $this->title];
         if ($this->type !== null) {
             if ($this->type === "select") {
@@ -754,10 +754,10 @@ class GradeEntry {
         if ($this->round) {
             $gej["round"] = $this->round;
         }
-        if ($this->max && ($vf >= VF_TF || $this->max_visible)) {
+        if ($this->max && ($uvf >= VF_TF || $this->max_visible)) {
             $gej["max"] = $this->max;
         }
-        if ($this->collate && $vf >= VF_TF) {
+        if ($this->collate && $uvf >= VF_TF) {
             $gej["collate"] = true;
         }
         if ($this->table_color) {
@@ -781,9 +781,9 @@ class GradeEntry {
         if ($this->landmark_range_file) {
             $gej["landmark_range"] = $this->landmark_range_file . ":" . $this->landmark_range_first . ":" . $this->landmark_range_last;
         }
-        if (($this->vf($info) & $vf & ~VF_TF) === 0) {
+        if (($uvf & ~VF_TF) === 0) {
             $gej["visible"] = false;
-        } else if (!$this->answer && ($vf & VF_STUDENT_ALLOWED) === 0) {
+        } else if (!$this->answer && ($uvf & VF_STUDENT_ALLOWED) === 0) {
             $gej["visible"] = true;
         }
         if ($info ? $this->disabled_at($info) : $this->disabled) {
@@ -798,7 +798,7 @@ class GradeEntry {
         if ($this->answer)  {
             $gej["answer"] = true;
         }
-        if (($vf >= VF_TF || $this->answer) && $this->description) {
+        if (($uvf >= VF_TF || $this->answer) && $this->description) {
             $gej["description"] = $this->description;
         }
         return $gej;

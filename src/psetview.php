@@ -179,11 +179,8 @@ class PsetView {
     private function vupi() {
         if (!$this->_vupi) {
             $upi = $this->upi();
-            if (($this->_snv ?? $upi->pinsnv ?? $upi->notesversion) >= $upi->notesversion) {
-                $this->_vupi = $upi;
-            } else {
-                $this->_vupi = $upi->version_at($this->_snv ?? $upi->pinsnv, true, $this->conf);
-            }
+            $snv = $this->_snv ?? $upi->pinsnv ?? $upi->notesversion;
+            $this->_vupi = $upi->version_at($snv, true, $this->conf);
         }
         return $this->_vupi;
     }
@@ -645,24 +642,9 @@ class PsetView {
     }
 
     /** @param ?int $snv */
-    function set_user_snv($snv) {
+    function set_answer_version($snv) {
         $this->_vupi = null;
         $this->_snv = $snv;
-    }
-
-    /** @param bool $newer */
-    function adjust_user_snv($newer) {
-        $upi = $this->upi();
-        $vupi = $this->vupi();
-        $delta = $newer ? 1 : -1;
-        $nv = ($vupi->studentnotesversion ?? $vupi->notesversion) + $delta;
-        while ($nv > 0
-               && $nv < $upi->notesversion
-               && (!($h = $upi->history_at($nv, true, $this->conf))
-                   || ($h->updateby !== $upi->cid))) {
-            $nv += $delta;
-        }
-        $this->set_user_snv(min(max($nv, 0), $upi->notesversion));
     }
 
     /** @return ?object */
@@ -739,33 +721,32 @@ class PsetView {
     }
 
     /** @return ?int */
-    function studentnotesversion() {
+    function answer_version() {
         if (!$this->pset->gitless) {
             return $this->notesversion();
         }
-        $vupi = $this->vupi();
-        return $vupi->studentnotesversion ?? $vupi->notesversion;
+        return $this->vupi()->notesversion;
     }
 
     /** @return ?int */
-    function latest_student_notes_version() {
+    function latest_answer_version() {
         if (!$this->pset->gitless) {
             return $this->notesversion();
         }
         $upi = $this->upi();
-        foreach ($upi->student_note_versions($this->conf) as $nv) {
+        foreach ($upi->answer_versions($this->conf) as $nv) {
             return $nv;
         }
-        return $upi->noteversion;
+        return $upi->notesversion;
     }
 
     /** @return list<int>|Generator<int> */
-    function student_notes_versions() {
+    function answer_versions() {
         if (!$this->pset->gitless) {
             $nv = $this->notesversion();
             return $nv !== null ? [$nv] : [];
         }
-        return $this->upi()->student_note_versions($this->conf);
+        return $this->upi()->answer_versions($this->conf);
     }
 
     /** @return bool */
@@ -885,7 +866,7 @@ class PsetView {
             $fs = [];
             foreach ($this->pset->formula_grades() as $ge) {
                 $f = $ge->formula();
-                $v = $f->evaluate($this->user);
+                $v = $f->evaluate($this->user, null);
                 if ($v !== null) {
                     $this->_g[$ge->pcview_index] = $v;
                 } else {
@@ -999,31 +980,32 @@ class PsetView {
         }
         if (!$ge) {
             return null;
-        } else if ($ge->pcview_index !== null) {
-            $this->ensure_grades();
-            $gv = $this->_g[$ge->pcview_index] ?? null;
-            if ($gv === null && $ge->is_formula()) {
-                if (!$this->_has_formula) {
-                    $this->ensure_formulas();
-                    $gv = $this->_g[$ge->pcview_index] ?? null;
-                }
-                if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
-                    $gv = $ge->formula()->evaluate($this->user, $this);
-                    if ($gv !== null) {
-                        $this->_g[$ge->pcview_index] = $gv;
-                    } else {
-                        $this->_has_fg[$ge->pcview_index] = true;
-                    }
-                }
+        }
+        if ($ge->pcview_index === null) {
+            if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
+                return $this->late_hours();
+            } else if ($ge->gtype === GradeEntry::GTYPE_STUDENT_TIMESTAMP) {
+                return $this->student_timestamp(true);
             }
-            return $gv;
-        } else if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
-            return $this->late_hours();
-        } else if ($ge->gtype === GradeEntry::GTYPE_STUDENT_TIMESTAMP) {
-            return $this->student_timestamp(true);
-        } else {
             return null;
         }
+        $this->ensure_grades();
+        $gv = $this->_g[$ge->pcview_index] ?? null;
+        if ($gv === null && $ge->is_formula()) {
+            if (!$this->_has_formula) {
+                $this->ensure_formulas();
+                $gv = $this->_g[$ge->pcview_index] ?? null;
+            }
+            if ($gv === null && !isset($this->_has_fg[$ge->pcview_index])) {
+                $gv = $ge->formula()->evaluate($this->user, $this);
+                if ($gv !== null) {
+                    $this->_g[$ge->pcview_index] = $gv;
+                } else {
+                    $this->_has_fg[$ge->pcview_index] = true;
+                }
+            }
+        }
+        return $gv;
     }
 
     /** @param string|GradeEntry $ge
@@ -1712,9 +1694,9 @@ class PsetView {
         }
     }
 
-    function pin_snv() {
+    function set_pin_snv() {
         assert(!!$this->pset->gitless);
-        $snv = $this->studentnotesversion();
+        $snv = $this->answer_version();
         $nv = $this->notesversion();
         $this->conf->qe("update ContactGrade set pinsnv=?, xnotes=null, xnotesOverflow=null where cid=? and pset=?", $snv !== null && $snv < $nv ? $snv : null, $this->user->contactId, $this->pset->id);
     }
@@ -1976,7 +1958,7 @@ class PsetView {
         }
         if ($this->pset->gitless
             && !isset($args["snv"])) {
-            $snv = $this->studentnotesversion();
+            $snv = $this->answer_version();
             if ($snv !== $this->notesversion() || $this->has_pinsnv()) {
                 $xargs["snv"] = $snv;
             }
@@ -2016,9 +1998,8 @@ class PsetView {
     const GRADEJSON_NO_EDITABLE_ANSWERS = 32;
 
     /** @param int $flags
-     * @param ?list<0|4|5|7> $values_vf
      * @return ?GradeExport */
-    function grade_export($flags = 0, $values_vf = null) {
+    function grade_export($flags = 0) {
         $override_view = ($flags & self::GRADEJSON_OVERRIDE_VIEW) !== 0;
         if (!$override_view && !$this->can_view_some_grade()) {
             return null;
@@ -2036,10 +2017,8 @@ class PsetView {
         } else {
             $gexp->export_entries();
         }
-        $gexp->set_grades_vf($this->grades_vf());
-        if ($values_vf !== null) {
-            $gexp->set_fixed_values_vf($values_vf);
-        }
+
+        $gexp->set_grades_vf($this->export_grades_vf($vf));
 
         $this->ensure_grades();
         if ($this->_g !== null
@@ -2068,13 +2047,11 @@ class PsetView {
         }
         if ($this->pset->gitless_grades) {
             if ($this->pset->gitless) {
-                $vupi = $this->vupi();
-                if ($vupi) {
-                    $gexp->version = $vupi->notesversion;
-                }
+                $upi = $this->upi();
+                $gexp->version = $upi->notesversion;
                 if (!$gexp->scores_editable) {
                     $gexp->answers_editable = !$this->pset->frozen
-                        && (!$vupi || $vupi === $this->upi());
+                        && $upi === $this->vupi();
                 }
             } else {
                 $rpi = $this->rpi();
@@ -2101,6 +2078,34 @@ class PsetView {
         return $gexp;
     }
 
+    private function is_past() {
+        return $this->pset->grades_history
+            && $this->pset->gitless
+            && $this->vupi() !== $this->upi();
+    }
+
+    private function export_grades_vf($uvf) {
+        $gvf = $this->grades_vf();
+        if (!$this->is_past() || !$this->pset->has_visible_if()) {
+            return $gvf;
+        }
+        $clone = null;
+        foreach ($gvf as $i => &$vf) {
+            if (($uvf & $vf) !== 0) {
+                continue;
+            }
+            if (!$clone) {
+                $clone = clone $this;
+                $clone->_grades_suppressed = 0;
+                $clone->clear_can_view_grade();
+                $clone->_gtime = -1;
+                $clone->set_answer_version($this->upi()->notesversion);
+            }
+            $vf |= $this->pset->grade_by_pcindex($i)->vf($clone);
+        }
+        return $gvf;
+    }
+
     function grade_export_grades(GradeExport $gexp) {
         $this->ensure_grades();
         $vges = $gexp->value_entries();
@@ -2121,17 +2126,16 @@ class PsetView {
     }
 
     function grade_export_updates(GradeExport $gexp) {
-        if ($this->pset->grades_history && $this->pset->gitless) {
-            $vupi = $this->vupi();
-            if ($vupi->studentnotesversion !== null) {
-                $jnn = $this->upi()->jnote("grades");
-                $jno = $vupi->jnote("grades");
-                foreach ($gexp->value_entries() as $ge) {
-                    if ($ge->answer
-                        && ($jnn->{$ge->key} ?? null) !== ($jno->{$ge->key} ?? null)) {
-                        $gexp->grades_latest[$ge->key] = $jnn->{$ge->key};
-                    }
-                }
+        if (!$this->is_past()) {
+            return;
+        }
+        $gexp->answer_version = $this->vupi()->notesversion;
+        $jnn = $this->upi()->jnote("grades");
+        $jno = $this->vupi()->jnote("grades");
+        foreach ($gexp->value_entries() as $ge) {
+            if ($ge->answer
+                && ($jnn->{$ge->key} ?? null) !== ($jno->{$ge->key} ?? null)) {
+                $gexp->grades_latest[$ge->key] = $jnn->{$ge->key};
             }
         }
     }

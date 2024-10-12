@@ -60,25 +60,11 @@ class PsetRequest {
 
         // notes version
         if ($this->pset->grades_history) {
-            if (isset($qreq->snv) && ctype_digit($qreq->snv)) {
-                $this->info->set_user_snv(intval($qreq->snv));
-            }
-            if (isset($qreq->oldersnv)) {
-                $this->info->adjust_user_snv(false);
-                if ($qreq->is_get() || $qreq->is_head()) {
-                    $this->conf->redirect_self($qreq, ["snv" => $this->info->studentnotesversion(), "oldersnv" => null, "newersnv" => null]);
-                }
-            } else if (isset($qreq->newersnv)) {
-                $this->info->adjust_user_snv(true);
-                if ($qreq->is_get() || $qreq->is_head()) {
-                    $snv = $this->info->studentnotesversion();
-                    if ($snv === $this->info->notesversion() && !$this->info->has_pinsnv()) {
-                        $snv = null;
-                    }
-                    $this->conf->redirect_self($qreq, ["snv" => $snv, "oldersnv" => null, "newersnv" => null]);
-                }
-            } else if (!isset($qreq->snv) && $this->info->has_pinsnv()) {
+            if (!isset($qreq->snv) && $this->info->has_pinsnv()) {
                 $this->conf->redirect_self($qreq, ["snv" => $this->info->pinsnv()]);
+            }
+            if (isset($qreq->snv) && ctype_digit($qreq->snv)) {
+                $this->info->set_answer_version(intval($qreq->snv));
             }
         }
     }
@@ -186,7 +172,7 @@ class PsetRequest {
             && $this->viewer->isPC
             && $this->viewer !== $this->user
             && $this->pset->gitless) {
-            $this->info->pin_snv();
+            $this->info->set_pin_snv();
             $this->conf->redirect($this->info->hoturl("pset"));
         }
     }
@@ -356,12 +342,12 @@ class PsetRequest {
     }
 
     private function echo_pset_grades_history() {
-        $snv = $this->info->studentnotesversion();
+        $snv = $this->info->answer_version();
         $newer = $older = $match = null;
-        foreach ($this->info->student_notes_versions() as $nv) {
+        foreach ($this->info->answer_versions() as $nv) {
             if ($nv > $snv) {
                 $newer = $nv;
-            } else if ($nv === $snv) {
+            } else if ($match === null) {
                 $match = $nv;
             } else {
                 $older = $nv;

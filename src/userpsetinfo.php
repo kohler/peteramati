@@ -47,8 +47,6 @@ class UserPsetInfo {
     public $sset_next;
     /** @var bool */
     public $phantom = true;
-    /** @var ?int */
-    public $studentnotesversion;
 
     /** @param int $cid
      * @param int $pset */
@@ -95,7 +93,6 @@ class UserPsetInfo {
         $this->jnotes = null;
         $this->jxnotes = null;
         $this->_history = null;
-        $this->_history_v0 = $this->notesversion;
         $this->_history_student = null;
     }
 
@@ -129,56 +126,40 @@ class UserPsetInfo {
         $this->notes = $notes;
         $this->jnotes = $jnotes;
         $this->notesversion = $this->phantom ? 1 : $this->notesversion + 1;
-        $this->_history_v0 = $this->_history_v0 ?? $this->notesversion;
         $this->phantom = false;
     }
 
 
-    /** @param string $clause */
-    private function load_history(Conf $conf, $clause) {
-        $this->_history = $this->_history ?? [];
-        while ($this->_history_v0 + count($this->_history) < $this->notesversion) {
-            $this->_history[] = null;
+    /** @param int $version
+     * @param ?bool $student_only
+     * @return ?UserPsetHistory */
+    function history_at($version, $student_only, Conf $conf) {
+        assert(!$this->phantom);
+        if ($version < 0 || $version >= $this->notesversion) {
+            return null;
         }
-        $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and $clause and notesversion<? order by notesversion asc", $this->cid, $this->pset, $this->_history_v0);
+        if ($this->_history === null
+            || (!$student_only && $this->_history_student)) {
+            $this->_history = [];
+            $this->_history_v0 = $this->notesversion;
+            $this->_history_student = $student_only;
+        }
+        if ($version >= $this->_history_v0) {
+            return $this->_history[$version - $this->_history_v0];
+        }
+        $v1 = $this->_history_v0;
+        $this->_history_width = min(($this->_history_width ?? 2) * 2, 128);
+        $v0 = max($version - $this->_history_width, 0);
+        $nulls = array_fill(0, $this->_history_v0 - $v0, null);
+        $this->_history = array_merge($nulls, $this->_history);
+        $this->_history_v0 = $v0;
+        $qtail = $this->_history_student ? " and antiupdateby={$this->cid}" : "";
+        $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and notesversion>=? and notesversion<?{$qtail} order by notesversion asc", $this->cid, $this->pset, $v0, $v1);
         while (($h = UserPsetHistory::fetch($result))) {
-            if ($h->notesversion < $this->_history_v0) {
-                $this->_history = array_merge(
-                    array_fill(0, $this->_history_v0 - $h->notesversion, null),
-                    $this->_history);
-                $this->_history_v0 = $h->notesversion;
-            }
             $this->_history[$h->notesversion - $this->_history_v0] = $h;
         }
         Dbl::free($result);
-    }
-
-    /** @param int $version
-     * @param ?bool $student_only
-     * @return UserPsetHistory */
-    function history_at($version, $student_only, Conf $conf) {
-        assert(!$this->phantom);
-        if (!$student_only && $this->_history_student) {
-            $this->_history = [];
-            $this->_history_v0 = $this->notesversion;
-        }
-        if ($this->_history_v0 > $version) {
-            $this->_history_student = $student_only && $this->_history_student !== false;
-            $this->_history_width = min(($this->_history_width ?? 8) * 2, 128);
-            $vx = max($version - $this->_history_width, 0);
-            if ($this->_history_student) {
-                $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0} and antiupdateby={$this->cid}");
-            } else {
-                $this->load_history($conf, "notesversion>={$vx} and notesversion<{$this->_history_v0}");
-            }
-        }
-        if ($this->_history_v0 + count($this->_history) <= $version) {
-            $this->load_history($conf, "notesversion>=" . ($this->_history_v0 + count($this->_history)));
-        }
-        if ($version >= $this->_history_v0) {
-            return $this->_history[$version - $this->_history_v0] ?? null;
-        }
-        return null;
+        return $this->_history[$version - $this->_history_v0];
     }
 
     /** @param ?int $version
@@ -189,16 +170,12 @@ class UserPsetInfo {
         if (($version ?? $this->notesversion) >= $this->notesversion) {
             return $this;
         }
-        $this->history_at($version, $student_only, $conf);
-        $this->history_at($this->notesversion - 1, $student_only, $conf);
+        $this->history_at(max($version - 1, 0), $student_only, $conf);
         assert($this->_history !== null);
         $vupi = new UserPsetInfo($this->cid, $this->pset);
         $vupi->updateat = $this->updateat;
         $vupi->studentupdateat = $this->studentupdateat;
         $vupi->notesversion = $this->notesversion;
-        if ($student_only) {
-            $vupi->studentnotesversion = $version;
-        }
         $jnotes = $this->jnotes();
         for ($v1 = $this->notesversion - 1; $v1 >= $version; --$v1) {
             if ($v1 >= $this->_history_v0
@@ -206,10 +183,7 @@ class UserPsetInfo {
                 && (!$student_only || $h->antiupdateby === $this->cid)) {
                 $jnotes = $h->apply_revdelta($jnotes);
                 $vupi->studentupdateat = $h->studentupdateat;
-                if ($vupi->notesversion === $v1 + 1) {
-                    $vupi->notesversion = $v1;
-                    $vupi->updateat = $h->updateat;
-                }
+                $vupi->notesversion = $v1;
             }
         }
         $vupi->jnotes = $jnotes;
@@ -217,8 +191,8 @@ class UserPsetInfo {
         return $vupi;
     }
 
-    /** @return Generator<DOMElement> */
-    function student_note_versions(Conf $conf) {
+    /** @return Generator<int> */
+    function answer_versions(Conf $conf) {
         assert(!$this->phantom);
         if ($this->updateby === $this->cid) {
             yield $this->notesversion;
