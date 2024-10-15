@@ -225,6 +225,12 @@ if (!Element.prototype.replaceChildren) {
     };
 }
 
+if (!Element.prototype.checkVisibility) {
+    Element.prototype.checkVisibility = function () {
+        return this.offsetParent != null;
+    };
+}
+
 if (!String.prototype.startsWith) {
     String.prototype.startsWith = function (search, pos) {
         pos = !pos || pos < 0 ? 0 : +pos;
