@@ -13,34 +13,67 @@ function update_answer_show(key, ve, v, opts) {
     const gi = opts.gradesheet;
     addClass(ve, "bg-none");
     addClass(ve, "align-self-start");
-    const div = document.createElement("div");
-    div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "") + (gi.scores_visible ? "" : " pa-scores-hidden");
     const fileid = "/g/" + key;
-    div.id = gi.file_anchor(fileid);
-    let pos1 = 0, lineno = 1;
+    let div = ve.firstChild;
+    if (!div) {
+        div = document.createElement("div");
+        div.className = "pa-filediff";
+        div.id = gi.file_anchor(fileid);
+        ve.appendChild(div);
+    }
+    if (div.tagName !== "DIV" || div.nextSibling || !hasClass(div, "pa-filediff")) {
+        throw new Error("bad ve.firstChild in gc-markdown");
+    }
+    div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "") + (gi.scores_visible ? "" : " pa-scores-hidden");
+
+    // apply new lines
+    let pos1 = 0, lineno = 1, dl = div.firstChild;
     while (pos1 !== v.length) {
         let pos2 = v.indexOf("\n", pos1);
         pos2 = pos2 < 0 ? v.length : pos2 + 1;
-        const line = document.createElement("div"),
-            da = document.createElement("div"),
-            db = document.createElement("div"),
-            dd = document.createElement("div");
-        line.className = "pa-dl pa-gi";
-        da.className = "pa-da";
-        da.hidden = true;
-        db.className = "pa-db";
-        db.hidden = true;
-        db.setAttribute("data-landmark", lineno);
-        dd.className = "pa-dd pa-dhlm";
-        dd.textContent = v.substring(pos1, pos2);
-        line.appendChild(da);
-        line.appendChild(db);
-        line.appendChild(dd);
-        div.appendChild(line);
+        const str = v.substring(pos1, pos2);
+        // find next textual line
+        while (dl && dl.className !== "pa-dl pa-gi") {
+            const ndl = dl.nextSibling;
+            if (!hasClass(dl, "pa-gw")) {
+                dl.remove();
+            }
+            dl = ndl;
+        }
+        // insert line or replace its contents
+        if (!dl) {
+            dl = document.createElement("div");
+            dl.className = "pa-dl pa-gi";
+            const da = document.createElement("div"),
+                db = document.createElement("div"),
+                dd = document.createElement("div");
+            da.className = "pa-da";
+            da.hidden = true;
+            db.className = "pa-db";
+            db.hidden = true;
+            db.setAttribute("data-landmark", lineno);
+            dd.className = "pa-dd pa-dhlm";
+            dl.append(da, db, dd);
+            div.append(dl);
+        } else if (dl.firstChild.nextSibling.getAttribute("data-landmark") != lineno) {
+            throw new Error("bad data-landmark in gc-markdown");
+        }
+        dl.lastChild.textContent = str;
+        dl = dl.nextSibling;
         ++lineno;
         pos1 = pos2;
     }
-    ve.replaceChildren(div);
+
+    // remove old lines
+    while (dl) {
+        const ndl = dl.nextSibling;
+        if (!hasClass(dl, "pa-gw")) {
+            dl.remove();
+        }
+        dl = ndl;
+    }
+
+    // apply markdown
     const fd = new Filediff(div);
     if (hasClass(ve.parentElement, "pa-markdown")) {
         fd.markdown();
@@ -49,15 +82,14 @@ function update_answer_show(key, ve, v, opts) {
     if (gi.linenotes
         && (ln = gi.linenotes[fileid])) {
         for (let lineid in ln) {
-            add_note_at(fd, lineid, Note.parse(ln[lineid]));
+            add_note_at(fd, lineid, ln[lineid]);
         }
     }
 }
 
-function add_note_at(fd, lineid, note) {
+function add_note_at(fd, lineid, ln) {
     fd.line(lineid).then(line => {
-        note.source = line.element;
-        note.render(false);
+        Note.near(line).assign(ln).render(false);
     });
 }
 
