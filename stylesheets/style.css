@@ -4013,10 +4013,6 @@ a.help {
 	left: 0;
 	right: 0;
 	z-index: 59;
-	display: none;
-}
-.modal.show {
-	display: block;
 }
 .modal-open .modal {
 	overflow-x: hidden;

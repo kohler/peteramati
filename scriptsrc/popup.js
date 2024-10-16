@@ -12,7 +12,7 @@ export function $popup(options) {
     options = options || {};
     const near = options.near || options.anchor || window,
         forme = $e("form", {enctype: "multipart/form-data", "accept-charset": "UTF-8", class: options.form_class || null}),
-        modale = $e("div", {class: "modal hidden", role: "dialog"},
+        modale = $e("div", {class: "modal", role: "dialog", hidden: true},
             $e("div", {class: "modal-dialog".concat(near === window ? " modal-dialog-centered" : "", options.className ? " " + options.className : ""), role: "document"},
                 $e("div", "modal-content", forme)));
     if (options.action) {
@@ -162,8 +162,8 @@ function popup_near(elt, anchor) {
     while (!hasClass(elt, "modal-dialog")) {
         elt = elt.childNodes[0];
     }
-    var bgelt = elt.parentNode;
-    addClass(bgelt, "show");
+    const bgelt = elt.parentNode;
+    bgelt.hidden = false;
     addClass(document.body, "modal-open");
     if (!hasClass(elt, "modal-dialog-centered")) {
         var anchorPos = $(anchor).geometry(),

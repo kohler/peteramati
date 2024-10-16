@@ -203,6 +203,9 @@ class UserPsetInfo {
      * @return Generator<int> */
     function answer_versions(Conf $conf, $v1 = null) {
         assert(!$this->phantom);
+        if ($this->phantom) {
+            error_log(debug_string_backtrace());
+        }
         $v1 = $v1 ?? $this->notesversion;
         if ($v1 >= $this->notesversion
             && $this->updateby === $this->cid) {
