@@ -169,7 +169,11 @@ class GradeEntry {
         $this->removed = Pset::cbool($loc, $g, "removed");
         $this->disabled = Pset::cbool($loc, $g, "disabled");
         if (isset($g->disabled_if)) {
-            $this->disabled_if = Pset::cstr($loc, $g, "disabled_if");
+            if (is_bool($g->disabled_if)) {
+                $this->disabled = $this->disabled || $g->disabled_if;
+            } else {
+                $this->disabled_if = Pset::cstr($loc, $g, "disabled_if");
+            }
         }
         $this->position = Pset::cnum($loc, $g, "position");
         if ($this->position === null && isset($g->priority)) {
