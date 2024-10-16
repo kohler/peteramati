@@ -86,6 +86,7 @@ export class Note {
                 elt.setAttribute("data-pa-note", JSON.stringify(a));
             }
         }
+        return this;
     }
 
     static at(elt) {

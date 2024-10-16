@@ -9,6 +9,51 @@ import { Filediff } from "./diff.js";
 import { Note } from "./note.js";
 
 
+function update_answer_show(key, ve, v, opts) {
+    const gi = opts.gradesheet;
+    addClass(ve, "bg-none");
+    addClass(ve, "align-self-start");
+    const div = document.createElement("div");
+    div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "") + (gi.scores_visible ? "" : " pa-scores-hidden");
+    const fileid = "/g/" + key;
+    div.id = gi.file_anchor(fileid);
+    let pos1 = 0, lineno = 1;
+    while (pos1 !== v.length) {
+        let pos2 = v.indexOf("\n", pos1);
+        pos2 = pos2 < 0 ? v.length : pos2 + 1;
+        const line = document.createElement("div"),
+            da = document.createElement("div"),
+            db = document.createElement("div"),
+            dd = document.createElement("div");
+        line.className = "pa-dl pa-gi";
+        da.className = "pa-da";
+        da.hidden = true;
+        db.className = "pa-db";
+        db.hidden = true;
+        db.setAttribute("data-landmark", lineno);
+        dd.className = "pa-dd pa-dhlm";
+        dd.textContent = v.substring(pos1, pos2);
+        line.appendChild(da);
+        line.appendChild(db);
+        line.appendChild(dd);
+        div.appendChild(line);
+        ++lineno;
+        pos1 = pos2;
+    }
+    ve.replaceChildren(div);
+    const fd = new Filediff(div);
+    if (hasClass(ve.parentElement, "pa-markdown")) {
+        fd.markdown();
+    }
+    let ln;
+    if (gi.linenotes
+        && (ln = gi.linenotes[fileid])) {
+        for (let lineid in ln) {
+            add_note_at(fd, lineid, Note.parse(ln[lineid]));
+        }
+    }
+}
+
 function add_note_at(fd, lineid, note) {
     fd.line(lineid).then(line => {
         note.source = line.element;
@@ -50,46 +95,7 @@ GradeClass.add("markdown", {
         if (v == null || v === "") {
             ve.replaceChildren();
         } else if (this.answer) {
-            const gi = opts.gradesheet;
-            addClass(ve, "bg-none");
-            addClass(ve, "align-self-start");
-            const div = document.createElement("div");
-            div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "") + (gi.scores_visible ? "" : " pa-scores-hidden");
-            let fileid = "/g/" + this.key;
-            div.id = gi.file_anchor(fileid);
-            let pos1 = 0, lineno = 1;
-            while (pos1 !== v.length) {
-                let pos2 = v.indexOf("\n", pos1);
-                pos2 = pos2 < 0 ? v.length : pos2 + 1;
-                const line = document.createElement("div"),
-                    da = document.createElement("div"),
-                    db = document.createElement("div"),
-                    dd = document.createElement("div");
-                line.className = "pa-dl pa-gi";
-                da.className = "pa-da hidden";
-                db.className = "pa-db hidden";
-                db.setAttribute("data-landmark", lineno);
-                dd.className = "pa-dd pa-dhlm";
-                dd.textContent = v.substring(pos1, pos2);
-                line.appendChild(da);
-                line.appendChild(db);
-                line.appendChild(dd);
-                div.appendChild(line);
-                ++lineno;
-                pos1 = pos2;
-            }
-            ve.replaceChildren(div);
-            const fd = new Filediff(div);
-            if (hasClass(ve.parentElement, "pa-markdown")) {
-                fd.markdown();
-            }
-            let ln;
-            if (gi.linenotes
-                && (ln = gi.linenotes[fileid])) {
-                for (let lineid in ln) {
-                    add_note_at(fd, lineid, Note.parse(ln[lineid]));
-                }
-            }
+            update_answer_show(this.key, ve, v, opts);
         } else if (hasClass(ve.parentElement, "pa-markdown")) {
             render_onto(ve, 1, v);
         } else {
@@ -105,12 +111,12 @@ GradeClass.add("markdown", {
 handle_ui.on("js-toggle-gc-markdown-preview", function () {
     const pd = this.closest(".pa-pv"),
         ta = pd.querySelector("textarea");
-    if (hasClass(ta, "hidden")) {
+    if (ta.hidden) {
         ta.parentElement.removeChild(ta.previousSibling);
-        removeClass(ta, "hidden");
+        ta.hidden = false;
         ta.focus();
         this.textContent = "Preview";
-        removeClass(this.previousSibling, "hidden");
+        this.previousSibling.hidden = false;
     } else {
         const div = document.createElement("div"),
             hr1 = document.createElement("hr"),
@@ -121,9 +127,9 @@ handle_ui.on("js-toggle-gc-markdown-preview", function () {
         inner.className = "pa-dr";
         div.append(hr1, inner, hr2);
         ta.parentElement.insertBefore(div, ta);
-        addClass(ta, "hidden");
+        ta.hidden = true;
         render_onto(inner, 1, ta.value);
         this.textContent = "Edit";
-        addClass(this.previousSibling, "hidden");
+        this.previousSibling.hidden = true;
     }
 });

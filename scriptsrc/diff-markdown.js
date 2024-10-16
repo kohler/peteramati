@@ -225,8 +225,6 @@ Filediff.define_method("markdown", function () {
         return;
     }
     const hidelm = hasClass(elt, "pa-hide-landmarks"),
-        daclass = hidelm ? "pa-da hidden" : "pa-da",
-        dbclass = hidelm ? "pa-db hidden" : "pa-db",
         drclass = hidelm ? "pa-dr pa-dhlm" : "pa-dr";
     // collect content
     let e = elt.firstChild, l = [], lineno = 1;
@@ -242,7 +240,7 @@ Filediff.define_method("markdown", function () {
             }
             l.push(e.lastChild.textContent);
             ++lineno;
-            addClass(e, "hidden");
+            e.hidden = true;
         }
         e = n;
     }
@@ -269,9 +267,11 @@ Filediff.define_method("markdown", function () {
         const lp = document.createElement("div");
         lp.className = "pa-dl pa-dlr";
         const la = document.createElement("div");
-        la.className = daclass;
+        la.className = "pa-da";
+        la.hidden = hidelm;
         const lb = document.createElement("div");
-        lb.className = dbclass;
+        lb.className = "pa-db";
+        lb.hidden = hidelm;
 
         const lm = d.getAttribute("data-landmark");
         if (lm) {
@@ -330,7 +330,7 @@ Filediff.define_method("unmarkdown", function () {
         if (hasClass(e, "pa-dlr")) {
             elt.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {
-            removeClass(e, "hidden");
+            e.hidden = false;
         }
         e = n;
     }

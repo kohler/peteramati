@@ -3977,9 +3977,11 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 .fold59c .fx59, .fold59o .fn59,
 .fold60c .fx60, .fold60o .fn60,
 .fold61c .fx61, .fold61o .fn61,
-.fold99c .fx99, .fold99o .fn99,
-.hidden {
+.fold99c .fx99, .fold99o .fn99 {
 	display: none;
+}
+.hidden, [hidden] {
+	display: none !important;
 }
 .pseudohidden {
 	overflow: visible !important;
