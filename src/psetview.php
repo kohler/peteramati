@@ -2156,7 +2156,7 @@ class PsetView {
         foreach ($gexp->value_entries() as $ge) {
             if ($ge->answer
                 && ($jnn->{$ge->key} ?? null) !== ($jno->{$ge->key} ?? null)) {
-                $gexp->grades_latest[$ge->key] = $jnn->{$ge->key};
+                $gexp->grades_latest[$ge->key] = $jnn->{$ge->key} ?? null;
             }
         }
     }
