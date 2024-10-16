@@ -60,11 +60,13 @@ class PsetRequest {
 
         // notes version
         if ($this->pset->grades_history) {
-            if (!isset($qreq->snv) && $this->info->has_pinsnv()) {
+            if (!isset($qreq->snv) && $this->info->has_pinned_answers()) {
                 $this->conf->redirect_self($qreq, ["snv" => $this->info->pinsnv()]);
             }
             if (isset($qreq->snv) && ctype_digit($qreq->snv)) {
                 $this->info->set_answer_version(intval($qreq->snv));
+            } else if ($qreq->snv === "latest") {
+                $this->info->set_answer_version(true);
             }
         }
     }
@@ -343,8 +345,9 @@ class PsetRequest {
 
     private function echo_pset_grades_history() {
         $snv = $this->info->answer_version();
-        $newer = $older = $match = null;
+        $newest = $newer = $older = $match = null;
         foreach ($this->info->answer_versions() as $nv) {
+            $newest = $newest ?? $nv;
             if ($nv > $snv) {
                 $newer = $nv;
             } else if ($match === null) {
@@ -369,7 +372,7 @@ class PsetRequest {
         }
         if ($newer || $older) {
             if ($newer !== null) {
-                $b[] = Ht::link("→", $this->info->hoturl("pset", ["snv" => $newer]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
+                $b[] = Ht::link("→", $this->info->hoturl("pset", ["snv" => $newer === $newest ? "latest" : $newer]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
             } else {
                 $b[] = Ht::button("→", ["type" => "button", "disabled" => true]);
             }

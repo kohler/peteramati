@@ -199,17 +199,22 @@ class UserPsetInfo {
         return $vupi;
     }
 
-    /** @return Generator<int> */
-    function answer_versions(Conf $conf) {
+    /** @param ?int $v1
+     * @return Generator<int> */
+    function answer_versions(Conf $conf, $v1 = null) {
         assert(!$this->phantom);
-        if ($this->updateby === $this->cid) {
+        $v1 = $v1 ?? $this->notesversion;
+        if ($v1 >= $this->notesversion
+            && $this->updateby === $this->cid) {
             yield $this->notesversion;
         }
-        for ($v1 = $this->notesversion - 1; $v1 >= 0; --$v1) {
+        $v1 = min($v1, $this->notesversion - 1);
+        while ($v1 >= 0) {
             if (($h = $this->history_at($v1, true, $conf))
                 && $h->antiupdateby === $this->cid) {
                 yield $v1;
             }
+            --$v1;
         }
     }
 

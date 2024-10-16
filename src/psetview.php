@@ -36,7 +36,7 @@ class PsetView {
     private $_upi;
     /** @var ?UserPsetInfo */
     private $_vupi;
-    /** @var ?int */
+    /** @var null|int|true */
     private $_snv;
     /** @var ?RepositoryPsetInfo */
     private $_rpi;
@@ -179,20 +179,17 @@ class PsetView {
     private function vupi() {
         if (!$this->_vupi) {
             $upi = $this->upi();
-            $snv = $this->_snv ?? $upi->pinsnv ?? $upi->notesversion;
+            if ($this->_snv === true) {
+                $snv = $upi->notesversion;
+            } else {
+                $snv = $this->_snv ?? $upi->pinsnv ?? $upi->notesversion;
+            }
             $this->_vupi = $upi->version_at($snv, true, $this->conf);
         }
         return $this->_vupi;
     }
 
-    /** @return bool */
-    private function older_answers() {
-        return $this->pset->grades_history
-            && $this->pset->gitless
-            && $this->vupi() !== $this->upi();
-    }
-
-    /** @param ?int $snv */
+    /** @param null|int|true $snv */
     function set_answer_version($snv) {
         $this->_vupi = null;
         $this->_snv = $snv;
@@ -735,18 +732,6 @@ class PsetView {
         return $this->vupi()->notesversion;
     }
 
-    /** @return ?int */
-    function latest_answer_version() {
-        if (!$this->pset->gitless) {
-            return $this->notesversion();
-        }
-        $upi = $this->upi();
-        foreach ($upi->answer_versions($this->conf) as $nv) {
-            return $nv;
-        }
-        return $upi->notesversion;
-    }
-
     /** @return list<int>|Generator<int> */
     function answer_versions() {
         if (!$this->pset->gitless) {
@@ -757,7 +742,33 @@ class PsetView {
     }
 
     /** @return bool */
-    function has_pinsnv() {
+    function has_older_answers() {
+        if (!$this->pset->grades_history || !$this->pset->gitless) {
+            return false;
+        }
+        $vupi = $this->vupi();
+        foreach ($this->upi()->answer_versions($this->conf, $vupi->notesversion - 1) as $nv) {
+            return true;
+        }
+        return false;
+    }
+
+    /** @return bool */
+    function has_newer_answers() {
+        if (!$this->pset->grades_history
+            || !$this->pset->gitless
+            || $this->_snv === true) {
+            return false;
+        }
+        $vupi = $this->vupi();
+        foreach ($this->upi()->answer_versions($this->conf) as $nv) {
+            return $nv > $vupi->notesversion;
+        }
+        return false;
+    }
+
+    /** @return bool */
+    function has_pinned_answers() {
         return $this->pset->gitless
             && $this->upi()->pinsnv !== null;
     }
@@ -1051,10 +1062,9 @@ class PsetView {
     function update_user_notes($updates, $is_student = null) {
         // find original
         $upi = $this->upi();
-        $is_student = $is_student ?? !$this->viewer->isPC;
         assert(!!$upi);
-        $snv = $this->_snv ?? $upi->pinsnv ?? $upi->notesversion;
-        assert($snv === $upi->notesversion || !$is_student);
+        $is_student = $is_student ?? !$this->viewer->isPC;
+        assert(!$is_student || !$this->has_newer_answers());
 
         // compare-and-swap loop
         while (true) {
@@ -1109,10 +1119,13 @@ class PsetView {
         $upi->assign_notes($notes, $new_notes); // also updates `notesversion`
         $upi->updateat = Conf::$now;
         $upi->updateby = $this->viewer->contactId;
-        $is_student && ($upi->studentupdateat = Conf::$now);
         $upi->hasactiveflags = $hasactiveflags;
-        $this->clear_can_view_grade();
+        if ($is_student) {
+            $upi->studentupdateat = Conf::$now;
+            $this->_snv = true;
+        }
         $this->_vupi = null;
+        $this->clear_can_view_grade();
         if (isset($updates["grades"]) || isset($updates["autogrades"])) {
             $this->_gtime = null;
             $this->user->invalidate_grades($this->pset->id);
@@ -1395,7 +1408,9 @@ class PsetView {
     /** @return bool */
     function can_edit_grade() {
         return $this->can_view_some_grade()
-            && ($this->pc_view || $this->pset->answers_editable_student());
+            && ($this->pc_view
+                || ($this->pset->answers_editable_student()
+                    && !$this->has_pinned_answers()));
     }
 
     /** @return bool */
@@ -1966,7 +1981,7 @@ class PsetView {
         if ($this->pset->gitless
             && !isset($args["snv"])) {
             $snv = $this->answer_version();
-            if ($snv !== $this->notesversion() || $this->has_pinsnv()) {
+            if ($snv !== $this->notesversion() || $this->has_pinned_answers()) {
                 $xargs["snv"] = $snv;
             }
         }
@@ -2062,7 +2077,8 @@ class PsetView {
                 $gexp->version = $upi->notesversion;
                 if (!$gexp->scores_editable) {
                     $gexp->answers_editable = !$this->pset->frozen
-                        && $upi === $this->vupi();
+                        && !$this->has_newer_answers()
+                        && !$this->has_pinned_answers();
                 }
             } else {
                 $rpi = $this->rpi();
@@ -2091,7 +2107,7 @@ class PsetView {
 
     private function export_grades_vf($uvf) {
         $gvf = $this->grades_vf();
-        if (!$this->older_answers() || !$this->pset->has_visible_if()) {
+        if (!$this->has_older_answers() || !$this->pset->has_visible_if()) {
             return $gvf;
         }
         $clone = null;
@@ -2131,7 +2147,7 @@ class PsetView {
     }
 
     function grade_export_updates(GradeExport $gexp) {
-        if (!$this->older_answers()) {
+        if (!$this->has_older_answers()) {
             return;
         }
         $gexp->answer_version = $this->vupi()->notesversion;

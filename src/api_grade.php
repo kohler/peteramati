@@ -134,6 +134,11 @@ class Grade_API {
         if (($err = $api->prepare_grading_commit($info))) {
             return $err;
         }
+        // students always update the latest version of their answers
+        // (NB edits are currently rejected if has_pinned_answers())
+        if (!$info->pc_view) {
+            $info->set_answer_version(true);
+        }
         $known_entries = $qreq->knowngrades ? explode(" ", $qreq->knowngrades) : null;
         $gapi = new Grade_API;
         // XXX match commit with grading commit

@@ -669,10 +669,12 @@ class GradeEntry {
         if (!$info->pc_view) {
             if ($this->visible === false || !$this->answer) {
                 return new GradeError("Cannot modify");
-            } else if ($this->pset->frozen) {
+            } else if ($this->pset->frozen || $info->has_pinned_answers()) {
                 return new GradeError("You can’t edit your answers further");
             } else if ($this->type === "timermark" && $oldv) {
                 return new GradeError("Time already started");
+            } else if ($info->has_newer_answers()) {
+                return new GradeError("You can’t edit an older version of your answers");
             }
         }
         if (isset($this->allow_edit_function)) {
