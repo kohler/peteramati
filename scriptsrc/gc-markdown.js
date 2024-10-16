@@ -27,13 +27,17 @@ function update_answer_show(key, ve, v, opts) {
     div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (gi.scores_editable ? " pa-editablenotes live" : "") + (gi.scores_visible ? "" : " pa-scores-hidden");
 
     // apply new lines
+    // All lines in Markdown answers are `.pa-gi` insertions. There are no
+    // `.pa-gc` context lines or `.pa-gd` deletions. This loop removes
+    // possible Markdown translations (`.pa-dlr`), but preserves linenotes
+    // (`.pa-gw`).
     let pos1 = 0, lineno = 1, dl = div.firstChild;
     while (pos1 !== v.length) {
         let pos2 = v.indexOf("\n", pos1);
         pos2 = pos2 < 0 ? v.length : pos2 + 1;
         const str = v.substring(pos1, pos2);
         // find next textual line
-        while (dl && dl.className !== "pa-dl pa-gi") {
+        while (dl && (!hasClass(dl, "pa-gi") || hasClass(dl, "pa-dlr"))) {
             const ndl = dl.nextSibling;
             if (!hasClass(dl, "pa-gw")) {
                 dl.remove();
