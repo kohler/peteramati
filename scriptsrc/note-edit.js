@@ -33,7 +33,8 @@ function locate(e) {
 }
 
 function render_form($tr, note, transition) {
-    $tr.removeClass("hidden").addClass("editing");
+    $tr[0].hidden = false;
+    $tr.addClass("editing");
     var $td = $tr.find(".pa-notebox");
     if (transition) {
         $tr.css("display", "").children().css("display", "");
@@ -406,7 +407,7 @@ handle_ui.on("pa-search-suggestions", function (event) {
         for (let ne = el.firstChild; ne; ne = ne.nextSibling) {
             if (ne.classList.contains("pa-note-suggestion")) {
                 const hidden = regex && !regex.test(ne.getAttribute("data-content"));
-                ne.classList.toggle("hidden", hidden);
+                ne.hidden = !!hidden;
             }
         }
     } else if (event.type === "keydown"

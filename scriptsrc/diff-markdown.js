@@ -309,9 +309,7 @@ Filediff.define_method("markdown", function () {
             lr.appendChild(dx.removeChild(dx.firstChild));
         }
 
-        lp.appendChild(la);
-        lp.appendChild(lb);
-        lp.appendChild(lr);
+        lp.append(la, lb, lr);
         elt.insertBefore(lp, e);
     }
 

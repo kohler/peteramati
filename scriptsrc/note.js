@@ -110,7 +110,7 @@ export class Note {
                 e = e.nextSibling;
             } else if (hasClass(e, "pa-gw")) {
                 return Note.at(e);
-            } else if (e === t || hasClass(e, "pa-gn") || hasClass(e, "pa-gx") || hasClass(e, "hidden")) {
+            } else if (e === t || hasClass(e, "pa-gn") || hasClass(e, "pa-gx") || e.hidden) {
                 e = e.nextSibling;
             } else {
                 break;
@@ -172,7 +172,7 @@ export class Note {
             if (transition) {
                 $(this.element).children().slideUp(80);
             } else {
-                addClass(this.element, "hidden");
+                this.element.hidden = true;
             }
             return true;
         }
@@ -218,8 +218,8 @@ export class Note {
             $(contdiv).hide().slideDown(80);
         } else {
             $td.show();
-            removeClass(this.element, "hidden");
         }
+        this.element.hidden = false;
         return true;
     }
 

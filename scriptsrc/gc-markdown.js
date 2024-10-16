@@ -56,7 +56,7 @@ function update_answer_show(key, ve, v, opts) {
             dl.append(da, db, dd);
             div.append(dl);
         } else if (dl.firstChild.nextSibling.getAttribute("data-landmark") != lineno) {
-            throw new Error("bad data-landmark in gc-markdown");
+            throw new Error(`bad data-landmark in gc-markdown, ${dl.firstChild.nextSibling.getAttribute("data-landmark")} vs. ${lineno}`);
         }
         dl.lastChild.textContent = str;
         dl = dl.nextSibling;
