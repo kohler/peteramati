@@ -144,15 +144,23 @@ class UserPsetInfo {
             $this->_history_v0 = $this->notesversion;
             $this->_history_student = $student_only;
         }
-        if ($version >= $this->_history_v0) {
-            return $this->_history[$version - $this->_history_v0];
+        $dv = $version - $this->_history_v0;
+        if ($dv >= 0 && $dv < count($this->_history)) {
+            return $this->_history[$dv];
         }
-        $v1 = $this->_history_v0;
-        $this->_history_width = min(($this->_history_width ?? 2) * 2, 128);
-        $v0 = max($version - $this->_history_width, 0);
-        $nulls = array_fill(0, $this->_history_v0 - $v0, null);
-        $this->_history = array_merge($nulls, $this->_history);
-        $this->_history_v0 = $v0;
+        if ($dv < 0) {
+            $this->_history_width = min(($this->_history_width ?? 2) * 2, 128);
+            $v0 = max($version - $this->_history_width, 0);
+            $v1 = $this->_history_v0;
+            $nulls = array_fill(0, $v1 - $v0, null);
+            $this->_history = array_merge($nulls, $this->_history);
+            $this->_history_v0 = $v0;
+        } else {
+            $v0 = $this->_history_v0 + count($this->_history);
+            $v1 = $this->notesversion;
+            $nulls = array_fill(0, $v1 - $v0, null);
+            array_push($this->_history, ...$nulls);
+        }
         $qtail = $this->_history_student ? " and antiupdateby={$this->cid}" : "";
         $result = $conf->qe("select * from ContactGradeHistory where cid=? and pset=? and notesversion>=? and notesversion<?{$qtail} order by notesversion asc", $this->cid, $this->pset, $v0, $v1);
         while (($h = UserPsetHistory::fetch($result))) {
@@ -179,8 +187,7 @@ class UserPsetInfo {
         $jnotes = $this->jnotes();
         $pset = $student_only ? $conf->pset_by_id($this->pset) : null;
         for ($v1 = $this->notesversion - 1; $v1 >= $version; --$v1) {
-            if ($v1 >= $this->_history_v0
-                && ($h = $this->_history[$v1 - $this->_history_v0])
+            if (($h = $this->history_at($v1, $student_only, $conf))
                 && (!$student_only || $h->antiupdateby === $this->cid)) {
                 $jnotes = $h->apply_revdelta($jnotes, $pset);
                 $vupi->studentupdateat = $h->studentupdateat;
