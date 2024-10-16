@@ -430,7 +430,7 @@ function gv_save_some() {
             nv = 0;
         }
         if (nv != null && (ov == null || nv != ov)) {
-            ov == null || (og[this.name] = ov);
+            og[this.name] = ov;
             g[this.name] = nv;
             if (fs.indexOf(this.form) < 0) {
                 fs.push(this.form);
