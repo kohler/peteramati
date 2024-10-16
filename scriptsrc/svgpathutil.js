@@ -1,5 +1,5 @@
 // svgpathutil.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { log_jserror } from "./utils-errors.js";

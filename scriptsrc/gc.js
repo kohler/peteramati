@@ -1,5 +1,5 @@
 // gc.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { addClass, hasClass, handle_ui, input_set_default_value } from "./ui.js";

@@ -1,5 +1,5 @@
 // utils.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 export let wstorage = function () { return false; };
