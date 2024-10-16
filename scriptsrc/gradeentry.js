@@ -732,6 +732,14 @@ export class GradeSheet {
         });
     }
 
+    add_linenotes(linenotes) {
+        this.linenotes = this.linenotes || {};
+        for (const [k, v] of Object.entries(linenotes || {})) {
+            this.linenotes[k] = this.linenotes[k] || {};
+            Object.assign(this.linenotes[k], v);
+        }
+    }
+
     static store(element, x) {
         if (!hasClass(element, "pa-psetinfo")) {
             throw new Error("bad GradeSheet.store");

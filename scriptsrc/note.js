@@ -1,5 +1,5 @@
 // note.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { hasClass, addClass, removeClass } from "./ui.js";
@@ -264,6 +264,11 @@ export class Note {
                     self.assign(nd && nd[self.lineid]);
                     self.render(editing);
                     resolve(self);
+                    if (self.file.startsWith("/g/")
+                        && pi
+                        && pi.pa__gradesheet) {
+                        pi.pa__gradesheet.add_linenotes(data.linenotes);
+                    }
                 } else {
                     if (self.element) {
                         addClass(self.element, "pa-save-failed");
