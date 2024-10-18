@@ -1077,7 +1077,7 @@ class PsetView {
             $notesa = strlen($notes) > 32000 ? null : $notes;
             $notesb = strlen($notes) > 32000 ? $notes : null;
             $hasactiveflags = CommitPsetInfo::notes_hasactiveflags($new_notes);
-            if ($upi->phantom) {
+            if ($upi->phantom()) {
                 $result = Dbl::qx($this->conf->dblink, "insert ignore into ContactGrade
                     set cid=?, pset=?,
                     updateat=?, updateby=?, studentupdateat=?,
@@ -1106,7 +1106,7 @@ class PsetView {
             $upi->reload($this->conf);
         }
 
-        if (!$upi->phantom && $this->pset->grades_history) {
+        if (!$upi->phantom() && $this->pset->grades_history) {
             $unotes = json_encode_db(json_antiupdate($upi->jnotes(), $updates));
             $unotesa = strlen($unotes) > 32000 ? null : $unotes;
             $unotesb = strlen($unotes) > 32000 ? $unotes : null;

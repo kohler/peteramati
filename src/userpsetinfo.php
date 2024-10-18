@@ -45,33 +45,35 @@ class UserPsetInfo {
     private $_history_width;
     /** @var ?UserPsetInfo */
     public $sset_next;
-    /** @var bool */
-    public $phantom = true;
+    /** @var 0|1|2 */
+    private $phantom_type;
 
     /** @param int $cid
      * @param int $pset */
     function __construct($cid, $pset) {
         $this->cid = $cid;
         $this->pset = $pset;
+        $this->phantom_type = 1;
     }
 
     /** @return ?UserPsetInfo */
     static function fetch($result) {
-        if (($x = $result->fetch_object())) {
-            $upi = new UserPsetInfo((int) $x->cid, (int) $x->pset);
-            $upi->merge($x);
-            $upi->phantom = false;
-            return $upi;
-        } else {
+        $x = $result->fetch_object();
+        if (!$x) {
             return null;
         }
+        $upi = new UserPsetInfo((int) $x->cid, (int) $x->pset);
+        $upi->merge($x);
+        $upi->phantom_type = 0;
+        return $upi;
     }
 
     function reload(Conf $conf) {
+        assert($this->phantom_type !== 2);
         $x = $conf->fetch_first_object("select * from ContactGrade where cid=? and pset=?",
             $this->cid, $this->pset);
         $this->merge($x ?? new UserPsetInfo($this->cid, $this->pset));
-        $this->phantom = !$x;
+        $this->phantom_type = $x ? 0 : 1;
     }
 
     /** @param object $x */
@@ -97,11 +99,17 @@ class UserPsetInfo {
     }
 
     function materialize(Conf $conf) {
-        if ($this->phantom) {
+        assert($this->phantom_type !== 2);
+        if ($this->phantom_type === 1) {
             $conf->qe("insert into ContactGrade set cid=?, pset=? on duplicate key update cid=cid",
                 $this->cid, $this->pset);
             $this->reload($conf);
         }
+    }
+
+    /** @return bool */
+    function phantom() {
+        return $this->phantom_type === 1;
     }
 
 
@@ -123,10 +131,11 @@ class UserPsetInfo {
     /** @param ?string $notes
      * @param ?object $jnotes */
     function assign_notes($notes, $jnotes) {
+        assert($this->phantom_type !== 2);
         $this->notes = $notes;
         $this->jnotes = $jnotes;
-        $this->notesversion = $this->phantom ? 1 : $this->notesversion + 1;
-        $this->phantom = false;
+        $this->notesversion = $this->phantom_type === 1 ? 1 : $this->notesversion + 1;
+        $this->phantom_type = 0;
     }
 
 
@@ -134,8 +143,10 @@ class UserPsetInfo {
      * @param ?bool $student_only
      * @return ?UserPsetHistory */
     function history_at($version, $student_only, Conf $conf) {
-        assert(!$this->phantom);
-        if ($version < 0 || $version >= $this->notesversion) {
+        assert($this->phantom_type !== 2);
+        if ($version < 0
+            || $version >= $this->notesversion
+            || $this->phantom_type === 0) {
             return null;
         }
         if ($this->_history === null
@@ -174,10 +185,11 @@ class UserPsetInfo {
      * @param bool $student_only
      * @return UserPsetInfo */
     function version_at($version, $student_only, Conf $conf) {
-        if (($version ?? $this->notesversion) >= $this->notesversion) {
+        assert($this->phantom_type !== 2);
+        if (($version ?? $this->notesversion) >= $this->notesversion
+            || $this->phantom_type === 0) {
             return $this;
         }
-        assert(!$this->phantom);
         $this->history_at(max($version - 1, 0), $student_only, $conf);
         assert($this->_history !== null);
         $vupi = new UserPsetInfo($this->cid, $this->pset);
@@ -195,15 +207,15 @@ class UserPsetInfo {
             }
         }
         $vupi->jnotes = $jnotes;
-        $vupi->phantom = true;
+        $vupi->phantom_type = 2;
         return $vupi;
     }
 
     /** @param ?int $v1
      * @return Generator<int> */
     function answer_versions(Conf $conf, $v1 = null) {
-        assert(!$this->phantom);
-        if ($this->phantom) {
+        assert($this->phantom_type !== 2);
+        if ($this->phantom_type === 2) {
             error_log(debug_string_backtrace());
         }
         $v1 = $v1 ?? $this->notesversion;
@@ -239,7 +251,7 @@ class UserPsetInfo {
     /** @param ?string $xnotes
      * @param ?object $jxnotes */
     function assign_xnotes($xnotes, $jxnotes) {
-        assert(!$this->phantom);
+        assert($this->phantom_type === 1);
         $this->xnotes = $xnotes;
         $this->jxnotes = $jxnotes;
     }
