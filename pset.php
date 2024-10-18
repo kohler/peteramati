@@ -183,7 +183,8 @@ class PsetRequest {
      * @param bool $isauto
      * @return ?string */
     function handle_upload_row(PsetView $info, $values, $isauto) {
-        if ($info->is_handout_commit()) {
+        if ($info->is_handout_commit()
+            && !$info->pset->gitless_grades) {
             return "this is a handout commit";
         }
         $grades = [];
