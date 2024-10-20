@@ -1375,7 +1375,7 @@ function pa_render_pset_table(ptconf) {
         const idx = colmap.rownumber.index;
         let trn = 0;
         for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
-            if (hasClass(tr, "gt")) {
+            if (hasClass(tr, "gt") && !tr.hidden) {
                 ++trn;
                 tr.children.item(idx).textContent = trn + ".";
             }
@@ -1703,7 +1703,7 @@ tooltip.add_builder("pa-ptable-user", function () {
 
 function ptable_recolor(tb) {
     const klasses = ["k0", "k1"];
-    let trn = 1, boring = null;
+    let trn = 1, boring = null, rownum = false;
     for (let tr = tb.firstChild; tr; tr = tr.nextElementSibling) {
         if (tr.className === "gt-boring") {
             tr.hidden = true;
@@ -1711,6 +1711,16 @@ function ptable_recolor(tb) {
             continue;
         } else if (tr.hidden) {
             continue;
+        }
+        if (rownum === false) {
+            rownum = null;
+            for (let e = tr.firstChild, i = 0; e; e = e.nextSibling, ++i) {
+                if (e.className === "gt-rownumber")
+                    rownum = i;
+            }
+        }
+        if (rownum !== null) {
+            tr.children.item(rownum).textContent = trn + ".";
         }
         tr.classList.remove(klasses[(trn ^ 1) & 1]);
         tr.classList.add(klasses[trn & 1]);
@@ -1757,6 +1767,46 @@ const search_keywords = {
             return (se, su) => su.gradercid === mcids[0];
         } else {
             return (se, su) => mcids.includes(su.gradercid);
+        }
+    },
+    year: (text) => {
+        if (!/^(?:(?:\d+[-–—]\d+|[a-zA-Z\d]+)(?=,\w|$),?)+$/.test(text)) {
+            return () => false;
+        }
+        text = text.toUpperCase();
+        const a = [];
+        for (const m of text.matchAll(/(\w+)[-–—]?(\w*)/g)) {
+            if (m[2]) {
+                a.push(+m[1], +m[2]);
+            } else if (/^\d+$/.test(m[1])) {
+                a.push(+m[1], null);
+            } else {
+                a.push(m[1], null);
+            }
+        }
+        return (se, su) => {
+            if (!su.year) {
+                return false;
+            }
+            const num = typeof su.year === "number";
+            for (let i = 0; i !== a.length; i += 2) {
+                if (a[i + 1] === null
+                    ? su.year === a[i]
+                    : num && su.year >= a[i] && su.year <= a[i + 1])
+                    return true;
+            }
+            return false;
+        };
+    },
+    is: (text) => {
+        if (text === "x" || text === "X") {
+            return (se, su) => !!su.x;
+        } else if (text === "college") {
+            return (se, su) => !su.x;
+        } else if (text === "dropped") {
+            return (se, su) => !!su.dropped;
+        } else {
+            return () => false;
         }
     }
 };
