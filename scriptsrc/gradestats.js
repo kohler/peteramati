@@ -3,6 +3,14 @@
 // See LICENSE for open-source distribution terms
 
 class GradeSeries {
+    n;
+    cdf;
+    cdfu;
+    mean;
+    median;
+    stddev;
+    cutoff;
+
     constructor(d) {
         this.n = d.n;
         this.cdf = d.cdf;
@@ -34,6 +42,11 @@ class GradeSeries {
 }
 
 export class GradeKde {
+    series;
+    kde;
+    maxp;
+    binwidth;
+
     constructor(series, gi, hfrac, nbins) {
         const maxg = gi.max, ming = gi.min,
             H = (maxg - ming) * hfrac, iH = 1 / H;
@@ -49,7 +62,25 @@ export class GradeKde {
         for (let i = 0; i !== nbins + 1; ++i) {
             bins.push(0);
         }
-        const cdf = series.cdf, dx = (maxg - ming) / nbins, idx = 1 / dx;
+        let cdf = series.cdf;
+        if (series.cutoff && cdf.length > 0) {
+            const dy = Math.floor(cdf[cdf.length - 1] * series.cutoff);
+            if (dy > 0) {
+                const cdf0 = [0, 0], xd = (cdf[0] - ming) / dy;
+                for (let x = ming, y = 0, ci = 0; y !== dy; x += xd, ++y) {
+                    const xt = Math.floor(x);
+                    if (cdf0[ci] === xt) {
+                        cdf0[ci + 1] = y;
+                    } else {
+                        cdf0.push(xt, y);
+                        ci += 2;
+                    }
+                }
+                cdf0.push(...cdf);
+                cdf = cdf0;
+            }
+        }
+        const dx = (maxg - ming) / nbins, idx = 1 / dx;
         for (let i = 0; i < cdf.length; i += 2) {
             const y = cdf[i+1] - (i === 0 ? 0 : cdf[i-1]);
             let x1 = Math.floor((cdf[i] - ming - H) * idx);

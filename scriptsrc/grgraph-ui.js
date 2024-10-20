@@ -128,16 +128,16 @@ function draw_grgraph() {
         grgr.append_cdf(d.series.extension, "pa-gg-cdf pa-gg-extension");
     }
 
-    // cutoff
-    if (grgr.cutoff && plot_type.substring(0, 3) !== "pdf") {
-        const cutoff = mksvg("rect");
-        cutoff.setAttribute("x", grgr.xax(0));
-        cutoff.setAttribute("y", grgr.yax(grgr.cutoff));
-        cutoff.setAttribute("width", grgr.xax(grgr.max));
-        cutoff.setAttribute("height", grgr.yax(0) - grgr.yax(grgr.cutoff));
-        cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
-        grgr.gg.appendChild(cutoff);
-    }
+    // cutoff block (currently showing it another way)
+    // if (grgr.cutoff && plot_type.substring(0, 3) !== "pdf") {
+    //     const cutoff = mksvg("rect");
+    //     cutoff.setAttribute("x", grgr.xax(0));
+    //     cutoff.setAttribute("y", grgr.yax(grgr.cutoff));
+    //     cutoff.setAttribute("width", grgr.xax(grgr.max));
+    //     cutoff.setAttribute("height", grgr.yax(0) - grgr.yax(grgr.cutoff));
+    //     cutoff.setAttribute("fill", "rgba(255,0,0,0.1)");
+    //     grgr.gg.appendChild(cutoff);
+    // }
 
     // load user grade
     const sheet = pi ? pi.pa__gradesheet : null,

@@ -104,7 +104,6 @@ class Series {
             $r->cdf = array_slice($r->cdf, $i);
             $r->cutoff = $cutoff;
         }
-        $r->cutoff = $cutoff;
     }
 }
 

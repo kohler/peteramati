@@ -3672,6 +3672,9 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 	stroke: #222222;
 	stroke-width: 2.5;
 }
+.pa-gg-cutoff {
+	stroke-dasharray: 4;
+}
 .pa-gg-has-hl > .pa-gg-cdf, .pa-gg-has-hl > .pa-gg-pdf {
 	stroke: #22222222;
 }
