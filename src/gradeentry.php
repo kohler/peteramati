@@ -632,19 +632,20 @@ class GradeEntry {
 
     /** @return bool */
     function value_differs($v1, $v2) {
+        if (!$this->type_numeric) {
+            return (string) $v1 !== (string) $v2;
+        }
+        if ((int) $v1 === 0
+            && (int) $v2 === 0
+            && in_array($this->type, ["checkbox", "checkboxes", "stars", "timermark"])) {
+            return false;
+        }
         $v1 = $v1 ?? false;
         $v2 = $v2 ?? false;
-        if (in_array($this->type, ["checkbox", "checkboxes", "stars", "timermark"])
-            && (int) $v1 === 0
-            && (int) $v2 === 0) {
-            return false;
-        } else if ($v1 === false
-                   || $v2 === false
-                   || !$this->type_numeric) {
+        if ($v1 === false || $v2 === false) {
             return $v1 !== $v2;
-        } else {
-            return abs($v1 - $v2) >= 0.0001;
         }
+        return abs($v1 - $v2) >= 0.0001;
     }
 
     /** @param PsetView $info
