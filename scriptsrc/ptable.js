@@ -1825,8 +1825,8 @@ function make_search_name(text) {
 }
 
 const grade_search_keywords = {
-    any: (gidx) => { return (se) => !!search_target.grades[gidx]; },
-    none: (gidx) => { return (se) => !search_target.grades[gidx]; },
+    any: (gidx) => { return (se) => search_target.grades[gidx] != null; },
+    none: (gidx) => { return (se) => search_target.grades[gidx] == null; },
     eq: (gidx, v) => { return (se) => search_target.grades[gidx] == v; },
     ne: (gidx, v) => { return (se) => search_target.grades[gidx] != v; },
     gt: (gidx, v) => { return (se) => search_target.grades[gidx] > v; },
