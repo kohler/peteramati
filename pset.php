@@ -472,7 +472,8 @@ class PsetRequest {
 
     private function echo_all_grades() {
         $info = $this->info;
-        if ($info->is_handout_commit()) {
+        if ($info->is_handout_commit()
+            && !$this->pset->gitless_grades) {
             return;
         }
 
