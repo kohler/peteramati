@@ -727,10 +727,12 @@ class PsetRequest {
 
 
     private function echo_flags() {
+        assert(!$this->pset->gitless);
         $user = $this->user;
         $viewer = $this->viewer;
         $admin = $viewer->isPC && $viewer !== $user;
-        if (($viewer !== $user && !$admin) || $this->info->is_handout_commit()) {
+        if (($viewer !== $user && !$admin)
+            || $this->info->is_handout_commit()) {
             return;
         }
 
@@ -767,14 +769,12 @@ class PsetRequest {
         $rpi = $this->info->rpi();
         echo '<div>';
         $gradelock = $rpi->placeholder === 0;
-        if ($this->pset->gitless_grades || (!$admin && $this->pset->frozen)) {
-            // skip
-        } else if ($admin) {
+        if ($admin) {
             echo '<div class="btnbox mr-3">',
                 Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade" . ($this->info->is_grading_commit() ? " active" : "")]),
                 Ht::button("🔒", ["class" => "ui pa-flagger-gradelock" . ($this->info->is_grading_commit() && $gradelock ? " active" : "")]),
                 '</div>';
-        } else if (!$gradelock) {
+        } else if (!$gradelock && !$this->pset->frozen && !$this->pset->gitless_grades) {
             echo Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade mr-3" . ($this->info->is_grading_commit() ? " active" : "")]);
         }
         if ($admin || (!$gradelock && !$this->pset->frozen)) {
