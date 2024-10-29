@@ -71,11 +71,10 @@ event_key.is_default_a = function (evt, a) {
         && evt.button == 0
         && (!a || !hasClass("ui", a));
 };
-
-export function event_modkey(evt) {
+event_key.modcode = function (evt) {
     return (evt.shiftKey ? 1 : 0) + (evt.ctrlKey ? 2 : 0) + (evt.altKey ? 4 : 0) + (evt.metaKey ? 8 : 0);
-}
-event_modkey.SHIFT = 1; // NB values matter
-event_modkey.CTRL = 2;
-event_modkey.ALT = 4;
-event_modkey.META = 8;
+};
+event_key.SHIFT = 1; // NB values matter
+event_key.CTRL = 2;
+event_key.ALT = 4;
+event_key.META = 8;

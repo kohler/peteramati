@@ -4,22 +4,23 @@
 
 import { wstorage, sprintf, strftime } from "./utils.js";
 import { $e, hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
-import { event_key, event_modkey } from "./ui-key.js";
+import { event_key } from "./ui-key.js";
 import { render_terminal } from "./render-terminal.js";
 import { grades_fetch } from "./grade-ui.js";
 
 function make_xterm_write_handler(write) {
     return function (event) {
         if (event.type === "keydown") {
-            let key = event_key(event), mod = event_modkey(event);
+            let key = event_key(event), mod = event_key.modcode(event);
             if (key.length === 1) {
-                if ((mod & 0xE) === 0 && event_key.printable(event)) {
+                mod &= ~event_key.SHIFT;
+                if (mod === 0 && event_key.printable(event)) {
                     // keep `key`
-                } else if ((mod & 0xE) === event_modkey.CTRL
+                } else if (mod === event_key.CTRL
                            && key >= "a"
                            && key <= "z") {
                     key = String.fromCharCode(key.charCodeAt(0) - 96);
-                } else if ((mod & 0xE) === event_modkey.META
+                } else if (mod === event_key.META
                            && key == "v") {
                     navigator.clipboard.readText().then(tx => write(tx));
                     event.preventDefault();

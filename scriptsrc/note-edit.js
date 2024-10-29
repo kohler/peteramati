@@ -5,7 +5,7 @@
 import { escape_entities, regexp_quote } from "./encoders.js";
 import { hoturl } from "./hoturl.js";
 import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
-import { event_key, event_modkey } from "./ui-key.js";
+import { event_key } from "./ui-key.js";
 import { Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeSheet } from "./gradeentry.js";
@@ -100,8 +100,8 @@ function arrowcapture(evt) {
                || ((key = event_key(evt)) !== "ArrowUp"
                    && key !== "ArrowDown"
                    && key !== "Enter")
-               || ((modkey = event_modkey(evt))
-                   && (modkey !== event_modkey.META || key !== "Enter"))
+               || ((modkey = event_key.modcode(evt))
+                   && (modkey !== event_key.META || key !== "Enter"))
                || !curline) {
         return uncapture();
     }
@@ -179,9 +179,9 @@ function cancel() {
 }
 
 function textarea_keydown(evt) {
-    if (event_key(evt) === "Escape" && !event_modkey(evt) && unedit(Note.closest(this))) {
+    if (event_key(evt) === "Escape" && !event_key.modecode(evt) && unedit(Note.closest(this))) {
         return false;
-    } else if (event_key(evt) === "Enter" && event_modkey(evt) === event_modkey.META) {
+    } else if (event_key(evt) === "Enter" && event_key.modcode(evt) === event_key.META) {
         $(this).closest("form").submit();
         return false;
     } else {
@@ -411,7 +411,7 @@ handle_ui.on("pa-search-suggestions", function (event) {
             }
         }
     } else if (event.type === "keydown"
-               && !(event_modkey(event) & (event_modkey.SHIFT | event_modkey.ALT))
+               && !(event_key.modcode(event) & (event_key.SHIFT | event_key.ALT))
                && event_key(event) === "Enter") {
         event.preventDefault();
     }

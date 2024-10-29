@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { hasClass, handle_ui } from "./ui.js";
-import { event_key, event_modkey } from "./ui-key.js";
+import { event_key } from "./ui-key.js";
 
 handle_ui.on("js-range-click", function (event) {
     if (event.type === "change") {
@@ -16,7 +16,7 @@ handle_ui.on("js-range-click", function (event) {
     f.jsRangeClick = rangeclick_state;
 
     let key = false;
-    if (event.type === "keydown" && !event_modkey(event)) {
+    if (event.type === "keydown" && !event_key.modcode(event)) {
         key = event_key(event);
     }
     if (rangeclick_state.__clicking__

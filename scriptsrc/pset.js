@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { handle_ui, fold61, addClass, hasClass, $e } from "./ui.js";
-import { event_key, event_modkey } from "./ui-key.js";
+import { event_key } from "./ui-key.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { Bubble, global_tooltip } from "./tooltip.js";
@@ -86,7 +86,7 @@ handle_ui.on("pa-flagger", function () {
             $e("button", {type: "button", class: "ui pa-flagger"}, "OK"),
             $e("span", "ajaxsave61")));
         $(form.elements.flagreason).on("keypress", function (evt) {
-            if (!event_modkey(evt) && event_key(evt) === "Enter") {
+            if (!event_key.modcode(evt) && event_key(evt) === "Enter") {
                 evt.preventDefault();
                 evt.stopImmediatePropagation();
                 $(self).click();
