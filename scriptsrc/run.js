@@ -20,8 +20,8 @@ function make_xterm_write_handler(write) {
                            && key >= "a"
                            && key <= "z") {
                     key = String.fromCharCode(key.charCodeAt(0) - 96);
-                } else if (mod === event_key.META && key == "v"
-                           || mod == event_key.CTRL && key == "V") {
+                } else if ((mod === event_key.META && key == "v")
+                           || (mod == event_key.CTRL && key == "V")) {
                     navigator.clipboard.readText().then(tx => write(tx));
                     event.preventDefault();
                     return;
