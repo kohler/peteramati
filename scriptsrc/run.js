@@ -20,8 +20,8 @@ function make_xterm_write_handler(write) {
                            && key >= "a"
                            && key <= "z") {
                     key = String.fromCharCode(key.charCodeAt(0) - 96);
-                } else if (mod === event_key.META
-                           && key == "v") {
+                } else if ((mod === event_key.META && key == "v")
+                           || (mod == event_key.CTRL && key == "V")) {
                     navigator.clipboard.readText().then(tx => write(tx));
                     event.preventDefault();
                     return;
@@ -44,8 +44,14 @@ function make_xterm_write_handler(write) {
                     key = "\x1bOB";
                 } else if (key === "ArrowRight" && !mod) {
                     key = "\x1bOC";
+                } else if (key === "Home" && !mod) {
+                    key = "\x1bOH";
+                } else if (key === "End" && !mod) {
+                    key = "\x1bOF";
                 } else if (key === "ArrowLeft" && !mod) {
                     key = "\x1bOD";
+                } else if (key === "Delete" && !mod) {
+                    key = "\x1b[3~";
                 } else if (key === "PageUp" && !mod) {
                     key = "\x1b[5~";
                 } else if (key === "PageDown" && !mod) {
