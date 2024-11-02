@@ -64,23 +64,28 @@ class Flag_API {
                 return ["ok" => false, "error" => "Parameter error"];
             }
             $admin = $viewer->isPC && $viewer !== $api->user;
-            $mode = $admin ? RepositoryPsetInfo::SGC_ADMIN : RepositoryPsetInfo::SGC_USER;
+            $mode = $admin ? RepositoryPsetInfo::UTYPE_ADMIN : RepositoryPsetInfo::UTYPE_USER;
             if ($grade) {
-                $placeholder = -1;
-                if ($admin && (friendly_boolean($qreq->gradelock) ?? ($rpi->placeholder === 0 || $rpi->placeholder === 2))) {
-                    $placeholder = 0;
+                $placeholder = RepositoryPsetInfo::PL_USER;
+                if ($admin) {
+                    $wantlock = friendly_boolean($qreq->gradelock)
+                        ?? ($rpi->placeholder === RepositoryPsetInfo::PL_LOCKED
+                            || $rpi->placeholder === RepositoryPsetInfo::PL_DONOTGRADE);
+                    if ($wantlock) {
+                        $placeholder = RepositoryPsetInfo::PL_LOCKED;
+                    }
                 }
-                $rpi->save_grading_commit($info->commit(), $placeholder, $mode, $info->conf);
+                $info->change_grading_commit($placeholder, $mode);
             } else if ($nograde) {
-                $rpi->save_grading_commit($info->latest_commit(), 2, $mode, $info->conf);
+                $info->change_grading_commit(RepositoryPsetInfo::PL_DONOTGRADE, $mode);
             } else if ($grade === false) {
                 if ($info->is_grading_commit()) {
                     // XXX compare-and-swap would be better
-                    $rpi->save_grading_commit($info->latest_commit(), 1, $mode, $info->conf);
+                    $info->change_grading_commit(RepositoryPsetInfo::PL_NONE, $mode);
                 }
             } else if ($nograde === false) {
-                if ($rpi->placeholder === 2) {
-                    $rpi->save_grading_commit($info->latest_commit(), 1, $mode, $info->conf);
+                if ($rpi->placeholder === RepositoryPsetInfo::PL_DONOTGRADE) {
+                    $info->change_grading_commit(RepositoryPsetInfo::PL_NONE, $mode);
                 }
             }
         }

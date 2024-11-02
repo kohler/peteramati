@@ -630,7 +630,7 @@ class PsetView {
             || ($updater !== null && !call_user_func($updater, $this, $rpi))) {
             return;
         }
-        $rpi->save_grading_commit($this->latest_commit(), $rpi->placeholder, RepositoryPsetInfo::SGC_PLACEHOLDER, $this->conf);
+        $rpi->save_grading_commit($this->latest_commit(), $rpi->placeholder, RepositoryPsetInfo::UTYPE_PLACEHOLDER, $this->conf);
     }
 
 
@@ -870,6 +870,23 @@ class PsetView {
         }
     }
 
+    private function ensure_formulas_from_jxnotes($g) {
+        if (!$g) {
+            return;
+        }
+        foreach ($this->pset->formula_grades() as $ge) {
+            if (!property_exists($g, $ge->key)) {
+                continue;
+            }
+            $v = $g->{$ge->key};
+            if ($v !== null) {
+                $this->_g[$ge->pcview_index] = $v;
+            } else {
+                $this->_has_fg[$ge->pcview_index] = true;
+            }
+        }
+    }
+
     private function ensure_formulas() {
         if (!$this->pset->has_formula || $this->_has_formula) {
             return;
@@ -880,37 +897,28 @@ class PsetView {
         $jn = $this->grade_jxnotes();
         $t = max($this->user->gradeUpdateTime, $this->pset->config_mtime);
         //error_log("{$t} {$this->user->gradeUpdateTime} {$this->pset->config_mtime} {$jn->formula_at}");
-        if (!$jn || ($jn->formula_at ?? null) !== $t) {
-            $fs = [];
-            foreach ($this->pset->formula_grades() as $ge) {
-                $f = $ge->formula();
-                $v = $f->evaluate($this->user, null);
-                if ($v !== null) {
-                    $this->_g[$ge->pcview_index] = $v;
-                } else {
-                    $this->_has_fg[$ge->pcview_index] = true;
-                }
-                if ($f->cacheable) {
-                    $fs[$ge->key] = $v;
-                }
+        if ($jn && ($jn->formula_at ?? null) === $t) {
+            $this->ensure_formulas_from_jxnotes($jn->formula ?? null);
+            return;
+        }
+        $fs = [];
+        foreach ($this->pset->formula_grades() as $ge) {
+            $f = $ge->formula();
+            $v = $f->evaluate($this->user, null);
+            if ($v !== null) {
+                $this->_g[$ge->pcview_index] = $v;
+            } else {
+                $this->_has_fg[$ge->pcview_index] = true;
             }
-            if ($this->pset->gitless_grades || $this->_hash) {
-                $this->update_grade_xnotes([
-                    "formula_at" => $t,
-                    "formula" => new JsonReplacement(empty($fs) ? null : $fs)
-                ]);
+            if ($f->cacheable) {
+                $fs[$ge->key] = $v;
             }
-        } else if (($g = $jn->formula ?? null)) {
-            foreach ($this->pset->formula_grades() as $ge) {
-                if (property_exists($g, $ge->key)) {
-                    $v = $g->{$ge->key};
-                    if ($v !== null) {
-                        $this->_g[$ge->pcview_index] = $v;
-                    } else {
-                        $this->_has_fg[$ge->pcview_index] = true;
-                    }
-                }
-            }
+        }
+        if ($this->pset->gitless_grades || $this->_hash) {
+            $this->update_grade_xnotes([
+                "formula_at" => $t,
+                "formula" => new JsonReplacement(empty($fs) ? null : $fs)
+            ]);
         }
     }
 
@@ -1629,6 +1637,20 @@ class PsetView {
     }
 
 
+    /** @param -1|0|1|2 $placeholder
+     * @param 0|1|2 $utype */
+    function change_grading_commit($placeholder, $utype) {
+        assert(!$this->pset->gitless);
+        $rpi = $this->rpi();
+        $commit = $placeholder > 0 ? $this->latest_commit() : $this->commit();
+        $old_gradehash = $rpi->gradehash;
+        $rpi->save_grading_commit($commit, $placeholder, $utype, $this->conf);
+        if ($rpi->gradehash !== $old_gradehash) {
+            $this->clear_can_view_grade();
+            $this->user->invalidate_grades($this->pset->id);
+        }
+    }
+
     /** @param Contact|int $grader */
     function change_grader($grader) {
         if (is_object($grader)) {
@@ -1646,8 +1668,8 @@ class PsetView {
             }
         } else if ($this->_hash !== null) {
             $rpi = $this->rpi();
-            if ($rpi->gradehash === $this->_hash && $rpi->placeholder === 1) {
-                $rpi->save_grading_commit($this->commit(), -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
+            if ($rpi->placeholder === RepositoryPsetInfo::PL_NONE) {
+                $this->change_grading_commit(RepositoryPsetInfo::PL_USER, RepositoryPsetInfo::UTYPE_ADMIN);
             }
             if ($rpi->gradehash === $this->_hash && $rpi->gradercid !== $gcid) {
                 $this->conf->qe("update RepositoryGrade set gradercid=? where repoid=? and branchid=? and pset=? and gradebhash=?",
@@ -1659,37 +1681,6 @@ class PsetView {
             throw new Error("change_grader with no hash");
         }
         $this->clear_can_view_grade();
-    }
-
-    function mark_grading_commit() {
-        if ($this->pset->gitless_grades) {
-            $upi = $this->upi();
-            if (!$upi->gradercid) {
-                $upi->materialize($this->conf);
-                $this->conf->qe("update ContactGrade set gradercid=? where cid=? and pset=? and gradercid is null",
-                    $this->viewer->contactId, $this->user->contactId, $this->pset->id);
-                $upi->gradercid = $this->viewer->contactId;
-                $this->clear_can_view_grade();
-                $this->user->invalidate_grades($this->pset->id);
-            }
-        } else if ($this->_hash !== null) {
-            $cn = $this->commit_jnotes();
-            $gcid = $cn ? $cn->gradercid ?? null : null;
-            $commit = $this->connected_commit($this->_hash);
-            $rpi = $this->rpi();
-            $rpi->materialize($this->conf);
-            if ($rpi->gradehash !== $this->_hash || $rpi->placeholder > 0) {
-                $rpi->save_grading_commit($commit, $rpi->placeholder === 0 ? 0 : -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
-                $this->clear_can_view_grade();
-                $this->user->invalidate_grades($this->pset->id);
-            }
-            if ($gcid !== null && $rpi->gradercid !== $gcid) {
-                $this->conf->qe("update RepositoryGrade set gradercid=? where repoid=? and branchid=? and pset=?", $gcid, $rpi->repoid, $rpi->branchid, $rpi->pset);
-                $rpi->gradercid = $gcid;
-            }
-        } else {
-            throw new Error("mark_grading_commit with no hash");
-        }
     }
 
     /** @param ?bool $vso */

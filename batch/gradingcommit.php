@@ -132,10 +132,13 @@ class GradingCommit_Batch {
                 continue;
             }
             if ($this->clear || $this->nograde) {
-                $info->rpi()->save_grading_commit($info->latest_commit(), $this->nograde ? 2 : 1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
+                $placeholder = $this->nograde ? RepositoryPsetInfo::PL_DONOTGRADE : RepositoryPsetInfo::PL_NONE;
             } else if ($info->hash()) {
-                $info->rpi()->save_grading_commit($info->commit(), $this->lock ? 0 : -1, RepositoryPsetInfo::SGC_ADMIN, $this->conf);
+                $placeholder = $this->lock ? RepositoryPsetInfo::PL_LOCKED : RepositoryPsetInfo::PL_USER;
+            } else {
+                continue;
             }
+            $info->change_grading_commit($placeholder, RepositoryPsetInfo::UTYPE_ADMIN);
             ++$nadded;
         }
         return $nadded > 0 ? 0 : 1;

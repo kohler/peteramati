@@ -41,7 +41,6 @@ class GitHubAdmin_Batch {
             if ($this->team === "") {
                 throw new CommandLineException("team argument missing");
             }
-            $this->subcommand = "collab";
         } else {
             throw new CommandLineException("unknown subcommand");
         }
@@ -139,6 +138,16 @@ class GitHubAdmin_Batch {
         }
     }
 
+    /** @param int|Repository $repo
+     * @return GitHub_RepositorySite
+     * @suppress PhanTypeMismatchReturnSuperType */
+    private function reposite($repo) {
+        if (is_int($repo)) {
+            $repo = $this->repos[$repo];
+        }
+        return $repo->reposite;
+    }
+
     private function run_collaborator() {
         if (empty($this->repos)) {
             $this->add_user_repositories();
@@ -153,7 +162,7 @@ class GitHubAdmin_Batch {
         // first look up id
         if ($this->team) {
             $ghr = GitHub_RepositorySite::graphql($this->conf,
-                'query { organization(login: ' . json_encode($this->repos[0]->reposite->organization()) . ') { team(slug: ' . json_encode($this->team) . ') { id } } }');
+                'query { organization(login: ' . json_encode($this->reposite(0)->organization()) . ') { team(slug: ' . json_encode($this->team) . ') { id } } }');
             $teamid = $ghr->rdata->organization->team->id ?? null;
         } else {
             $ghr = GitHub_RepositorySite::graphql($this->conf,
@@ -170,7 +179,7 @@ class GitHubAdmin_Batch {
             $iend = min($i + 100, count($this->repos));
             $q = [];
             for ($j = $i; $j !== $iend; ++$j) {
-                $q[] = "repo:" . $this->repos[$j]->reposite->base;
+                $q[] = "repo:" . $this->reposite($j)->base;
             }
             $ghr = GitHub_RepositorySite::graphql($this->conf,
                 'query { search(query: ' . json_encode(join(" ", $q)) . ' type: REPOSITORY first: 100) { nodes { ... on Repository { nameWithOwner id } } } }');
@@ -185,12 +194,13 @@ class GitHubAdmin_Batch {
         // then perform modifications
         $qs = [];
         foreach ($this->repos as $i => $repo) {
-            $id = $repoids[$repo->reposite->base] ?? null;
-            if (!isset($repoids[$repo->reposite->base])) {
-                fwrite(STDERR, "{$repo->reposite->base}: cannot look up id\n");
+            $reposite = $this->reposite($repo);
+            $id = $repoids[$reposite->base] ?? null;
+            if (!isset($repoids[$reposite->base])) {
+                fwrite(STDERR, "{$reposite->base}: cannot look up id\n");
                 continue;
             } else if ($this->verbose) {
-                fwrite(STDOUT, "{$repo->reposite->base}: {$id}\n");
+                fwrite(STDOUT, "{$reposite->base}: {$id}\n");
             }
             $qs[] = "update{$i}: updateTeamsRepository(input: {repositoryId:" . json_encode($id) . ',permission:' . $this->role . ',teamIds:[' . json_encode($teamid) . ']}) { clientMutationId }';
         }

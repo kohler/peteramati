@@ -48,6 +48,11 @@ class RepositoryPsetInfo {
     // 0: admin has locked grading commit
     // -1: user has requested grade
 
+    const PL_DONOTGRADE = 2;
+    const PL_NONE = 1;
+    const PL_LOCKED = 0;
+    const PL_USER = -1;
+
     /** @param int $repoid
      * @param int $branchid
      * @param int $pset */
@@ -182,21 +187,21 @@ class RepositoryPsetInfo {
         return true;
     }
 
-    const SGC_ADMIN = 0;
-    const SGC_USER = 1;
-    const SGC_PLACEHOLDER = 2;
+    const UTYPE_ADMIN = 0;
+    const UTYPE_USER = 1;
+    const UTYPE_PLACEHOLDER = 2;
 
     /** @param null|-1|0|1|2 $placeholder
      * @param 0|1|2 $utype */
     function save_grading_commit(?CommitRecord $commit, $placeholder, $utype, Conf $conf) {
         assert($commit || $placeholder > 0);
         $bhash = $commit ? hex2bin($commit->hash) : null;
-        if (!$commit && $placeholder === 1 && $this->phantom) {
+        if (!$commit && $placeholder === self::PL_NONE && $this->phantom) {
             return;
         }
 
         $this->materialize($conf);
-        if ($utype === self::SGC_ADMIN) {
+        if ($utype === self::UTYPE_ADMIN) {
             $conf->qe("update RepositoryGrade
                 set gradebhash=?, commitat=?,
                 placeholder=?, placeholder_at=?,
@@ -214,7 +219,7 @@ class RepositoryPsetInfo {
             $this->placeholder = $placeholder;
             $this->placeholder_at = Conf::$now;
         } else {
-            if ($utype === self::SGC_USER) {
+            if ($utype === self::UTYPE_USER) {
                 $pmatch = $psetmatch = "placeholder!=0";
             } else {
                 $pmatch = "placeholder>0";

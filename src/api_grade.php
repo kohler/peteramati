@@ -339,12 +339,9 @@ class Grade_API {
         }
         if (isset($ug->gradercid)
             && ($pset->gitless_grades || $info->repo)) {
-            if (!$pset->gitless_grades && !$info->grading_hash()) {
+            if (!$pset->gitless && !$info->grading_hash()) {
                 $info->repo->refresh(2700, true);
                 $info->set_latest_nontrivial_commit($sset);
-                if ($info->hash()) {
-                    $info->mark_grading_commit();
-                }
             }
             if ($pset->gitless_grades || $info->hash()) {
                 $info->change_grader($ug->gradercid);
