@@ -145,7 +145,7 @@ class Home_Student_Page {
             Dbl::free($result);
         }
 
-        foreach ($this->conf->formulas_by_home_position() as $fc) {
+        foreach ($this->conf->formulas_by_home_order() as $fc) {
             if (($this->viewer->isPC || $fc->visible)
                 && ($gf = $fc->formula())
                 && ($v = $gf->evaluate($this->user, null)) !== null

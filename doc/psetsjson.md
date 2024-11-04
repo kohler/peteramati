@@ -264,11 +264,11 @@ this format.
 
     If true, then this grade is not included in the total.
 
-* `position`: number
+* `order`: number
 
     Determines display order. Grade entries are sorted first by
-    increasing `position`, and second by the order they appear in
-    `psets.json`. Negative `position` entries appear first.
+    increasing `order`, and second by the order they appear in
+    `psets.json`. Negative `order` entries appear first.
 
 * `landmark`: string, like "FILENAME:LINE" or "FILENAME:LINE1:LINE:LINE2"
 
@@ -310,7 +310,7 @@ object keyed by regular expression. For example:
 
 ```json
 "diffs": {
-    "README\\.txt": {"full": true, "position": -1},
+    "README\\.txt": {"full": true, "order": -1},
     "\\.gitignore|check\\.pl": {"collapse": true},
     "out": {"ignore": true}
 }
@@ -319,7 +319,7 @@ object keyed by regular expression. For example:
 This setting says:
 
 * Files named `README.txt` will be displayed in full (not as a diff), before
-  other files (files by default have position 0).
+  other files (files by default have order 0).
 
 * Files named `.gitignore` and `check.pl` are collapsed. This means that diffs
   in these files will not be displayed by default.
@@ -381,11 +381,11 @@ A run entry is an object following this format.
     If true, then the _output_ of the runner is displayed to students. This
     can be set even if the runner itself is not visible.
 
-* `position`: number
+* `order`: number
 
     Determines display order. Runners are sorted first by increasing
-    `position`, and second by the order they appear in `psets.json`. Negative
-    `position` entries appear first.
+    `order`, and second by the order they appear in `psets.json`. Negative
+    `order` entries appear first.
 
 ### Run commands
 

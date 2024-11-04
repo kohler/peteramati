@@ -53,7 +53,7 @@ class GradeEntry {
     public $answer;
     /** @var float|false
      * @readonly */
-    public $position;
+    public $order;
     /** @var ?bool
      * @readonly */
     private $visible;
@@ -175,9 +175,9 @@ class GradeEntry {
                 $this->disabled_if = Pset::cstr($loc, $g, "disabled_if");
             }
         }
-        $this->position = Pset::cnum($loc, $g, "position");
-        if ($this->position === null && isset($g->priority)) {
-            $this->position = -Pset::cnum($loc, $g, "priority");
+        $this->order = Pset::cnum($loc, $g, "order", "position");
+        if ($this->order === null && isset($g->priority)) {
+            $this->order = -Pset::cnum($loc, $g, "priority");
         }
 
         $allow_total = false;
@@ -356,7 +356,7 @@ class GradeEntry {
      * @suppress PhanAccessReadOnlyProperty */
     static function make_special(Pset $pset, $key, $title, $gtype) {
         $ge = new GradeEntry("x_{$key}", (object) [
-            "no_total" => true, "position" => PHP_INT_MAX, "title" => $title
+            "no_total" => true, "order" => PHP_INT_MAX, "title" => $title
         ], $pset);
         $ge->key = $key;
         $ge->gtype = $gtype;

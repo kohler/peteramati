@@ -2424,15 +2424,15 @@ class Conf {
     }
 
     /** @return list<FormulaConfig> */
-    function formulas_by_home_position() {
+    function formulas_by_home_order() {
         $fs = [];
         foreach ($this->global_formulas() as $f) {
-            if ($f->home_position !== null)
+            if ($f->home_order !== null)
                 $fs[] = $f;
         }
         usort($fs, function ($a, $b) {
-            if ($a->home_position != $b->home_position) {
-                return $a->home_position < $b->home_position ? -1 : 1;
+            if ($a->home_order != $b->home_order) {
+                return $a->home_order < $b->home_order ? -1 : 1;
             } else {
                 return $a->subposition - $b->subposition;
             }

@@ -56,7 +56,7 @@ class Pset {
     public $weight_default = false;
     /** @var float
      * @readonly */
-    public $position;
+    public $order;
 
     /** @var bool */
     public $disabled;
@@ -297,7 +297,7 @@ class Pset {
             $this->weight_default = true;
         }
         $this->weight = (float) $this->weight;
-        $this->position = (float) (Pset::cnum($p, "position") ?? 0.0);
+        $this->order = (float) (Pset::cnum($p, "order", "position") ?? 0.0);
 
         $this->disabled = self::cbool($p, "disabled");
         if (($this->removed = self::cbool($p, "removed", "admin_disabled"))) {
@@ -408,7 +408,7 @@ class Pset {
         if ($p->grade_order ?? null) {
             $this->grades = self::reorder_config("grade_order", $this->all_grades, $p->grade_order);
         } else {
-            $this->grades = self::position_sort("grades", $this->grades ?? []);
+            $this->grades = self::order_sort("grades", $this->grades ?? []);
         }
         $this->ngrades = count($this->grades);
         $this->grades_history = self::cbool($p, "grades_history") ?? false;
@@ -465,7 +465,7 @@ class Pset {
         } else if ($downloads) {
             throw new PsetConfigException("`downloads` format error`", "downloads");
         }
-        $this->downloads = self::position_sort("downloads", $this->downloads);
+        $this->downloads = self::order_sort("downloads", $this->downloads);
 
         // reports
         $this->reports = $p->reports ?? [];
@@ -494,7 +494,7 @@ class Pset {
         if ($p->runner_order ?? false) {
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
         } else {
-            $this->runners = self::position_sort("runners", $this->all_runners);
+            $this->runners = self::order_sort("runners", $this->all_runners);
         }
         $this->run_dirpattern = self::cstr($p, "run_dirpattern");
         $this->run_username = self::cstr($p, "run_username");
@@ -567,8 +567,8 @@ class Pset {
 
     /** @return int */
     static function compare(Pset $a, Pset $b) {
-        if ($a->position != $b->position) {
-            return $a->position < $b->position ? -1 : 1;
+        if ($a->order != $b->order) {
+            return $a->order < $b->order ? -1 : 1;
         }
         $adl = $a->deadline_college ? : $a->deadline;
         $bdl = $b->deadline_college ? : $b->deadline;
@@ -585,8 +585,8 @@ class Pset {
 
     /** @return int */
     static function compare_newest_first(Pset $a, Pset $b) {
-        if ($a->position != $b->position) {
-            return $a->position < $b->position ? -1 : 1;
+        if ($a->order != $b->order) {
+            return $a->order < $b->order ? -1 : 1;
         }
         $adl = $a->deadline_college ? : $a->deadline;
         $bdl = $b->deadline_college ? : $b->deadline;
@@ -1222,11 +1222,11 @@ class Pset {
         return $b;
     }
 
-    private static function position_sort($what, $x) {
+    private static function order_sort($what, $x) {
         $i = 0;
         $xp = [];
         foreach ($x as $k => $v) {
-            $xp[$k] = [$v->position, $i];
+            $xp[$k] = [$v->order, $i];
             ++$i;
         }
         uasort($xp, function ($a, $b) {
@@ -1268,7 +1268,7 @@ class DownloadEntryConfig {
     public $timeout;
     /** @var ?float
      * @readonly */
-    public $position;
+    public $order;
     /** @var null|bool|int|'grades'
      * @readonly */
     public $visible;
@@ -1303,7 +1303,7 @@ class DownloadEntryConfig {
             $this->filename = $this->key;
         }
         $this->timed = Pset::cbool($loc, $g, "timed");
-        $this->position = Pset::cnum($loc, $g, "position");
+        $this->order = Pset::cnum($loc, $g, "order", "position");
         $this->visible = Pset::cbool_or_date($loc, $g, "visible");
         $this->timeout = Pset::cinterval($loc, $g, "timeout");
     }
@@ -1332,7 +1332,7 @@ class RunnerConfig {
     /** @var ?bool */
     public $display_visible;
     /** @var ?float */
-    public $position;
+    public $order;
     /** @var ?string */
     public $username;
     /** @var ?list<RunOverlayConfig> */
@@ -1437,9 +1437,9 @@ class RunnerConfig {
         if (($nc = Pset::cint($loc, $rs, "nconcurrent")) !== null) {
             $this->queue = ($this->queue ?? "") . "#{$nc}";
         }
-        $this->position = Pset::cnum($loc, $rs, "position");
-        if ($this->position === null && isset($r->priority)) {
-            $this->position = -Pset::cnum($loc, $r, "priority");
+        $this->order = Pset::cnum($loc, $rs, "order", "position");
+        if ($this->order === null && isset($r->priority)) {
+            $this->order = -Pset::cnum($loc, $r, "priority");
         }
         if (($overs = $r->overlay ?? null) !== null) {
             $this->overlay = [];
@@ -1593,7 +1593,7 @@ class DiffConfig {
     public $title;
     /** @var float
      * @readonly */
-    public $position;
+    public $order;
     /** @var int */
     public $subposition = 0;
     /** @var bool */
@@ -1651,7 +1651,7 @@ class DiffConfig {
         $p = (float) (Pset::cnum($loc, $d, "priority", "match_priority") ?? $priority ?? 0.0);
         $this->priority = $p;
         $this->priority_default = $p >= 100.0 ? -INF : $p;
-        $this->position = Pset::cnum($loc, $d, "position");
+        $this->order = Pset::cnum($loc, $d, "order", "position");
         $this->fileless = Pset::cbool($loc, $d, "fileless");
         $this->full = Pset::cbool($loc, $d, "full");
         $this->collate = Pset::cbool($loc, $d, "collate");
@@ -1699,7 +1699,7 @@ class DiffConfig {
                 $a->nonshared = true;
             }
             $a->title = $b->title ?? $a->title;
-            $a->position = $b->position ?? $a->position;
+            $a->order = $b->order ?? $a->order;
             $a->fileless = $b->fileless ?? $a->fileless;
             $a->full = $b->full ?? $a->full;
             $a->collate = $b->collate ?? $a->collate;
@@ -1754,7 +1754,7 @@ class FormulaConfig {
     /** @var ?string */
     public $description;
     /** @var ?float */
-    public $home_position;
+    public $home_order;
     /** @var ?bool */
     public $visible;
     /** @var ?bool */
@@ -1794,7 +1794,7 @@ class FormulaConfig {
             $this->visible = !Pset::cbool($loc, $fj, "hidden");
         }
         $this->nonzero = Pset::cbool($loc, $fj, "nonzero");
-        $this->home_position = Pset::cnum($loc, $fj, "home_position");
+        $this->home_order = Pset::cnum($loc, $fj, "home_order", "home_position");
         $this->subposition = $subposition;
         $this->formula = Pset::cstr($loc, $fj, "formula");
         $this->config = $fj;
