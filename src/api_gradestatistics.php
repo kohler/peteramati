@@ -221,7 +221,7 @@ class GradeStatistics_API {
         }
 
         $suffix = ($user->isPC ? ".pp" : ".p") . $pset->id;
-        $gradets = $pset->conf->setting("__gradets$suffix");
+        $gradets = $pset->conf->setting("__gradets{$suffix}");
         if ($gradets < @filemtime(__FILE__)) {
             $gradets = 0;
         }
