@@ -251,7 +251,7 @@ class UserPsetInfo {
     /** @param ?string $xnotes
      * @param ?object $jxnotes */
     function assign_xnotes($xnotes, $jxnotes) {
-        assert($this->phantom_type === 1);
+        assert($this->phantom_type === 0);
         $this->xnotes = $xnotes;
         $this->jxnotes = $jxnotes;
     }
