@@ -252,18 +252,21 @@ class MinMax_GradeFormula extends Function_GradeFormula {
     }
 }
 
-class Number_GradeFormula extends GradeFormula {
-    /** @var float */
+class Constant_GradeFormula extends GradeFormula {
+    /** @var float|bool */
     private $v;
 
     function __construct($v)  {
         parent::__construct("n", []);
         $this->v = $v;
+        if (is_bool($v)) {
+            $this->vtype = GradeEntry::VTBOOL;
+        }
     }
     function evaluate(Contact $student, ?PsetView $info) {
         return $this->v;
     }
-    function jsonSerialize(): float {
+    function jsonSerialize() {
         return $this->v;
     }
 }

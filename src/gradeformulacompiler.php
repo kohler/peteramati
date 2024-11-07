@@ -259,13 +259,16 @@ class GradeFormulaCompiler {
             $e = $e ? new Not_GradeFormula($e) : null;
         } else if (preg_match('/\G(?:\d+\.?\d*|\.\d+)/s', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
-            $e = new Number_GradeFormula((float) $m[0]);
+            $e = new Constant_GradeFormula((float) $m[0]);
         } else if (preg_match('/\G(?:pi|π|m_pi)\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
-            $e = new Number_GradeFormula((float) M_PI);
+            $e = new Constant_GradeFormula((float) M_PI);
         } else if (preg_match('/\Gnull\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Null_GradeFormula;
+        } else if (preg_match('/\G(?:false|true)\b/si', $s, $m, 0, $p)) {
+            $p += strlen($m[0]);
+            $e = new Constant_GradeFormula($m[0] === "true");
         } else if (preg_match('/\Gnow\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Now_GradeFormula;
