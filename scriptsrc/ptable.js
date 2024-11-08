@@ -342,7 +342,8 @@ class PtableConf {
             return tbody.pa__rowmap;
         }
         const rowmap = tbody.pa__rowmap = {rows: [], users: new WeakMap};
-        rowmap.rows.fill(null, 0, this.smap.length);
+        rowmap.rows.length = this.smap.length;
+        rowmap.rows.fill(null);
         for (let tr = tbody.firstChild; tr; tr = tr.nextSibling) {
             const spos = tr.getAttribute("data-pa-spos");
             if (spos) {
