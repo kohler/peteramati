@@ -99,6 +99,39 @@ const CHECKED_USERS = 1;
 const SOME_USERS = 2;
 
 class PtableConf {
+    id;
+    key;
+    title;
+    gitless;
+    gitless_grades;
+    has_older_repo;
+    disabled;
+    visible;
+    scores_visible;
+    frozen;
+    anonymous;
+    has_nonanonymous;
+    overridable_anonymous;
+    flagged_commits;
+    sort;
+    no_sort;
+    checkbox;
+    grades;
+    need_total;
+    total_key;
+    runners;
+    diff_files;
+    reports;
+    requested_columns;
+    col;
+    pincol;
+    colmap;
+    data;
+    mode;
+    smap;
+    uidmap;
+    input_timeout;
+
     constructor(pconf, data) {
         this.id = pconf.id;
         this.key = pconf.key;
@@ -304,6 +337,22 @@ class PtableConf {
         return tre;
     }
 
+    tbody_rowmap(tbody) {
+        if (tbody.pa__rowmap) {
+            return tbody.pa__rowmap;
+        }
+        const rowmap = tbody.pa__rowmap = {rows: [], users: new WeakMap};
+        rowmap.rows.fill(null, 0, this.smap.length);
+        for (let tr = tbody.firstChild; tr; tr = tr.nextSibling) {
+            const spos = tr.getAttribute("data-pa-spos");
+            if (spos) {
+                rowmap.rows[+spos] = tr;
+                rowmap.users.set(tr, this.smap[spos]);
+            }
+        }
+        return rowmap;
+    }
+
 
     render_gdialog_users(h3, slist) {
         if (slist.length === this.data.length || slist.length === 0) {
@@ -353,22 +402,17 @@ class PtableConf {
         return SOME_USERS;
     }
 
-    user_at(tr) {
-        const spos = tr.getAttribute("data-pa-spos");
-        return spos ? this.smap[spos] : null;
-    }
-
     users_in(form, users) {
-        const table = form.querySelector("table.gtable"),
+        const tb = form.querySelector("table.gtable > tbody"),
+            rowmap = this.tbody_rowmap(tb),
             cbidx = this.colmap.checkbox.index,
             sus = [], chsus = [];
-        for (let tr = table.tBodies[0].firstChild; tr; tr = tr.nextSibling) {
-            const spos = tr.getAttribute("data-pa-spos"),
-                su = spos ? this.smap[spos] : null;
-            if (su) {
-                sus.push(su);
+        for (let tr = tb.firstChild; tr; tr = tr.nextSibling) {
+            const ss = rowmap.users.get(tr);
+            if (ss) {
+                sus.push(ss);
                 if (users && tr.children[cbidx].firstChild.checked)
-                    chsus.push(su);
+                    chsus.push(ss);
             }
         }
         if (users === SOME_USERS) {
@@ -497,13 +541,12 @@ function ptable_body_click(evt) {
 }
 
 function ptable_make_hotlist(evt) {
-    const ptconf = this.closest("form").pa__ptconf, j = [];
+    const ptconf = this.closest("form").pa__ptconf,
+        rowmap = ptconf.tbody_rowmap(this),
+        j = [];
     for (let tr = this.firstChild; tr; tr = tr.nextElementSibling) {
-        if (tr.hidden) {
-            continue;
-        }
-        const su = ptconf.user_at(tr);
-        if (!su) {
+        const su = rowmap.users.get(tr);
+        if (!su || su.hidden) {
             continue;
         }
         let t = "~" + encodeURIComponent(ptconf.ukey(su));
@@ -1143,21 +1186,11 @@ function ptable_boring_row(table) {
     return tr;
 }
 
-function ptable_permute_rmap(table) {
-    const rmap = {};
-    let tr = table.tBodies[0].firstChild;
-    while (tr) {
-        rmap[tr.getAttribute("data-pa-spos")] = tr;
-        tr = tr.nextSibling;
-    }
-    return rmap;
-}
-
 function ptable_permute(ptconf, table, data) {
     const tb = table.tBodies[0],
-        rmap = ptable_permute_rmap(table),
         mode = table.classList.contains("gtable-left-pin") ? 2 : 0,
-        klasses = ["k0", "k1"];
+        klasses = ["k0", "k1"],
+        rowmap = tb.firstChild && ptconf.tbody_rowmap(tb);
     let was_boringness = false, trn = 1,
         last = tb.firstChild;
     for (const su of data) {
@@ -1178,8 +1211,14 @@ function ptable_permute(ptconf, table, data) {
 
         let any_visible = false;
         for (const ss of su.partners ? [su, ...su.partners] : [su]) {
-            const tr = rmap[ss._spos]
-                || ptconf.render_table_row(su, su === ss ? mode : mode | 1);
+            let tr;
+            if (!rowmap || !(tr = rowmap.rows[ss._spos])) {
+                tr = ptconf.render_table_row(ss, su === ss ? mode : mode | 1);
+                if (rowmap) {
+                    rowmap.rows[ss._spos] = tr;
+                    rowmap.users.set(tr, ss);
+                }
+            }
             if (tr !== last) {
                 tb.insertBefore(tr, last);
             } else {
@@ -1187,6 +1226,7 @@ function ptable_permute(ptconf, table, data) {
             }
             tr.classList.remove(klasses[(trn ^ 1) & 1]);
             tr.classList.add(klasses[trn & 1]);
+            tr.hidden = ss.hidden;
             any_visible = any_visible || !tr.hidden;
         }
         any_visible && ++trn;
@@ -1512,7 +1552,7 @@ function pa_render_pset_table(ptconf) {
         }
 
         lpintable = document.createElement("table");
-        lpintable.className = "gtable-left-pin gtable-fixed new";
+        lpintable.className = "gtable-left-pin user-gtable gtable-fixed new";
         lpintable.style.width = (tw + 24) + "px";
         lpintable.appendChild(ptable_thead(cx, ptconf, true));
         lpintable.appendChild(document.createElement("tbody"));
@@ -1941,42 +1981,40 @@ function evaluate_search(se) {
     return se.info ? se.info(se, search_target) : false;
 }
 
-function ptable_search_check(ptconf, trx, sexpr) {
-    search_target = ptconf.user_at(trx);
-    return !!search_target && sexpr.evaluate_simple(evaluate_search);
-}
-
 function ptable_search(search) {
     return function () {
         const form = search.closest("form");
         let ptconf = form.pa__ptconf,
             pexpr = new SearchParser(search.value).parse_expression();
-        search_ptconf = ptconf;
         ptconf.input_timeout = null;
         if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
             pexpr = null;
         }
-        let changed = false;
-        const ptbodies = $(form).find("table.gtable > tbody").toArray(),
-            trs = ptbodies.map((tb) => tb.firstChild);
-        let trx = trs[0];
-        while (trx) {
-            const hide = !!pexpr && !ptable_search_check(ptconf, trx, pexpr);
-            if (hide !== trx.hidden) {
-                changed = true;
-                for (const tr of trs) {
-                    tr.hidden = hide;
-                }
+        search_ptconf = ptconf;
+        const changed = [];
+        for (const ss of ptconf.smap) {
+            if (!ss) {
+                continue;
             }
-            trx = trx.nextElementSibling;
-            for (let i = 0; i !== trs.length; ++i) {
-                trs[i] = trs[i].nextElementSibling;
+            search_target = ss;
+            const hidden = pexpr ? !pexpr.evaluate_simple(evaluate_search) : false;
+            if (ss.hidden !== hidden) {
+                changed.push(ss);
+                ss.hidden = hidden;
             }
-        }
-        if (changed) {
-            ptbodies.forEach((tb) => ptable_recolor(tb));
         }
         search_ptconf = null;
+        if (!changed.length) {
+            return;
+        }
+        for (const tbody of form.querySelectorAll("table.user-gtable > tbody")) {
+            const rowmap = ptconf.tbody_rowmap(tbody);
+            for (const ss of changed) {
+                const tr = rowmap.rows[ss._spos];
+                tr && (tr.hidden = ss.hidden);
+            }
+            ptable_recolor(tbody);
+        }
     };
 }
 

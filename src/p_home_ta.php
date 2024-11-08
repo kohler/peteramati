@@ -165,7 +165,7 @@ class Home_TA_Page {
             '<div class="gtable-container-0">',
             '<div class="gtable-container-1">',
             '<div class="gtable-container-2">',
-            '<table class="gtable want-gtable-fixed"></table></div></div></div>',
+            '<table class="gtable user-gtable want-gtable-fixed"></table></div></div></div>',
             Ht::button("Resolve flags", ["class" => "btn ui js-multiresolveflag"]),
             '</form>', "\n";
         $jd = [
@@ -497,7 +497,7 @@ class Home_TA_Page {
             echo '<div class="gtable-gutter-pset ', $psettitle, '</div>';
         }
         echo '</div></div>',
-            '<div class="gtable-container-2"><table class="gtable want-gtable-fixed"></table></div></div></div>';
+            '<div class="gtable-container-2"><table class="gtable user-gtable want-gtable-fixed"></table></div></div></div>';
         echo Ht::unstash(),
             '<script>$pa.pset_table($("#', $pset->urlkey, '")[0],',
             json_encode_browser($jd), ',',
