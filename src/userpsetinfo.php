@@ -146,7 +146,7 @@ class UserPsetInfo {
         assert($this->phantom_type !== 2);
         if ($version < 0
             || $version >= $this->notesversion
-            || $this->phantom_type === 0) {
+            || $this->phantom_type === 1) {
             return null;
         }
         if ($this->_history === null
