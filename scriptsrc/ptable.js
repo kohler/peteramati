@@ -324,6 +324,7 @@ class PtableConf {
 
     push(s) {
         s._spos = this.smap.length;
+        s.hidden = false;
         this.smap.push(s);
         if (s.uid > 0) {
             if (s.uid >= this.uidmap.length) {
@@ -1203,8 +1204,7 @@ export function pa_pset_table(form, pconf, data) {
 }
 
 function pa_render_pset_table(ptconf) {
-    const table = this, $j = $(table),
-        smap = ptconf.smap;
+    const table = this, $j = $(table);
     let $alltables = $(table),
         hdrtable = null, lpintable = null, lpinhdrtable = null,
         slist_input,
@@ -1616,7 +1616,7 @@ function pa_render_pset_table(ptconf) {
             $alltables.toggleClass("gt-anonymous", !!ptconf.anonymous);
             set_tables_width();
             $alltables.children("tbody").find("input.gt-check").each(function () {
-                const s = smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
+                const s = ptconf.smap[this.parentNode.parentNode.getAttribute("data-pa-spos")];
                 this.setAttribute("name", ptconf.render_checkbox_name(s));
             });
             const anon = table.closest("form").elements.anonymous;
