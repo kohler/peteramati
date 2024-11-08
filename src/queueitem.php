@@ -873,11 +873,11 @@ class QueueItem {
         $pset = $this->pset();
         $runner = $this->runner();
         if (!$repo) {
-            throw new RunnerException("No repository.");
+            throw new RunnerException("No repository");
         } else if (!$pset) {
-            throw new RunnerException("Bad queue item pset.");
+            throw new RunnerException("Bad queue item pset");
         } else if (!$runner) {
-            throw new RunnerException("Bad queue item runner.");
+            throw new RunnerException("Bad queue item runner");
         }
 
         // if no command, skip right to evaluation
@@ -891,16 +891,16 @@ class QueueItem {
         assert($this->queueid !== 0 || $foreground);
 
         if (!chdir(SiteLoader::$root)) {
-            throw new RunnerException("Can’t cd to main directory.");
+            throw new RunnerException("Can’t cd to main directory");
         }
         if (!is_executable("jail/pa-jail")) {
-            throw new RunnerException("The pa-jail program has not been compiled.");
+            throw new RunnerException("The pa-jail program has not been compiled");
         }
 
         $info = $this->info();
         $runlog = $info->run_logger();
         if (!$runlog->mkdirs()) {
-            throw new RunnerException("Can’t create log directory.");
+            throw new RunnerException("Can’t create log directory");
         }
 
         $runlog->invalidate_active_job();
@@ -918,7 +918,7 @@ class QueueItem {
             $username = "jail61user";
         }
         if (!preg_match('/\A\w+\z/', $username)) {
-            throw new RunnerException("Bad run_username.");
+            throw new RunnerException("Bad run_username");
         }
 
         $pwnam = posix_getpwnam($username);
@@ -928,7 +928,7 @@ class QueueItem {
         // collect directory information
         $this->_jaildir = preg_replace('/\/+\z/', '', $this->expand($pset->run_dirpattern));
         if (!$this->_jaildir) {
-            throw new RunnerException("Bad run_dirpattern.");
+            throw new RunnerException("Bad run_dirpattern");
         }
         $this->_jailhomedir = "{$this->_jaildir}/" . preg_replace('/\A\/+/', '', $userhome);
 
@@ -978,7 +978,7 @@ class QueueItem {
         // create jail
         $this->remove_old_jails();
         if ($this->run_and_log(["jail/pa-jail", "add", $this->_jaildir, $username])) {
-            throw new RunnerException("Can’t initialize jail.");
+            throw new RunnerException("Can’t initialize jail");
         }
 
         // check out code
@@ -1026,7 +1026,7 @@ class QueueItem {
             }
             $homedir = $this->_jaildir;
         } else {
-            throw new RunnerException("Missing jail population configuration.");
+            throw new RunnerException("Missing jail population configuration");
         }
 
         $jmanifest = $runner->jailmanifest();
@@ -1099,7 +1099,7 @@ class QueueItem {
         $tries = 0;
         while (is_dir($this->_jaildir)) {
             if ($tries > 10) {
-                throw new RunnerException("Can’t remove old jail.");
+                throw new RunnerException("Can’t remove old jail");
             } else if ($tries > 0) {
                 usleep(100000 * (1 << min($tries, 4)));
                 Conf::set_current_time(time());
@@ -1107,7 +1107,7 @@ class QueueItem {
 
             $newdir = $newdirpfx . ($tries ? ".{$tries}" : "");
             if ($this->run_and_log(["jail/pa-jail", "mv", $this->_jaildir, $newdir])) {
-                throw new RunnerException("Can’t remove old jail.");
+                throw new RunnerException("Can’t remove old jail");
             }
 
             $this->run_and_log(["jail/pa-jail", "rm", "--bg", $newdir]);
@@ -1131,14 +1131,14 @@ class QueueItem {
 
         fwrite($this->_logstream, "++ mkdir {$checkoutdir}\n");
         if (!mkdir($clonedir, 0777, true)) {
-            throw new RunnerException("Can’t initialize user repo in jail.");
+            throw new RunnerException("Can’t initialize user repo in jail");
         }
 
         // need a branch to check out a specific commit
         $repodir = $repo->repodir();
         $branch = "jailcheckout_" . Conf::$now;
         if ($this->run_and_log(["git", "branch", $branch, $hash], $repodir)) {
-            throw new RunnerException("Can’t create branch for checkout.");
+            throw new RunnerException("Can’t create branch for checkout");
         }
 
         // make the checkout
@@ -1162,11 +1162,11 @@ class QueueItem {
         $this->run_and_log(["git", "branch", "-D", ...$args], $repodir);
 
         if ($status !== 0) {
-            throw new RunnerException("Can’t check out code into jail.");
+            throw new RunnerException("Can’t check out code into jail");
         }
 
         if ($this->run_and_log(["rm", "-rf", ".git", ".gitcheckout"], $clonedir)) {
-            throw new RunnerException("Can’t clean up checkout in jail.");
+            throw new RunnerException("Can’t clean up checkout in jail");
         }
 
         // create overlay
@@ -1193,7 +1193,7 @@ class QueueItem {
                 $x = !copy($path, $checkoutdir . substr($path, $rslash));
             }
             if ($x) {
-                throw new RunnerException("Can’t unpack overlay.");
+                throw new RunnerException("Can’t unpack overlay");
             }
         }
 

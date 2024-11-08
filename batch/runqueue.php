@@ -1,9 +1,12 @@
 <?php
 // runqueue.php -- Peteramati script for progressing the execution queue
-// HotCRP and Peteramati are Copyright (c) 2006-2023 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
+    global $Opt;
+    $Opt = $Opt ?? [];
+    $Opt["__no_main"] = true;
     require_once(dirname(__DIR__) . "/src/init.php");
     CommandLineException::$default_exit_status = 2;
 }
@@ -11,7 +14,7 @@ if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
 class RunQueue_Batch {
     /** @var Conf */
     public $conf;
-    /** @var 'list'|'list-chains'|'clean'|'once'|'complete'|'list-broken-chains'|'cancel-broken-chains'|'randomize'|'pause'|'resume' */
+    /** @var 'list'|'list-chains'|'clean'|'once'|'complete'|'monitor'|'list-broken-chains'|'cancel-broken-chains'|'randomize'|'pause'|'resume' */
     public $mode;
     /** @var ?int */
     public $count;
@@ -291,9 +294,11 @@ class RunQueue_Batch {
         return $qs->nrunning >= $qs->nconcurrent;
     }
 
-    function execute() {
+    /** @param bool $monitor */
+    function execute($monitor) {
         while ($this->load()
-               || ($this->any_completed && $this->load())) {
+               || ($this->any_completed && $this->load())
+               || $monitor) {
             $this->any_completed = false;
             do {
                 sleep(5);
@@ -410,10 +415,11 @@ class RunQueue_Batch {
         ++$this->nreports;
         $id = "#{$qi->queueid} " . $qi->unparse_key();
         $chain = $qi->chain ? " C{$qi->chain}" : "";
+        $msg = $qi->last_error ? " ({$qi->last_error})" : "";
         if ($qi->cancelled()) {
-            fwrite($f, "{$id}: cancelled\n");
+            fwrite($f, "{$id}: cancelled{$msg}\n");
         } else if ($qi->stopped()) {
-            fwrite($f, "{$id}: completed\n");
+            fwrite($f, "{$id}: completed{$msg}\n");
         } else if ($old_status > 0) {
             fwrite($f, "{$id}: running " . self::unparse_time($qi->runat) . "{$chain}\n");
         } else if ($qi->working()) {
@@ -447,7 +453,9 @@ class RunQueue_Batch {
         } else if ($this->mode === "once") {
             $this->load();
         } else if ($this->mode === "complete") {
-            $this->execute();
+            $this->execute(false);
+        } else if ($this->mode === "monitor") {
+            $this->execute(true);
         } else if ($this->mode === "schedule") {
             return $this->report_no_work($this->schedule(false));
         } else if ($this->mode === "cancel") {
@@ -488,11 +496,12 @@ class RunQueue_Batch {
     ];
 
     /** @return RunQueue_Batch|RunEnqueue_Batch */
-    static function make_args(Conf $conf, $argv) {
+    static function make_args($argv) {
         $arg = (new Getopt)->long(
             "n:,count: {n} =N !list Print at most N items",
             "w,working !list Print only working items",
             "all !cancel Cancel all jobs",
+            "daemon,d !monitor Run as daemon",
             self::$add_options,
             "q,quiet",
             "V,verbose",
@@ -503,6 +512,7 @@ class RunQueue_Batch {
             "add Add jobs to queue (`add --help` for more)",
             "once Execute queue once",
             "complete Execute queue to completion",
+            "monitor Monitor queue forever",
             "clean Clean queue",
             "list-chains Print summary of chains",
             "schedule Schedule jobs or chains",
@@ -523,11 +533,17 @@ class RunQueue_Batch {
             $mode = isset($arg["p"]) || isset($arg["r"]) ? "add" : "list";
         }
 
-        if ($mode === "add") {
-            return RunEnqueue_Batch::make_parsed_args($conf, $arg);
+        if (isset($arg["daemon"])) {
+            BatchProcess::daemonize();
         }
 
-        $self = new RunQueue_Batch($conf, $mode);
+        initialize_psets();
+
+        if ($mode === "add") {
+            return RunEnqueue_Batch::make_parsed_args(Conf::$main, $arg);
+        }
+
+        $self = new RunQueue_Batch(Conf::$main, $mode);
         $self->words = $arg["_"];
         $self->all = isset($arg["all"]);
         $self->quiet = isset($arg["q"]);
@@ -821,5 +837,5 @@ class RunEnqueue_Batch {
 }
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
-    exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
+    exit(RunQueue_Batch::make_args($argv)->run());
 }
