@@ -144,6 +144,7 @@ class UserPsetInfo {
      * @return ?UserPsetHistory */
     function history_at($version, $student_only, Conf $conf) {
         assert($this->phantom_type !== 2);
+        error_log("{$this->phantom_type} {$version}");
         if ($version < 0
             || $version >= $this->notesversion
             || $this->phantom_type === 1) {
@@ -219,6 +220,7 @@ class UserPsetInfo {
             error_log(debug_string_backtrace());
         }
         $v1 = $v1 ?? $this->notesversion;
+        error_log("VVVV $v1");
         if ($v1 >= $this->notesversion
             && $this->updateby === $this->cid) {
             yield $this->notesversion;
@@ -229,6 +231,7 @@ class UserPsetInfo {
                 && $h->antiupdateby === $this->cid) {
                 yield $v1;
             }
+            error_log($h ? "history @{$v1} {$this->cid} v {$h->antiupdateby}" : "no history @{$v1}");
             --$v1;
         }
     }
