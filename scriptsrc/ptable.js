@@ -2014,6 +2014,8 @@ function ptable_search(search) {
                 tr && (tr.hidden = ss.hidden);
             }
             ptable_recolor(tbody);
+            const cb = tbody.parentElement.tHead.querySelector(".js-range-click");
+            cb && handle_ui.trigger.call(cb, "js-range-click", "updaterange");
         }
     };
 }
