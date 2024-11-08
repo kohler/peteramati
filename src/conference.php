@@ -2686,13 +2686,11 @@ class Conf {
         } else if ($need_hash) {
             $api->commit = $this->check_api_hash($api->hash, $api);
             if (!$api->commit) {
-                return ["ok" => false, "error" => $api->hash ? "Missing commit." : "Disconnected commit."];
+                return ["ok" => false, "error" => $api->hash ? "Missing commit" : "Disconnected commit"];
             }
         }
-        if (($req = $uf->require ?? [])) {
-            foreach (SiteLoader::expand_includes($req) as $f) {
-                require_once $f;
-            }
+        if (isset($uf->require)) {
+            SiteLoader::require_includes(null, $uf->require);
         }
         return call_user_func($uf->function, $user, $qreq, $api, $uf);
     }

@@ -1814,7 +1814,7 @@ class PsetView {
      * @param int $jobid
      * @return mixed */
     function runner_evaluate(RunnerConfig $runner, $jobid) {
-        $runner->require && SiteLoader::require_includes($runner->require);
+        SiteLoader::require_includes(null, $runner->require);
         return call_user_func($runner->evaluate_function, $this, $runner, $jobid);
     }
 

@@ -67,17 +67,23 @@ class BatchProcess {
                 error_log("posix_setsid error: " . posix_strerror(posix_get_last_error()));
             }
         }
-        if (function_exists("posix_isatty") && PHP_SAPI === "cli") {
+        if (PHP_SAPI === "cli" && function_exists("posix_isatty")) {
             if (posix_isatty(STDIN)) {
-                fclose(STDIN);
+                self::devnull(STDIN);
             }
             if (posix_isatty(STDOUT)) {
-                fclose(STDOUT);
+                self::devnull(STDOUT);
             }
             if (posix_isatty(STDERR)) {
-                fclose(STDERR);
+                self::devnull(STDERR);
             }
         }
         return true;
+    }
+
+    /** @param resource $f */
+    static function devnull($f) {
+        fclose($f);
+        fopen("/dev/null", "w+");
     }
 }

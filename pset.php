@@ -874,7 +874,7 @@ class PsetRequest {
                 echo $n ? '' : '<div class="pa-runoutlist">';
                 ++$n;
                 if ($runner->display_function) {
-                    $runner->require && SiteLoader::require_includes($runner->require);
+                    SiteLoader::require_includes(null, $runner->require);
                     call_user_func($runner->display_function, $this->info, $runner);
                 } else {
                     self::default_runner_display_function($this->info, $runner);

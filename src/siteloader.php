@@ -1,6 +1,6 @@
 <?php
 // siteloader.php -- HotCRP autoloader
-// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2024 Eddie Kohler; see LICENSE.
 
 class SiteLoader {
     static $map = [
@@ -49,6 +49,7 @@ class SiteLoader {
         }
     }
 
+    // Set up conference options
     /** @param string $file
      * @param list<string> $includepath
      * @param bool $globby
@@ -108,17 +109,20 @@ class SiteLoader {
         return $s;
     }
 
-    /** @param null|string|list<string> $files
+    /** @param ?string $root
+     * @param string|list<string> $files
+     * @param array<string,string> $expansions
      * @return list<string> */
-    static function expand_includes($files, $expansions = []) {
+    static function expand_includes($root, $files, $expansions = []) {
         global $Opt;
+
         if (empty($files)) {
             return [];
         } else if (!is_array($files)) {
             $files = [$files];
         }
 
-        $root = self::$root;
+        $root = $root ?? self::$root;
         $autoload = $expansions["autoload"] ?? 0;
         $includepath = null;
 
@@ -182,9 +186,10 @@ class SiteLoader {
         return $results;
     }
 
-    /** @param null|string|list<string> $files */
-    static function require_includes($files) {
-        foreach (self::expand_includes($files) as $f) {
+    /** @param ?string $root
+     * @param null|string|list<string> $files */
+    static function require_includes($root, $files) {
+        foreach (self::expand_includes($root, $files) as $f) {
             require_once $f;
         }
     }
@@ -200,18 +205,28 @@ class SiteLoader {
     }
 
     static function read_main_options() {
-        $file = defined("PETERAMATI_OPTIONS") ? PETERAMATI_OPTIONS : self::$root . "/conf/options.php";
+        global $Opt;
+        $Opt = $Opt ?? [];
+        $file = defined("PETERAMATI_OPTIONS") ? PETERAMATI_OPTIONS : "conf/options.php";
+        if (!str_starts_with($file, "/")) {
+            $file = self::$root . "/{$file}";
+        }
         self::read_options_file($file);
+        if (empty($Opt["missing"]) && !empty($Opt["include"])) {
+            self::read_included_options();
+        }
     }
 
-    static function read_included_options() {
+    /** @param ?string $root */
+    static function read_included_options($root = null) {
         global $Opt;
         '@phan-var array<string,mixed> $Opt';
         if (is_string($Opt["include"])) {
             $Opt["include"] = [$Opt["include"]];
         }
+        $root = $root ?? self::$root;
         for ($i = 0; $i !== count($Opt["include"]); ++$i) {
-            foreach (self::expand_includes($Opt["include"][$i]) as $f) {
+            foreach (self::expand_includes($root, $Opt["include"][$i]) as $f) {
                 if (!in_array($f, $Opt["loaded"])) {
                     self::read_options_file($f);
                 }
@@ -220,13 +235,13 @@ class SiteLoader {
     }
 
     /** @param string $class_name */
-    static function autoloader($class_name) {
+    static function autoload($class_name) {
         $f = self::$map[$class_name] ?? strtolower($class_name) . ".php";
-        foreach (self::expand_includes($f, ["autoload" => true]) as $fx) {
+        foreach (self::expand_includes(self::$root, $f, ["autoload" => true]) as $fx) {
             require_once($fx);
         }
     }
 }
 
 SiteLoader::set_root();
-spl_autoload_register("SiteLoader::autoloader");
+spl_autoload_register("SiteLoader::autoload");

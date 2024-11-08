@@ -24,7 +24,7 @@ const VF_STUDENT_ALLOWED = 2;
 const VF_STUDENT_ANY = 3;
 const VF_TF = 4;
 
-global $OK;
+global $OK, $Conf, $Opt;
 $OK = 1;
 
 
@@ -39,7 +39,7 @@ require_once(SiteLoader::find("src/conference.php"));
 require_once(SiteLoader::find("src/contact.php"));
 Conf::set_current_time(time());
 if (PHP_SAPI === "cli") {
-    set_exception_handler("Multiconference::batch_exception_handler");
+    set_exception_handler("BatchProcess::exception_handler");
     pcntl_signal(SIGPIPE, SIG_DFL);
 }
 
@@ -65,7 +65,7 @@ function expand_json_includes_callback($includelist, $callback) {
             }
         }
         if ($expandable) {
-            foreach (SiteLoader::expand_includes($expandable) as $f) {
+            foreach (SiteLoader::expand_includes(null, $expandable) as $f) {
                 if (($x = file_get_contents($f)))
                     $includes[] = [$x, $f];
             }
@@ -99,56 +99,33 @@ function expand_json_includes_callback($includelist, $callback) {
     }
 }
 
-function read_main_options() {
-    global $Opt;
-    if (!$Opt) {
-        $Opt = [];
+
+function initialize_options() {
+    global $Conf, $Opt;
+    $Opt = $Opt ?? [];
+    if (!($Opt["loaded"] ?? null)) {
+        SiteLoader::read_main_options();
     }
-    if (!($Opt["loaded"] ?? false)) {
-        if (defined("HOTCRP_OPTIONS")) {
-            $options = HOTCRP_OPTIONS;
-        } else {
-            $options = SiteLoader::$root . "/conf/options.php";
-        }
-        if ((include $options) !== false) {
-            $Opt["loaded"] = true;
-        } else {
-            $Opt["missing"][] = $options;
-        }
-        if ($Opt["multiconference"] ?? false) {
-            Multiconference::init();
-        }
-        if ($Opt["include"] ?? false) {
-            SiteLoader::read_included_options();
-        }
-    }
-    if (!($Opt["loaded"] ?? false) || ($Opt["missing"] ?? false)) {
+    if (!empty($Opt["missing"])) {
         Multiconference::fail_bad_options();
     }
 
-    // Respond to main options
+    // handle overall options
     if ($Opt["dbLogQueries"] ?? false) {
         Dbl::log_queries($Opt["dbLogQueries"]);
     }
-    // Allow lots of memory
+    // allow lots of memory
     if (!($Opt["memoryLimit"] ?? false) && ini_get_bytes("memory_limit") < (128 << 20)) {
         $Opt["memoryLimit"] = "128M";
     }
     if ($Opt["memoryLimit"] ?? false) {
         ini_set("memory_limit", $Opt["memoryLimit"]);
     }
-}
-
-read_main_options();
-
-
-// Create the conference
-global $Conf, $Opt;
-if (!Conf::$main) {
-    Conf::set_main_instance(new Conf($Opt, true));
-}
-if (!$Conf->dblink) {
-    Multiconference::fail_bad_database();
+    // environment
+    putenv("GIT_REPOCACHE=" . SiteLoader::$root . "/repo");
+    if (isset($Opt["mysql"])) {
+        putenv("MYSQL=" . $Opt["mysql"]);
+    }
 }
 
 
@@ -157,9 +134,9 @@ if (!$Conf->dblink) {
 function psets_json_data($exclude_overrides, &$mtime) {
     global $Conf;
     $datamap = array();
-    $fnames = SiteLoader::expand_includes($Conf->opt("psetsConfig"),
-                              ["CONFID" => $Conf->opt("confid") ? : $Conf->dbname,
-                               "HOSTTYPE" => $Conf->opt("hostType") ?? ""]);
+    $fnames = SiteLoader::expand_includes(null,
+            $Conf->opt("psetsConfig"),
+            ["CONFID" => $Conf->opt("confid") ? : $Conf->dbname, "HOSTTYPE" => $Conf->opt("hostType") ?? ""]);
     foreach ($fnames as $fname) {
         $datamap[$fname] = @file_get_contents($fname);
         $mtime = max($mtime, @filemtime($fname));
@@ -198,8 +175,17 @@ function load_psets_json($exclude_overrides) {
     return $json;
 }
 
-function load_pset_info() {
-    global $Conf, $PsetOverrides;
+function initialize_psets() {
+    global $Opt, $PsetOverrides;
+
+    // create initial conference
+    if (!Conf::$main) {
+        Conf::set_main_instance(new Conf($Opt, true));
+    }
+    if (!Conf::$main->dblink) {
+        Multiconference::fail_bad_database();
+    }
+
     // read initial messages
     Messages::$main = new Messages;
     $x = json_decode(file_get_contents(SiteLoader::$root . "/src/messages.json"));
@@ -209,7 +195,7 @@ function load_pset_info() {
 
     // read psets
     try {
-        $Conf->set_config(load_psets_json(false));
+        Conf::$main->set_config(load_psets_json(false));
     } catch (Exception $exception) {
         // Want to give a good error message, so discover where the error is.
         if ($exception instanceof PsetConfigException
@@ -251,12 +237,12 @@ function load_pset_info() {
         Multiconference::fail_message($locp . "Configuration error: " . $exception->getMessage());
     }
 
-    foreach ($Conf->config->_messagedefs as $k => $v) {
+    foreach (Conf::$main->config->_messagedefs as $k => $v) {
         Messages::$main->define($k, $v);
     }
 
     // if any anonymous problem sets, create anonymous usernames
-    foreach ($Conf->psets() as $p) {
+    foreach (Conf::$main->psets() as $p) {
         if (!$p->disabled && $p->anonymous) {
             while (($row = Dbl::fetch_first_row(Dbl::qe("select contactId from ContactInfo where anon_username is null limit 1")))) {
                 Dbl::q("update ContactInfo set anon_username='[anon" . sprintf("%08u", mt_rand(1, 99999999)) . "]' where contactId=?", $row[0]);
@@ -266,21 +252,16 @@ function load_pset_info() {
     }
 
     // update schema as required by psets
-    if ($Conf->sversion === 107) {
-        (new UpdateSchema($Conf))->run();
+    if (Conf::$main->sversion === 107) {
+        (new UpdateSchema(Conf::$main))->run();
     }
-    if ($Conf->sversion === 138) {
-        (new UpdateSchema($Conf))->run();
+    if (Conf::$main->sversion === 138) {
+        (new UpdateSchema(Conf::$main))->run();
     }
 }
 
-load_pset_info();
 
-putenv("GIT_REPOCACHE=" . SiteLoader::$root . "/repo");
-if ($Conf->opt("mysql") !== null) {
-    putenv("MYSQL=" . $Conf->opt("mysql"));
-}
-if (!$Conf->opt("disableRemote")
-    && !is_executable(SiteLoader::$root . "/jail/pa-timeout")) {
-    $Conf->set_opt("disableRemote", "The `pa-timeout` program has not been built. Run `cd DIR/jail; make` to access remote repositories.");
+initialize_options();
+if (!($Opt["__no_main"] ?? false)) {
+    initialize_psets();
 }
