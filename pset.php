@@ -358,7 +358,6 @@ class PsetRequest {
                 break;
             }
         }
-        error_log(json_encode(iterator_to_array($this->info->answer_versions())));
 
         $b = [];
         if ($newer || $older) {
