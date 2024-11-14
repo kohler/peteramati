@@ -34,7 +34,8 @@ class FsckRepodir_Batch {
         }
         $ok = @chmod($path, ($mode | 060) & 0777);
         if (!$ok) {
-            fwrite(STDERR, "chmod {$path}: " . posix_strerror(posix_get_last_error()) . "\n");
+            $error = error_get_last();
+            fwrite(STDERR, "{$path}: " . $error["message"] . "\n");
         }
         return $ok;
     }
@@ -78,7 +79,7 @@ class FsckRepodir_Batch {
                 $mode = $stat["mode"];
                 if (($mode & 060) !== 060
                     && $file !== "/FETCH_HEAD") {
-                    $this->chmod_grw($path, $mode)
+                    $this->chmod_grw($path, $mode);
                 }
                 if (($mode & 0040000) !== 0 // directory
                     && (!str_starts_with($file, "/objects/")
