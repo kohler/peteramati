@@ -61,7 +61,7 @@ class Repository {
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
     /** @var bool */
-    static public $verbose = true;
+    static public $verbose = false;
     /** @var ?resource */
     static private $verbosef;
 
