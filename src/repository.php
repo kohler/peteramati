@@ -375,11 +375,46 @@ class Repository {
 
     /** @param string $cacheid
      * @return string */
+    static function update_repodir_at(Conf $conf, $repodir) {
+        $lockf = @fopen("{$repodir}/UPGRADE_TO_BARE", "w+");
+        if (!$lockf) {
+            return "{$repodir}/.git";
+        }
+        flock($lockf, LOCK_EX);
+
+        $d = opendir("{$repodir}/.git");
+        if (!$d) {
+            fclose($lockf);
+            return "";
+        }
+        $fs = [];
+        while (($entry = readdir($d)) !== false) {
+            if ($entry !== "." && $entry !== ".." && $entry !== ".git")
+                $fs[] = $entry;
+        }
+        closedir($d);
+
+        foreach ($fs as $f) {
+            if (!rename("{$repodir}/.git/{$f}", "{$repodir}/{$f}"))
+                error_log("failed to rename {$repodir}/.git/{$f}");
+        }
+
+        fclose($lockf);
+        unlink("{$repodir}/UPGRADE_TO_BARE");
+        @rmdir("{$repodir}/.git");
+        return $repodir;
+    }
+
+    /** @param string $cacheid
+     * @return string */
     static function ensure_repodir_at(Conf $conf, $cacheid) {
         $repodir = self::repodir_at($conf, $cacheid);
         if (!file_exists("{$repodir}/config")) {
             if (!mk_site_subdir($repodir, 02770)) {
                 return "";
+            }
+            if (file_exists("{$repodir}/.git")) {
+                return self::update_repodir_at($conf, $repodir);
             }
             shell_exec("cd {$repodir} && git init --bare --shared -b main");
         }
