@@ -807,18 +807,29 @@ class QueueItem {
     /** @param string $x
      * @return string */
     function expand($x) {
-        if (strpos($x, '${') !== false) {
-            $x = str_replace('${REPOID}', (string) $this->repoid, $x);
-            $x = str_replace('${PSET}', (string) $this->psetid, $x);
-            $x = str_replace('${CONFDIR}', "conf/", $x);
-            $x = str_replace('${SRCDIR}', "src/", $x);
-            $x = str_replace('${HOSTTYPE}', $this->conf->opt("hostType") ?? "", $x);
-            if (($hash = $this->hash()) !== null) {
-                $x = str_replace('${COMMIT}', $hash, $x);
-                $x = str_replace('${HASH}', $hash, $x);
-            }
+        if (strpos($x, '${') === false) {
+            return $x;
         }
-        return $x;
+        return preg_replace_callback('/\$\{[A-Z]+\}/', function ($m) {
+            if ($m[0] === '${REPOGID}') {
+                $repo = $this->repo();
+                return ($repo ? $repo->repogid : null) ?? $m[0];
+            } else if ($m[0] === '${PSET}') {
+                return (string) $this->psetid;
+            } else if ($m[0] === '${REPOID}') {
+                return (string) $this->repoid;
+            } else if ($m[0] === '${HOSTTYPE}') {
+                return $this->conf->opt("hostType") ?? "";
+            } else if ($m[0] === '${COMMIT}' || $m[0] === '${HASH}') {
+                return $this->hash() ?? $m[0];
+            } else if ($m[0] === '${CONFDIR}') {
+                return "conf/";
+            } else if ($m[0] === '${SRCDIR}') {
+                return "src/";
+            } else {
+                return $m[0];
+            }
+        }, $x);
     }
 
     /** @param ?PsetView $info
