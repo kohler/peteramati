@@ -27,7 +27,7 @@ class FsckRepodir_Batch {
      * @return bool */
     private function chmod_grw($path, $mode) {
         if ($this->verbose) {
-            fwrite(STDOUT, "+chmod g+" . ($mode & 040 ? "" : "r") . ($mode & 020 ? "" : "w") . " {$path}\n");
+            fwrite(STDOUT, "+ chmod g+" . ($mode & 040 ? "" : "r") . ($mode & 020 ? "" : "w") . " {$path}\n");
         }
         if ($this->dry_run) {
             return true;
@@ -42,21 +42,38 @@ class FsckRepodir_Batch {
 
     /** @param string $cacheid */
     function update_cachedir($cacheid) {
-        $repodir = Repository::repodir_at($this->conf, $cacheid);
-        if (!file_exists($repodir)) {
+        $irepodir = Repository::repodir_at($this->conf, $cacheid);
+        if (!file_exists($irepodir)) {
+            if ($this->verbose) {
+                fwrite(STDOUT, "- {$irepodir} does not exist\n");
+            }
             return true;
         }
 
+        if ($this->verbose) {
+            fwrite(STDOUT, "* {$irepodir}\n");
+        }
+
         $repodir = Repository::ensure_repodir_at($this->conf, $cacheid);
+        if (!$repodir) {
+            fwrite(STDERR, "{$irepodir}: cannot upgrade repository\n");
+            return false;
+        }
+
         $proc = Repository::gitrun_at($this->conf, ["git", "config", "--get", "core.sharedrepository"], $repodir);
         if (!$proc->ok) {
+            fwrite(STDERR, "{$repodir}: git config error: {$proc->stderr}\n");
             return false;
         }
         $shared = trim($proc->stdout);
         if ($shared !== "1" && $shared !== "group") {
+            if ($this->verbose) {
+                fwrite(STDOUT, "- {$repodir} is not group-shared\n");
+            }
             return true; // XXX should check umask
         }
 
+        $n = 1;
         $mode = stat($repodir)["mode"];
         if (($mode & 060) !== 060) {
             $this->chmod_grw($repodir, $mode);
@@ -70,6 +87,7 @@ class FsckRepodir_Batch {
                 if ($suffix === "." || $suffix === "..") {
                     continue;
                 }
+                ++$n;
                 $file = $pfx . $suffix;
                 $path = $repodir . $file;
                 $stat = stat($path);
@@ -88,6 +106,10 @@ class FsckRepodir_Batch {
                 }
             }
         }
+
+        if ($this->verbose) {
+            fwrite(STDOUT, "- {$repodir}: checked {$n} entries\n");
+        }
         return true;
     }
 
@@ -95,7 +117,11 @@ class FsckRepodir_Batch {
     function run_or_warn() {
         $ok = true;
         foreach (str_split("0123456789abcdef") as $cacheid) {
-            $ok = $this->update_cachedir($cacheid) && $ok;
+            $okhere = $this->update_cachedir($cacheid);
+            if (!$okhere) {
+                fwrite(STDERR, "repo/repo{$cacheid}: could not upgrade\n");
+            }
+            $ok = $ok && $okhere;
         }
         return $ok ? 0 : 1;
     }
