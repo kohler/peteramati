@@ -936,7 +936,10 @@ class QueueItem {
         $runat = time();
         $logbase = $runlog->job_prefix($runat);
         $pidfile = $runlog->pid_file();
-        file_put_contents($pidfile, "{$runat}\n");
+        $pidresult = @file_put_contents($pidfile, "{$runat}\n");
+        if ($pidresult === false) {
+            throw new RunnerException("Can’t create pidfile");
+        }
         $inputfifo = $timingfile = null;
         if (!$foreground) {
             if (posix_mkfifo("{$logbase}.in", 0660)) {
@@ -946,12 +949,17 @@ class QueueItem {
                 $timingfile = "{$logbase}.log.time";
             }
             $this->_logfile = "{$logbase}.log";
-            $this->_logstream = fopen($this->_logfile, "a");
+            $logstream = @fopen($this->_logfile, "a");
         } else if (($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0) {
-            $this->_logstream = fopen("php://stderr", "w"); // `STDERR` not available in php-fpm
+            $logstream = fopen("php://stderr", "w"); // `STDERR` not available in php-fpm
         } else {
-            $this->_logstream = fopen("/dev/null", "w");
+            $logstream = fopen("/dev/null", "w");
         }
+        if (!$logstream) {
+            @unlink($pidfile);
+            throw new RunnerException("Can’t create log file");
+        }
+        $this->_logstream = $logstream;
         $this->bhash = $info->bhash(); // resolve blank hash
 
         // maybe register eventsource
