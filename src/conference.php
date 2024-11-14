@@ -2662,7 +2662,7 @@ class Conf {
     function repodir_refs($cacheid) {
         if (!isset($this->_repodir_refs[$cacheid])) {
             $repodir = Repository::repodir_at($this, $cacheid);
-            $sp = Repository::gitrun_subprocess($this, ["git", "show-ref"], $repodir);
+            $sp = Repository::gitrun_at($this, ["git", "show-ref"], $repodir);
             $this->_repodir_refs[$cacheid] = $sp->ok ? $sp->stdout : "";
         }
         return $this->_repodir_refs[$cacheid];

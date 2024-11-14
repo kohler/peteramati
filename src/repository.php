@@ -159,7 +159,7 @@ class Repository {
     static function repogid_repodir_known(Conf $conf, $repogid) {
         $repodir = self::repodir_at($conf, substr($repogid, 0, 1));
         return file_exists("{$repodir}/config")
-            && (self::gitrun_subprocess($conf, ["git", "remote", "get-url", "repo{$repogid}"], $repodir))->ok;
+            && (self::gitrun_at($conf, ["git", "remote", "get-url", "repo{$repogid}"], $repodir))->ok;
     }
 
 
@@ -378,7 +378,8 @@ class Repository {
     /** @param string $cacheid
      * @return string */
     static function update_repodir_at(Conf $conf, $repodir) {
-        $lockf = @fopen("{$repodir}/UPGRADE_TO_BARE", "w+");
+        $lockfn = "{$repodir}/UPGRADE_TO_BARE";
+        $lockf = @fopen($lockfn, "w+");
         if (!$lockf) {
             return "{$repodir}/.git";
         }
@@ -387,7 +388,8 @@ class Repository {
         $d = opendir("{$repodir}/.git");
         if (!$d) {
             fclose($lockf);
-            return "";
+            @unlink($lockfn);
+            return file_exists("{$repodir}/config") ? $repodir : "";
         }
         $fs = [];
         while (($entry = readdir($d)) !== false) {
@@ -402,7 +404,7 @@ class Repository {
         }
 
         fclose($lockf);
-        unlink("{$repodir}/UPGRADE_TO_BARE");
+        @unlink($lockfn);
         @rmdir("{$repodir}/.git");
         return $repodir;
     }
@@ -418,7 +420,7 @@ class Repository {
             if (file_exists("{$repodir}/.git")) {
                 return self::update_repodir_at($conf, $repodir);
             }
-            shell_exec("cd {$repodir} && git init --bare --shared -b main");
+            self::gitrun_at($conf, ["git", "init", "--bare", "--shared", "-bmain"], $repodir);
         }
         return $repodir;
     }
@@ -493,13 +495,26 @@ class Repository {
      * @param string $cwd
      * @param array{firstline?:int,linecount?:int,stdin?:string} $args
      * @return Subprocess */
-    static function gitrun_subprocess(Conf $conf, $command, $cwd, $args = []) {
+    static function gitrun_at(Conf $conf, $command, $cwd, $args = []) {
         $command = $conf->fix_command($command);
         $args["env"] = self::git_env_vars();
         if (self::$verbose) {
             self::verbose_log(json_encode($command) . " @{$cwd}");
         }
-        return Subprocess::run($command, $cwd, $args);
+        $proc = Subprocess::run($command, $cwd, $args);
+        if (self::$verbose) {
+            self::verbose_log(json_encode($proc, JSON_PRETTY_PRINT));
+        }
+        return $proc;
+    }
+
+    /** @param list<string> $command
+     * @param string $cwd
+     * @param array{firstline?:int,linecount?:int,stdin?:string} $args
+     * @return Subprocess
+     * @deprecated */
+    static function gitrun_subprocess(Conf $conf, $command, $cwd, $args = []) {
+        return self::gitrun_at($conf, $command, $cwd, $args);
     }
 
     /** @param list<string> $command
@@ -510,7 +525,7 @@ class Repository {
         if (!$cwd) {
             throw new Error("Cannot safely create repository directory");
         }
-        return self::gitrun_subprocess($this->conf, $command, $cwd, $args);
+        return self::gitrun_at($this->conf, $command, $cwd, $args);
     }
 
     /** @param list<string> $command
@@ -624,12 +639,11 @@ class Repository {
 
     /** @return list<string> */
     private function extra_heads() {
-        if ($this->heads !== null && strlen($this->heads) > 40) {
-            $sp = strpos($this->heads, " ");
-            return explode(" ", substr($this->heads, $sp + 1));
-        } else {
+        if ($this->heads === null || strlen($this->heads) <= 40) {
             return [];
         }
+        $sp = strpos($this->heads, " ");
+        return explode(" ", substr($this->heads, $sp + 1));
     }
 
     /** @param string $key
@@ -951,7 +965,7 @@ class Repository {
 
 
     /** @return ?string */
-    static private function _temp_repodir() {
+    static private function _temp_repodir(Conf $conf) {
         $root = SiteLoader::$root;
         $n = 0;
         while (true) {
@@ -966,14 +980,14 @@ class Repository {
         }
         chmod($tmpdir, 02770);
         register_shutdown_function("rm_rf_tempdir", $tmpdir);
-        return Subprocess::runok(["git", "init", "-b", "main"], $tmpdir)
-            ? $tmpdir : null;
+        $proc = self::gitrun_at($conf, ["git", "init", "-bmain"], $tmpdir);
+        return $proc->ok ? $tmpdir : null;
     }
 
     /** @param string $hash
      * @return ?string */
     private function prepare_truncated_hash(Pset $pset, $hash) {
-        $tmpdir = self::_temp_repodir();
+        $tmpdir = self::_temp_repodir($this->conf);
         if (!$tmpdir) {
             return null;
         }
@@ -1013,7 +1027,7 @@ class Repository {
         }
 
         if (!$this->gitrunok($addcommand, ["cwd" => $tmpdir])
-            || !$this->gitrunok(["git", "commit", "-m", "Truncated version of {$hash} for pset {$pset->key}"], ["cwd" => $tmpdir])
+            || !$this->gitrunok(["git", "commit", "-mTruncated version of {$hash} for pset {$pset->key}"], ["cwd" => $tmpdir])
             || !$this->gitrunok(["git", "push", "-f", $this->repodir(), "main:refs/tags/trunc{$pset->id}_{$hash}"], ["cwd" => $tmpdir])) {
             return null;
         }

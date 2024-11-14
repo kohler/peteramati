@@ -8,11 +8,11 @@ class UpgradeRepository {
      * @return bool */
     static function upgrade_refs(Repository $repo, $cacheid) {
         $cwd = Repository::repodir_at($repo->conf, $cacheid);
-        $sp = Repository::gitrun_subprocess($repo->conf,
+        $sp = Repository::gitrun_at($repo->conf,
             ["git", "remote", "rename", "repo{$repo->repoid}", "repo{$repo->repogid}"],
             $cwd);
         if (!$sp->ok) {
-            $sp = Repository::gitrun_subprocess($repo->conf,
+            $sp = Repository::gitrun_at($repo->conf,
                 ["git", "remote", "get-url", "repo{$repo->repoid}"],
                 $cwd);
             return !$sp->ok;
@@ -23,7 +23,7 @@ class UpgradeRepository {
                        $m, PREG_SET_ORDER);
         $deletes = [];
         foreach ($m as $mx) {
-            $sp = Repository::gitrun_subprocess($repo->conf,
+            $sp = Repository::gitrun_at($repo->conf,
                 ["git", "tag", "-f", "repo{$repo->repogid}.{$mx[2]}", $mx[1]],
                 $cwd);
             if (!$sp->ok) {
@@ -35,7 +35,7 @@ class UpgradeRepository {
         $n = count($deletes);
         for ($i = 0; $i !== $n; ) {
             $x = min(100, $n - $i);
-            Repository::gitrun_subprocess($repo->conf,
+            Repository::gitrun_at($repo->conf,
                 ["git", "tag", "-d", ...array_slice($deletes, $i, $x)],
                 $cwd);
             $i += $x;
