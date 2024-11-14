@@ -813,7 +813,10 @@ class QueueItem {
         return preg_replace_callback('/\$\{[A-Z]+\}/', function ($m) {
             if ($m[0] === '${REPOGID}') {
                 $repo = $this->repo();
-                return ($repo ? $repo->repogid : null) ?? $m[0];
+                if (!$repo) {
+                    return $m[0];
+                }
+                return $repo->repogid ? : (string) $this->repoid;
             } else if ($m[0] === '${PSET}') {
                 return (string) $this->psetid;
             } else if ($m[0] === '${REPOID}') {
