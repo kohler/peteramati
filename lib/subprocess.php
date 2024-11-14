@@ -60,7 +60,7 @@ class Subprocess implements JsonSerializable {
 
     /** @param list<string> $command
      * @param string $cwd
-     * @param array{firstline?:int,linecount?:int,stdin?:string} $args
+     * @param array{firstline?:int,linecount?:int,stdin?:string,env?:array<string,string>} $args
      * @return Subprocess */
     static function run($command, $cwd, $args = []) {
         $firstline = max($args["firstline"] ?? 1, 1);
@@ -77,7 +77,8 @@ class Subprocess implements JsonSerializable {
             $descriptors[0] = ["pipe", "r"];
         }
         $cmd = self::unparse_command($command);
-        $proc = proc_open($cmd, $descriptors, $pipes, $cwd);
+        $env = $args["env"] ?? null;
+        $proc = proc_open($cmd, $descriptors, $pipes, $cwd, $env);
         if (!$proc) {
             error_log(self::unparse_command($command));
         }

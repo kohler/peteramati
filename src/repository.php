@@ -61,7 +61,9 @@ class Repository {
     /** @var list<array{string,string,list<string>,int}> */
     static private $_file_contents = [];
     /** @var bool */
-    static public $verbose = false;
+    static public $verbose = true;
+    /** @var ?resource */
+    static private $verbosef;
 
     function __construct(Conf $conf) {
         $this->conf = $conf;
@@ -467,23 +469,33 @@ class Repository {
 
 
     static function verbose_log($text) {
-        if (PHP_SAPI === "cli") {
-            fwrite(STDERR, $text . "\n");
-        } else {
-            error_log($text);
+        if (!self::$verbosef) {
+            if (PHP_SAPI === "cli") {
+                self::$verbosef = STDERR;
+            } else {
+                self::$verbosef = fopen(SiteLoader::$root . "/var/fetch.log", "a");
+            }
         }
+        fwrite(self::$verbosef, $text . "\n");
     }
 
+
+    /** @return array<string,string> */
+    static function git_env_vars() {
+        return $_ENV + [
+            "GIT_CONFIG_COUNT" => "1",
+            "GIT_CONFIG_KEY_0" => "safe.directory",
+            "GIT_CONFIG_VALUE_0" => "*"
+        ];
+    }
 
     /** @param list<string> $command
      * @param string $cwd
      * @param array{firstline?:int,linecount?:int,stdin?:string} $args
      * @return Subprocess */
     static function gitrun_subprocess(Conf $conf, $command, $cwd, $args = []) {
-        if ($command[0] === "git") {
-            $command[0] = $conf->opt("gitCommand") ?? "git";
-            array_splice($command, 1, 0, ["-c", "safe.directory=*"]); // XXX
-        }
+        $command = $conf->fix_command($command);
+        $args["env"] = self::git_env_vars();
         if (self::$verbose) {
             self::verbose_log(json_encode($command) . " @{$cwd}");
         }

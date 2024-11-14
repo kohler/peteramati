@@ -92,6 +92,8 @@ class QueueItem {
     private $_logstream;
     /** @var ?int */
     private $_runstatus;
+    /** @var ?array */
+    private $_runpipes;
     /** @var ?int */
     public $foreground_command_status;
     /** @var ?string */
@@ -1066,7 +1068,7 @@ class QueueItem {
         $cmdarg[] = "TERM=xterm-256color";
         $cmdarg[] = $this->expand($runner->command);
         $this->_runstatus = 2;
-        $s = $this->run_and_log($cmdarg, null, true);
+        $s = $this->run_and_log($cmdarg, null, ["main" => true]);
 
         // save information about execution
         if ($foreground) {
@@ -1080,25 +1082,43 @@ class QueueItem {
 
     /** @param list<string> $cmdarg
      * @param ?string $cwd
-     * @param bool $main_command
-     * @return int */
-    private function run_and_log($cmdarg, $cwd = null, $main_command = false) {
+     * @param array{main?:bool,stdin?:mixed,stdout?:mixed} $opts
+     * @return resource */
+    private function run_and_log_proc($cmdarg, $cwd = null, $opts = []) {
+        $main_command = $opts["main"] ?? false;
+        $env = $cmdarg[0] === "git" ? Repository::git_env_vars() : null;
+        $cmdarg = $this->conf->fix_command($cmdarg);
         fwrite($this->_logstream, "++ " . Subprocess::unparse_command($cmdarg) . ($main_command ? "\n\n" : "\n"));
         fflush($this->_logstream);
 
         $cmd = PHP_VERSION_ID >= 70400 ? $cmdarg : Subprocess::unparse_command($cmdarg);
         $redirects = [];
-        if (!$main_command || ($this->flags & self::FLAG_FOREGROUND) === 0) {
+        if (isset($opts["stdin"])) {
+            $redirects[0] = $opts["stdin"];
+        } else if (!$main_command
+                   || ($this->flags & self::FLAG_FOREGROUND) === 0) {
             $redirects[0] = ["file", "/dev/null", "r"];
         }
-        if (($this->flags & self::FLAG_FOREGROUND) === 0) {
+        if (isset($opts["stdout"])) {
+            $redirects[1] = $opts["stdout"];
+            $redirects[2] = ["file", $this->_logfile, "a"];
+        } else if (($this->flags & self::FLAG_FOREGROUND) === 0) {
             $redirects[1] = ["file", $this->_logfile, "a"];
             $redirects[2] = PHP_VERSION_ID >= 70400 ? ["redirect", 1] : ["file", $this->_logfile, "a"];
-        } else if (($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0 && PHP_VERSION_ID >= 70400) {
+        } else if (PHP_VERSION_ID >= 70400
+                   && ($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0) {
             $redirects[1] = ["redirect", 2];
         }
-        $pipes = null;
-        $proc = proc_open($cmd, $redirects, $pipes, $cwd);
+        $this->_runpipes = null;
+        return proc_open($cmd, $redirects, $this->_runpipes, $cwd, $env);
+    }
+
+    /** @param list<string> $cmdarg
+     * @param ?string $cwd
+     * @param array{main?:bool,stdin?:mixed,stdout?:mixed} $opts
+     * @return resource */
+    private function run_and_log($cmdarg, $cwd = null, $opts = []) {
+        $proc = $this->run_and_log_proc($cmdarg, $cwd, $opts);
         return proc_close($proc);
     }
 
@@ -1125,8 +1145,9 @@ class QueueItem {
     }
 
     private function checkout_code() {
-        $repo = $this->repo();
         $pset = $this->pset();
+        $repo = $this->repo();
+        $repodir = $repo->repodir();
         $runner = $this->runner();
         assert($repo !== null && $pset !== null && $runner !== null && $this->bhash !== null);
         $hash = $this->hash();
@@ -1142,13 +1163,6 @@ class QueueItem {
             throw new RunnerException("Can’t initialize user repo in jail");
         }
 
-        // need a branch to check out a specific commit
-        $repodir = $repo->repodir();
-        $branch = "jailcheckout_" . Conf::$now;
-        if ($this->run_and_log(["git", "branch", $branch, $hash], $repodir)) {
-            throw new RunnerException("Can’t create branch for checkout");
-        }
-
         // make the checkout
         $quiet = [];
         if (($this->flags & (self::FLAG_FOREGROUND | self::FLAG_FOREGROUND_VERBOSE)) === self::FLAG_FOREGROUND) {
@@ -1159,15 +1173,23 @@ class QueueItem {
             $status = $this->run_and_log(["git", "init", "--shared=group", "-b", "main", ...$quiet], $clonedir);
         }
         if ($status === 0) {
-            $args = array_merge($quiet, [$repodir, $branch]);
-            $status = $this->run_and_log(["git", "fetch", "--depth=1", "-p", ...$args], $clonedir);
+            // Create a pipe between `git pack-objects`, in the source repo,
+            // and `git unpack-objects`, in the clone.
+            $packproc = $this->run_and_log_proc(["git", "pack-objects", "--delta-base-offset", "--revs", "--stdout", "-q"],
+                                                $repodir, ["stdin" => ["pipe", "r"], "stdout" => ["pipe", "w"]]);
+            $packpipes = $this->_runpipes;
+            fwrite($packpipes[0], "{$hash}\n");
+            fclose($packpipes[0]);
+
+            $unpackproc = $this->run_and_log_proc(["git", "unpack-objects", "-q"], $clonedir, ["stdin" => $packpipes[1]]);
+            fclose($packpipes[1]);
+            $status = proc_close($unpackproc);
+            $status1 = proc_close($packproc);
         }
         if ($status === 0) {
             $args = array_merge($quiet, [$hash]);
             $status = $this->run_and_log(["git", "reset", "--hard", ...$args], $clonedir);
         }
-        $args = array_merge($quiet, [$branch]);
-        $this->run_and_log(["git", "branch", "-D", ...$args], $repodir);
 
         if ($status !== 0) {
             throw new RunnerException("Can’t check out code into jail");

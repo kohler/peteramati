@@ -2274,6 +2274,14 @@ class Conf {
         }
     }
 
+    /** @param list<string> $command
+     * @return list<string> */
+    function fix_command($command) {
+        if ($command[0] === "git") {
+            $command[0] = $this->opt("gitCommand") ?? "git";
+        }
+        return $command;
+    }
 
     function register_pset(Pset $pset) {
         if (isset($this->_psets[$pset->id])) {
