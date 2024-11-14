@@ -22,6 +22,23 @@ class FsckRepodir_Batch {
         $this->conf = $conf;
     }
 
+    /** @param string $path
+     * @param int $mode
+     * @return bool */
+    private function chmod_grw($path, $mode) {
+        if ($this->verbose) {
+            fwrite(STDOUT, "+chmod g+" . ($mode & 040 ? "" : "r") . ($mode & 020 ? "" : "w") . " {$path}\n");
+        }
+        if ($this->dry_run) {
+            return true;
+        }
+        $ok = @chmod($path, ($mode | 060) & 0777);
+        if (!$ok) {
+            fwrite(STDERR, "chmod {$path}: " . posix_strerror(posix_get_last_error()) . "\n");
+        }
+        return $ok;
+    }
+
     /** @param string $cacheid */
     function update_cachedir($cacheid) {
         $repodir = Repository::repodir_at($this->conf, $cacheid);
@@ -40,8 +57,8 @@ class FsckRepodir_Batch {
         }
 
         $mode = stat($repodir)["mode"];
-        if (($mode & 020) === 0) {
-            chmod($repodir, $mode | 020);
+        if (($mode & 060) !== 060) {
+            $this->chmod_grw($repodir, $mode);
         }
 
         $dirs = [""];
@@ -59,14 +76,9 @@ class FsckRepodir_Batch {
                     continue;
                 }
                 $mode = $stat["mode"];
-                if (($mode & 020) === 0
+                if (($mode & 060) !== 060
                     && $file !== "/FETCH_HEAD") {
-                    if ($this->verbose) {
-                        fwrite(STDOUT, "+ chmod g+w {$repodir}{$file}\n");
-                    }
-                    if (!$this->dry_run) {
-                        chmod($path, $mode | 020);
-                    }
+                    $this->chmod_grw($path, $mode)
                 }
                 if (($mode & 0040000) !== 0 // directory
                     && (!str_starts_with($file, "/objects/")
