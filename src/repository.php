@@ -590,7 +590,7 @@ class Repository {
         }
         $list->merges_checked = true;
 
-        $s = $this->gitrun(["git", "log", "--cc", "--name-only", "--format=%x00%H", $this->repobranchname($branch)]);
+        $s = $this->gitrun(["git", "log", "--cc", "--name-only", "--format=%x00%H", $this->repobranchname($branch), "--"]);
         $p = 0;
         $l = strlen($s);
         $cr = $newcr = null;
@@ -643,10 +643,10 @@ class Repository {
         $list = $this->_commit_lists[$key] = new CommitList;
 
         // read log
-        $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head]);
+        $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head, "--"]);
         if ($s === "" && !$this->_refresh_count) {
             $this->refresh(30, true);
-            $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head]);
+            $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head, "--"]);
         }
 
         // parse log
@@ -880,6 +880,8 @@ class Repository {
             $command[] = "-n{$limit}";
         }
         $argpos = count($command);
+        $command[] = "";
+        $command[] = "--";
         $users = [];
         foreach ($this->heads_on($branch ?? $this->conf->default_main_branch) as $h) {
             $command[$argpos] = $h;
