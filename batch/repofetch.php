@@ -52,6 +52,9 @@ class RepoFetch_Batch {
     /** @param int|string $key
      * @return ?RepoFetch_Batch */
     static function make_repo(Conf $conf, $key) {
+        if (is_string($key) && str_starts_with($key, "repo")) {
+            $key = substr($key, 4);
+        }
         if (is_string($key) && ctype_digit($key)) {
             $key = intval($key);
         }
