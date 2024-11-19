@@ -145,10 +145,28 @@ class Bin_GradeFormula extends GradeFormula {
 
 class Relation_GradeFormula extends GradeFormula {
     /** @param string $op
+     * @return ?string */
+    static function canonical_relation($op) {
+        if ($op === "==" || $op === "=") {
+            return "==";
+        } else if ($op === "!=" || $op === "≠" || $op === "!") {
+            return "!=";
+        } else if ($op === "≤") {
+            return "<=";
+        } else if ($op === "≥") {
+            return ">=";
+        } else if ($op === "<" || $op === "<=" || $op === ">" || $op === ">=") {
+            return $op;
+        } else {
+            return null;
+        }
+    }
+
+    /** @param string $op
      * @param GradeFormula $e1
      * @param GradeFormula $e2 */
     function __construct($op, $e1, $e2) {
-        parent::__construct($op, [$e1, $e2]);
+        parent::__construct(self::canonical_relation($op), [$e1, $e2]);
         $this->vtype = GradeEntry::VTBOOL;
     }
     function evaluate(Contact $student, ?PsetView $info) {
