@@ -6,8 +6,6 @@
 require_once(SiteLoader::$root . "/src/gradeformula.php");
 
 class GradeFormulaCompilerState {
-    /** @var ?GradeEntry */
-    public $context;
     /** @var string */
     public $str;
     /** @var int */
@@ -16,12 +14,14 @@ class GradeFormulaCompilerState {
     public $pos2;
     /** @var ?string */
     public $ident;
+    /** @var ?Pset */
+    public $pset;
+    /** @var ?GradeEntry */
+    public $entry;
 
     /** @param string $str
-     * @param ?GradeEntry $context
      * @param ?string $ident */
-    function __construct($str, $context, $ident) {
-        $this->context = $context;
+    function __construct($str, $ident) {
         $this->str = $str;
         $this->ident = $ident;
     }
@@ -86,26 +86,24 @@ class GradeFormulaCompiler {
 
     /** @return ?GradeFormula */
     private function parse_grade_entry(GradeEntry $ge) {
-        if ($ge->is_formula()) {
-            $e = $ge->formula();
-            if (!$e || $e instanceof Error_GradeFormula) {
-                $this->error_at($this->state->pos1, $this->state->pos2, "<0>References invalid formula");
-            }
-            return $e;
-        } else {
+        if (!$ge->is_formula()) {
             return new GradeEntry_GradeFormula($ge);
         }
+        $e = $ge->formula();
+        if (!$e || $e instanceof Error_GradeFormula) {
+            $this->error_at($this->state->pos1, $this->state->pos2, "<0>References invalid formula");
+        }
+        return $e;
     }
 
     /** @param Pset $pset
      * @param string $gkey
-     * @param ?GradeEntry $context
+     * @param ?GradeEntry $self
      * @return ?GradeFormula */
-    private function parse_pset_grade($pset, $gkey, $context) {
+    private function parse_pset_grade($pset, $gkey, $self) {
         if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
             return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
-        } else if (($ge = $pset->gradelike_by_key($gkey))
-                   && $ge !== $context) {
+        } else if (($ge = $pset->gradelike_by_key($gkey)) && $ge !== $self) {
             return $this->parse_grade_entry($ge);
         } else {
             return null;
@@ -116,8 +114,8 @@ class GradeFormulaCompiler {
      * @param string $gkey
      * @return ?GradeFormula */
     private function parse_grade_pair($pkey, $gkey) {
-        if ($pkey === "self" && $this->state->context) {
-            $pset = $this->state->context->pset;
+        if ($pkey === "self" && $this->state->pset) {
+            $pset = $this->state->pset;
         } else if ($pkey === "global") {
             return $this->parse_grade_word($gkey, true);
         } else {
@@ -126,10 +124,9 @@ class GradeFormulaCompiler {
         if ($pset) {
             if (($gf = $this->parse_pset_grade($pset, $gkey, null))) {
                 return $gf;
-            } else {
-                $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "<0>Undefined grade entry");
-                return null;
             }
+            $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "<0>Undefined grade entry");
+            return null;
         } else if ($this->conf->pset_category($pkey)
                    && ($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
             if (!$this->conf->pset_category_has_extra($pkey)) {
@@ -146,9 +143,9 @@ class GradeFormulaCompiler {
      * @param bool $no_local
      * @return ?GradeFormula */
     private function parse_grade_word($gkey, $no_local) {
-        if ($this->state->context
+        if ($this->state->pset
             && !$no_local
-            && ($gf = $this->parse_pset_grade($this->state->context->pset, $gkey, $this->state->context))) {
+            && ($gf = $this->parse_pset_grade($this->state->pset, $gkey, $this->state->entry))) {
             return $gf;
         } else if (($gf = $this->conf->formula_by_name($gkey))) {
             $e = $gf->formula();
@@ -311,7 +308,7 @@ class GradeFormulaCompiler {
 
         while (true) {
             $p = $this->skip_space($p);
-            if (preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|==?|<=?|>=?|!=|≠|≤|≥|:)/s', $s, $m, 0, $p)) {
+            if (preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|\^\^|==?|<=?|>=?|!=|≠|≤|≥|:)/s', $s, $m, 0, $p)) {
                 $op = self::$synonyms[$m[0]] ?? $m[0];
                 $prec = self::$precedences[$op];
                 if ($prec < $minprec) {
@@ -324,7 +321,7 @@ class GradeFormulaCompiler {
                 if ($e2 === null) {
                     return [null, $p];
                 }
-                if (in_array($op, ["+?", "??", "||", "&&"])) {
+                if (in_array($op, ["+?", "??", "||", "&&", "^^"])) {
                     $e = new NullableBin_GradeFormula($op, $e, $e2);
                 } else if (in_array($op, ["<", "=", "==", ">", "<=", ">=", "!=", "≠", "≤", "≥"])) {
                     $e = new Relation_GradeFormula($op, $e, $e2);
@@ -348,15 +345,21 @@ class GradeFormulaCompiler {
     }
 
     /** @param ?string $s
-     * @param ?GradeEntry $context
+     * @param null|GradeEntry|Pset $context
      * @param ?string $ident
      * @return ?GradeFormula */
-    function parse($s, ?GradeEntry $context = null, $ident = null) {
+    function parse($s, $context = null, $ident = null) {
         if ($s === null) {
             return null;
         }
         $oldstate = $this->state;
-        $this->state = new GradeFormulaCompilerState($s, $context, $ident);
+        $this->state = new GradeFormulaCompilerState($s, $ident);
+        if ($context instanceof Pset) {
+            $this->state->pset = $context;
+        } else if ($context instanceof GradeEntry) {
+            $this->state->pset = $context->pset;
+            $this->state->entry = $context;
+        }
         list($e, $p) = $this->parse_prefix(0, self::MIN_PRECEDENCE);
         if ($e === null) {
             // skip
@@ -366,6 +369,99 @@ class GradeFormulaCompiler {
         }
         $this->state = $oldstate;
         return $e;
+    }
+
+    /** @param ?string $s
+     * @param ?Pset $context
+     * @return GradeFormula */
+    function parse_search($s, $context = null) {
+        $sex = (new SearchParser($s))->parse_expression();
+        $oldstate = $this->state;
+        $this->state = new GradeFormulaCompilerState($s, null);
+        $this->state->pset = $context;
+        $answer = $sex ? $this->_compile_search($sex, $context) : new Constant_GradeFormula(true);
+        $this->state = $oldstate;
+        return $answer;
+    }
+
+    /** @param SearchExpr $sex
+     * @param ?Pset $context
+     * @return GradeFormula */
+    private function _compile_search($sex, $context) {
+        if (!$sex->op) {
+            return $this->_compile_search_keyword($sex, $context);
+        } else if (($sex->op->flags & SearchOperator::F_NOT) !== 0) {
+            if (!$sex->child[0]) {
+                return new Constant_GradeFormula(true);
+            }
+            $gf = $this->_compile_search($sex->child[0], $context);
+            return new Not_GradeFormula($gf);
+        }
+        if (($sex->op->flags & SearchOperator::F_AND) !== 0) {
+            $op = "&&";
+        } else if (($sex->op->flags & SearchOperator::F_OR) !== 0) {
+            $op = "||";
+        } else if (($sex->op->flags & SearchOperator::F_XOR) !== 0) {
+            $op = "^^";
+        } else {
+            throw new ErrorException("unknown operator");
+        }
+        $gf = null;
+        foreach ($sex->child as $ch) {
+            $chgf = $this->_compile_search($ch, $context);
+            $gf = $gf ? new NullableBin_GradeFormula($op, $gf, $chgf) : $chgf;
+        }
+        return $gf ?? new Null_GradeFormula;
+    }
+
+    /** @param SearchExpr $sex
+     * @param ?Pset $context
+     * @return GradeFormula */
+    private function _compile_search_keyword($sex, $context) {
+        $kw = $sex->kword;
+        $text = $sex->text;
+        if (!$kw
+            && preg_match('/\A([a-zA-Z][-_.a-zA-Z0-9]*)((?:<=?|>=?|==?|!=?|≤|≥|≠)[^<>=!]*)\z/', $text, $m)) {
+            $kw = $m[1];
+            $text = $m[2];
+        }
+        if (!$kw) {
+            return $this->_compile_search_name($text);
+        }
+        if ($kw === "year") {
+            return new Year_GradeFormula($text);
+        } else if ($kw === "is") {
+            return new Is_GradeFormula($text);
+        }
+        if (($dot = strpos($kw, ".")) !== false) {
+            $gf = $this->parse_grade_pair(substr($kw, 0, $dot), substr($kw, $dot + 1));
+        } else {
+            $gf = $this->parse_grade_word($kw, false);
+        }
+        if (!$gf) {
+            return new Constant_GradeFormula(false);
+        }
+        if (preg_match('/\A(<=?|>=?|==?|!=?|≤|≥|≠)\s*(.+)\z/', $text, $m)) {
+            $op = $m[1];
+            $v = $m[2];
+        } else {
+            $op = "=";
+            $v = $text;
+        }
+        if (preg_match('/\A(?:[-+]?)(?:\d+\.?\d*|\.\d+)\z/', $v)) {
+            return new Relation_GradeFormula($op, $gf, new Constant_GradeFormula(floatval($v)));
+        }
+        return new Null_GradeFormula;
+    }
+
+    /** @param string $text
+     * @return GradeFormula */
+    private function _compile_search_name($text) {
+        $text = SearchParser::unquote($text);
+        if ($text === "") {
+            return new Constant_GradeFormula(true);
+        }
+        return new NameMatch_GradeFormula($text);
     }
 
     function check_all() {
@@ -379,7 +475,7 @@ class GradeFormulaCompiler {
             }
         }
         foreach ($this->conf->global_formulas() as $i => $f) {
-            $name = $f->name ?? "\$g$i";
+            $name = $f->name ?? "\$g{$i}";
             $this->parse($f->formula_expression(), null, "global.{$name}");
         }
     }

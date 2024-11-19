@@ -273,4 +273,14 @@ class SearchParser {
         }
         return $cura;
     }
+
+    /** @param string $t
+     * @return string */
+    static function unquote($t) { // XXX does not align with hiotcrp
+        if (!str_starts_with($t, "\"")) {
+            return $t;
+        }
+        $t = substr($t, 1, str_ends_with($t, "\"") && strlen($t) > 1 ? -1 : 0);
+        return preg_replace('/\\\\([\\\\"])/', '$1', $t);
+    }
 }

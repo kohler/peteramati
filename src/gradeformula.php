@@ -35,6 +35,13 @@ abstract class GradeFormula implements JsonSerializable {
         }
     }
 
+    /** @param list<Pset> &$psets */
+    function export_psets(&$psets) {
+        foreach ($this->_a as $a) {
+            $a->export_psets($psets);
+        }
+    }
+
     /** @return array<int,mixed> */
     function compute_all(Conf $conf) {
         if ($this->_allv === null) {
@@ -217,6 +224,11 @@ class NullableBin_GradeFormula extends GradeFormula {
             return $v0 ? $v1 : $v0;
         case "||":
             return $v0 ? : $v1;
+        case "^^":
+            if ($v0 === null && $v1 === null) {
+                return null;
+            }
+            return !$v0 !== !$v1;
         }
     }
 }
@@ -312,6 +324,11 @@ class PsetTotal_GradeFormula extends GradeFormula {
     function export_grade_names(&$v) {
         $v[] = "{$this->pset->id}.total" . ($this->noextra ? "_noextra" : "");
     }
+    function export_psets(&$psets) {
+        if (!in_array($this->pset, $psets)) {
+            $psets[] = $this->pset;
+        }
+    }
     function jsonSerialize(): string {
         return $this->pset->nonnumeric_key . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "_norm" : "");
     }
@@ -340,6 +357,13 @@ class CategoryTotal_GradeFormula extends GradeFormula {
     function export_grade_names(&$v) {
         foreach ($this->conf->pset_category($this->category) as $pset) {
             $v[] = "{$pset->id}.total" . ($this->noextra ? "_noextra" : "");
+        }
+    }
+    function export_psets(&$psets) {
+        foreach ($this->conf->pset_category($this->category) as $pset) {
+            if (!in_array($pset, $psets)) {
+                $psets[] = $pset;
+            }
         }
     }
     function jsonSerialize(): string {

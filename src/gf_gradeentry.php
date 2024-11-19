@@ -25,6 +25,11 @@ class GradeEntry_GradeFormula extends GradeFormula {
     function export_grade_names(&$v) {
         $v[] = "{$this->ge->pset->id}.{$this->ge->key}";
     }
+    function export_psets(&$psets) {
+        if (!in_array($this->ge->pset, $psets)) {
+            $psets[] = $this->ge->pset;
+        }
+    }
     function jsonSerialize(): string {
         return "{$this->ge->pset->nonnumeric_key}.{$this->ge->key}";
     }
