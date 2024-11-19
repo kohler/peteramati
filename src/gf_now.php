@@ -5,7 +5,7 @@
 
 class Now_GradeFormula extends GradeFormula {
     function __construct()  {
-        parent::__construct("null", []);
+        parent::__construct("now", []);
         $this->vtype = GradeEntry::VTTIME;
     }
     function evaluate(Contact $student, ?PsetView $info) {

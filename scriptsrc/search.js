@@ -557,7 +557,7 @@ export class SearchParser {
         if (!t.startsWith("\"")) {
             return t;
         }
-        t = t.substring(1, t.length - (t.endsWith("\"") ? 1 : 0));
+        t = t.substring(1, t.length - (t.endsWith("\"") && t.length > 1 ? 1 : 0));
         return t.replace(/\\([\\"])/g, '$1');
     }
 }

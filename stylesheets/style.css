@@ -3712,6 +3712,12 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 	text-align: center;
 	margin: 0 auto 1rem;
 }
+.pa-grgraph-subtype {
+	font-weight: normal;
+	font-size: smaller;
+	display: inline-block;
+	padding-left: 0.333em;
+}
 .pa-grgraph > .statistics {
 	width: fit-content;
 	font-size: 90%;

@@ -16,8 +16,6 @@ class FsckRepodir_Batch {
     /** @var bool */
     public $verbose = false;
 
-    /** @param list<Pset> $psets
-     * @param list<string> $usermatch */
     function __construct(Conf $conf) {
         $this->conf = $conf;
     }

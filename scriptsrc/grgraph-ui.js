@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
+import { hasClass, addClass, removeClass, handle_ui, $e } from "./ui.js";
 import { hoturl } from "./hoturl.js";
 import { wstorage } from "./utils.js";
 import { GradeGraph } from "./grgraph.js";
@@ -187,20 +187,26 @@ function draw_grgraph() {
     });
 
     $(self).find(".pa-grgraph-type").each(function () {
-        const title = [];
+        const spec = [];
         if (plot_type.startsWith("cdf")) {
-            title.push("CDF");
+            spec.push("CDF");
         } else if (plot_type.startsWith("pdf")) {
-            title.push("PDF");
+            spec.push("PDF");
         }
         if (want_extension && !want_all) {
-            title.push("extension");
+            spec.push("ext");
         }
         if (want_noextra && !want_all) {
-            title.push("no extra credit");
+            spec.push("no EC");
         }
-        const t = title.length ? " (" + title.join(", ") + ")" : "";
-        this.innerHTML = "grade statistics" + t;
+        if (spec.length === 0) {
+            if (this.lastChild && this.lastChild.nodeType === 1 && this.lastChild.className === "pa-grgraph-subtype")
+                this.lastChild.remove();
+        } else {
+            if (!this.lastChild || this.lastChild.nodeType !== 1 || this.lastChild.className !== "pa-grgraph-subtype")
+                this.append($e("span", "pa-grgraph-subtype"));
+            this.lastChild.textContent = "(" + spec.join(", ") + ")";
+        }
     });
 
     grgr.highlight_users();

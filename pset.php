@@ -418,7 +418,7 @@ class PsetRequest {
         }
         echo '"><button type="button" class="qo ui js-grgraph-flip prev">←</button>';
         echo '<button type="button" class="qo ui js-grgraph-flip next">→</button>';
-        echo '<h4 class="title pa-grgraph-type"></h4>';
+        echo '<h4 class="title pa-grgraph-type">grade statistics</h4>';
         if ($this->info->can_view_grade_statistics_graph()) {
             echo '<div class="pa-plot" style="width:350px;height:200px"></div>';
         }

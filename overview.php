@@ -17,7 +17,8 @@ echo '<div class="pa-grade-overview-users"><div>',
     '<label class="checki d-inline-block ml-2"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03"><strong class="hl-h03">B</strong></label>',
     '<label class="checki d-inline-block ml-2"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04"><strong class="hl-h04">B-</strong></label>',
     '</div>',
-    '<table class="pap gtable want-gtable-fixed" id="pa-overview-table"></table>',
+    '<input type="search" class="uii uikd js-ptable-search ml-2" placeholder="Search">',
+    '<table class="pap gtable want-gtable-fixed user-gtable" id="pa-overview-table"></table>',
     '</div><div class="pa-gradegrid">';
 $anonymity = 0;
 foreach ($Conf->psets() as $pset) {
@@ -31,7 +32,7 @@ foreach ($Conf->psets() as $pset) {
         echo '" data-pa-pset="', $pset->urlkey, '">';
         echo '<button type="button" class="qo ui js-grgraph-flip prev">←</button>';
         echo '<button type="button" class="qo ui js-grgraph-flip next">→</button>';
-        echo '<h4 class="title">', htmlspecialchars($pset->title), '</h4>';
+        echo '<h4 class="title pa-grgraph-type">', htmlspecialchars($pset->title), '</h4>';
         echo '<div class="pa-plot pa-grgraph-min-yaxis"></div>';
         echo '<div class="statistics"></div></div>';
     }
@@ -46,12 +47,14 @@ foreach ($Sset->users() as $u) {
     if ($u->extension ? $extension : $college)
         $sj[] = StudentSet::json_basics($u, ($anonymity & 1) !== 0);
 }
-$jd = ["id" => "overview",
-       "checkbox" => true,
-       "anonymous" => ($anonymity & 1) !== 0,
-       "has_nonanonymous" => ($anonymity & 2) !== 0,
-       "overridable_anonymous" => ($anonymity & 1) !== 0,
-       "col" => ["rownumber", ["name" => "checkbox", "type" => "checkbox", "className" => "uic uich js-range-click js-grgraph-highlight"], "user"]];
+$jd = [
+    "id" => "overview",
+    "checkbox" => true,
+    "anonymous" => ($anonymity & 1) !== 0,
+    "has_nonanonymous" => ($anonymity & 2) !== 0,
+    "overridable_anonymous" => ($anonymity & 1) !== 0,
+    "col" => ["rownumber", ["name" => "checkbox", "type" => "checkbox", "className" => "uic uich js-range-click js-grgraph-highlight"], "user"]
+];
 echo Ht::unstash(),
     '<script>$pa.pset_table($(".pa-grade-overview")[0],',
     json_encode_browser($jd), ',', json_encode_browser($sj), ');',
