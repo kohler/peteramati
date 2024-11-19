@@ -142,23 +142,32 @@ function update_hash(href) {
     }
 }
 
-handle_ui.on("change.js-grgraph-highlight", function () {
-    const rt = this.getAttribute("data-range-type"),
-        a = [];
-    $(this).closest("form").find("input[type=checkbox]").each(function () {
+function change_highlight(f, range) {
+    const a = [];
+    for (let e of f.querySelectorAll("input[type=checkbox]")) {
         let tr;
-        if (this.getAttribute("data-range-type") === rt
-            && this.checked
-            && (tr = this.closest("tr"))
+        if (e.checked
+            && e.getAttribute("data-range-type") === range
+            && (tr = e.closest("tr"))
             && tr.hasAttribute("data-pa-uid"))
             a.push(+tr.getAttribute("data-pa-uid"));
-    });
-    a.sort(function (x, y) { return x - y; });
+    }
+    a.sort((x, y) => x - y);
     if (want_grgraph_hash()) {
         hash_modify({hs: a.length ? a.join(" ") : null});
         update(document.body, "main", a.join(" "));
     } else {
-        update(this.closest("form"), "main", a.join(" "));
+        update(f, "main", a.join(" "));
+    }
+    f.removeAttribute("data-pa-grgraph-hl-scheduled-" + range);
+}
+
+handle_ui.on("change.js-grgraph-highlight", function () {
+    const range = this.getAttribute("data-range-type"),
+        f = this.closest("form");
+    if (!f.hasAttribute("data-pa-grgraph-hl-scheduled-" + range)) {
+        f.setAttribute("data-pa-grgraph-hl-scheduled-" + range, "");
+        queueMicrotask(() => change_highlight(f, range));
     }
 });
 
