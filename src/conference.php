@@ -117,6 +117,8 @@ class Conf {
     private $_script_assets_site;
     /** @var ?Collator */
     private $_collator;
+    /** @var ?Collator */
+    private $_search_collator;
 
     private $usertimeId = 1;
 
@@ -855,6 +857,16 @@ class Conf {
             $this->_collator->setAttribute(Collator::NUMERIC_COLLATION, Collator::ON);
         }
         return $this->_collator;
+    }
+
+    /** @return Collator */
+    function search_collator() {
+        if (!$this->_search_collator) {
+            $this->_search_collator = new Collator("en_US.utf8");
+            $this->_search_collator->setAttribute(Collator::NUMERIC_COLLATION, Collator::ON);
+            $this->_search_collator->setAttribute(Collator::STRENGTH, Collator::SECONDARY);
+        }
+        return $this->_search_collator;
     }
 
     /** @param ?int $sortspec
@@ -2745,6 +2757,7 @@ class Conf {
             "multigrade" => "3 Grade_API::multigrade",
             "multiresolveflag" => "0 Flag_API::multiresolve",
             "psetconfig" => "35 PsetConfig_API::psetconfig",
+            "search" => "1 Search_API::search",
             "repo" => "19 RepoConfig_API::repo",
             "repositories" => "17 RepoConfig_API::user_repositories",
             "runchainhead" => "1 Run_API::runchainhead"

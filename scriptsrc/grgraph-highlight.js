@@ -57,7 +57,7 @@ function update(where, color, attr) {
             && (color === "main" || this.getAttribute("data-pa-pset") !== "course")) {
             attr ? this.setAttribute(key, attr) : this.removeAttribute(key);
             window.requestAnimationFrame(function () {
-                const gg = $(that).data("paGradeGraph");
+                const gg = that.pa__gradegraph;
                 gg && gg.highlight_users();
             });
         }
@@ -67,7 +67,7 @@ function update(where, color, attr) {
 function course_xcdf() {
     let xd = null;
     $(".pa-grgraph[data-pa-pset=course]").each(function () {
-        const d = $(this).data("paGradeData");
+        const d = this.pa__gradedata;
         if (d && d.series.all && d.series.all.cdfu) {
             xd = d.series.all;
             return false;

@@ -3681,6 +3681,9 @@ input.pa-gradewidth, textarea.pa-gradewidth {
 .pa-gg-cdf.pa-gg-noextra, .pa-gg-pdf.pa-gg-noextra {
 	stroke: #bb7777;
 }
+.pa-gg-cdf.pa-gg-filtered, .pa-gg-pdf.pa-gg-filtered {
+	stroke: #ff7777;
+}
 .pa-gg-has-hl > .pa-gg-cdf.pa-gg-noextra, .pa-gg-has-hl > .pa-gg-pdf-noextra {
 	stroke: #bb777722;
 }

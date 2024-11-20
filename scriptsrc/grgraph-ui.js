@@ -13,19 +13,15 @@ function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
 }
 
-function draw_grgraph() {
-    const self = this, d = $(self).data("paGradeData");
+function grgraph_set_types(self) {
+    const d = self.pa__gradedata;
     if (!d) {
-        addClass(self, "hidden");
-        $(self).removeData("paGradeGraph").off("redrawgraph");
+        self.removeAttribute("data-pa-gg-types");
         return;
     }
-
     const pi = self.closest(".pa-psetinfo"),
-        user_extension = !pi || pi.hasAttribute("data-pa-user-extension");
-
-    // compute plot types
-    const plot_types = [];
+        user_extension = !pi || pi.hasAttribute("data-pa-user-extension"),
+        plot_types = [];
     if (d.series.extension && pi && user_extension) {
         plot_types.push("cdf-extension", "pdf-extension");
     }
@@ -38,9 +34,11 @@ function draw_grgraph() {
     }
     plot_types.push("all");
     self.setAttribute("data-pa-gg-types", plot_types.join(" "));
+}
 
-    // compute this plot type
-    let plot_type = self.getAttribute("data-pa-gg-type");
+function grgraph_type(self) {
+    const old_plot_type = self.getAttribute("data-pa-gg-type");
+    let plot_type = old_plot_type;
     if (!plot_type) {
         plot_type = wstorage(true, "pa-gg-type");
     }
@@ -59,6 +57,7 @@ function draw_grgraph() {
             }
         }
     }
+    const plot_types = self.getAttribute("data-pa-gg-types").split(" ");
     if (!plot_type || plot_type === "default") {
         plot_type = plot_types[0];
     }
@@ -69,10 +68,28 @@ function draw_grgraph() {
             plot_type = plot_types[0];
         }
     }
-    self.setAttribute("data-pa-gg-type", plot_type);
-    $(self).removeClass("cdf pdf all cdf-extension pdf-extension all-extension cdf-noextra pdf-noextra all-noextra hidden").addClass(plot_type);
+    if (plot_type !== old_plot_type) {
+        self.setAttribute("data-pa-gg-type", plot_type);
+        removeClass(self, old_plot_type);
+        addClass(self, plot_type);
+    }
+    return plot_type;
+}
 
-    const want_all = plot_type.substring(0, 3) === "all",
+function grgraph_draw() {
+    const self = this, d = self.pa__gradedata;
+    if (!d) {
+        addClass(self, "hidden");
+        $(self).removeData("paGradeGraph").off("redrawgraph");
+        return;
+    }
+
+    const pi = self.closest(".pa-psetinfo"),
+        form = self.closest("form"),
+        ptconf = form ? form.pa__ptconf : null,
+        user_extension = !pi || pi.hasAttribute("data-pa-user-extension"),
+        plot_type = grgraph_type(self),
+        want_all = plot_type.substring(0, 3) === "all",
         want_extension = plot_type.indexOf("-extension") >= 0
             || (want_all && user_extension && d.extension),
         want_noextra = plot_type.indexOf("-noextra") >= 0
@@ -84,7 +101,7 @@ function draw_grgraph() {
     }
 
     const grgr = new GradeGraph($plot[0], d, plot_type);
-    $(self).data("paGradeGraph", grgr);
+    self.pa__gradegraph = grgr;
 
     if (grgr.total && grgr.total < grgr.max) {
         let total = mksvg("line");
@@ -97,6 +114,14 @@ function draw_grgraph() {
     }
 
     // series
+    let filtered = null;
+    if (ptconf && ptconf.has_hidden) {
+        filtered = d.series.all.filter((x, u) => {
+            const user = ptconf.uidmap[u];
+            return user && !user.hidden;
+        });
+    }
+
     const kde_nbins = Math.ceil((grgr.max - grgr.min) / 2), kde_hfactor = 0.08, kdes = {};
     if (plot_type === "pdf-extension") {
         kdes.extension = new GradeKde(d.series.extension, grgr, kde_hfactor, kde_nbins);
@@ -105,18 +130,28 @@ function draw_grgraph() {
     } else if (plot_type === "pdf") {
         kdes.main = new GradeKde(d.series.all, grgr, kde_hfactor, kde_nbins);
     }
+    if (filtered && plot_type.startsWith("pdf")) {
+        kdes.filtered = new GradeKde(filtered, grgr, kde_hfactor, kde_nbins);
+    }
     for (let i in kdes) {
         grgr.maxp = Math.max(grgr.maxp, kdes[i].maxp);
     }
 
+    if (filtered && plot_type.startsWith("pdf")) {
+        grgr.append_pdf(kdes.filtered, "pa-gg-pdf pa-gg-filtered");
+    }
     if (plot_type === "pdf-noextra") {
         grgr.append_pdf(kdes.noextra, "pa-gg-pdf pa-gg-noextra");
     } else if (plot_type === "pdf") {
         grgr.append_pdf(kdes.main, "pa-gg-pdf");
     } else if (plot_type === "pdf-extension") {
         grgr.append_pdf(kdes.extension, "pa-gg-pdf pa-gg-extension");
-    } else if (plot_type === "cdf-noextra"
-               || (plot_type === "all" && d.series.noextra)) {
+    }
+    if (filtered && !plot_type.startsWith("pdf")) {
+        grgr.append_cdf(filtered, "pa-gg-cdf pa-gg-filtered");
+    }
+    if (plot_type === "cdf-noextra"
+        || (plot_type === "all" && d.series.noextra)) {
         grgr.append_cdf(d.series.noextra, "pa-gg-cdf pa-gg-noextra");
     }
     if (plot_type === "cdf"
@@ -210,7 +245,7 @@ function draw_grgraph() {
     });
 
     grgr.highlight_users();
-    $(self).off("redrawgraph").on("redrawgraph", draw_grgraph);
+    $(self).off("redrawgraph").on("redrawgraph", grgraph_draw);
 }
 
 export function grgraph() {
@@ -219,8 +254,9 @@ export function grgraph() {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.series && d.series.all) {
-                $(self).data("paGradeData", new GradeStats(d));
-                draw_grgraph.call(self);
+                self.pa__gradedata = new GradeStats(d);
+                grgraph_set_types(self);
+                grgraph_draw.call(self);
             }
         }
     });
@@ -236,6 +272,6 @@ handle_ui.on("js-grgraph-flip", function () {
         elt.setAttribute("data-pa-gg-type", plot_types[i]);
         wstorage(true, "pa-gg-type", plot_types[i]);
         wstorage(false, "pa-gg-type", {type: plot_types[i], at: new Date().getTime()});
-        draw_grgraph.call(elt);
+        grgraph_draw.call(elt);
     }
 });

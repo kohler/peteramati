@@ -200,9 +200,7 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @param ?bool $anonymous */
     function set_pset(Pset $pset, $anonymous = null) {
         assert($this->conf === $pset->conf);
-        if ($anonymous === null) {
-            $anonymous = $pset->anonymous;
-        }
+        $anonymous = $anonymous ?? $pset->anonymous;
         if ($this->pset === $pset && $this->_anonymous === $anonymous) {
             return;
         }
@@ -212,14 +210,19 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
         $this->pset = $pset;
         /** @phan-suppress-next-line PhanAccessReadOnlyProperty */
         $this->_psetid = $pset->id;
+        $this->set_anonymous($anonymous);
+        foreach ($this->_u as $u) {
+            $u->visited = $u->incomplete = false;
+        }
+    }
+
+    /** @param ?bool $anonymous */
+    function set_anonymous($anonymous = null) {
         if ($this->_anonymous !== $anonymous) {
             $this->_anonymous = $anonymous;
             foreach ($this->_u as $u) {
                 $u->set_anonymous($anonymous);
             }
-        }
-        foreach ($this->_u as $u) {
-            $u->visited = $u->incomplete = false;
         }
     }
 

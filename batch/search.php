@@ -50,6 +50,7 @@ class Search_Batch {
                 $hdr[] = $c;
                 $this->columns[] = $gf;
             } else {
+                fwrite(STDERR, $gfc->ms->full_feedback_text());
                 throw new CommandLineException("Column `{$c}` not found");
             }
         }

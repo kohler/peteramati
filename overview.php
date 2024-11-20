@@ -17,7 +17,7 @@ echo '<div class="pa-grade-overview-users"><div>',
     '<label class="checki d-inline-block ml-2"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="83.5-86.5" data-pa-highlight-type="h03"><strong class="hl-h03">B</strong></label>',
     '<label class="checki d-inline-block ml-2"><input type="checkbox" class="checkc uich js-grgraph-highlight-course" data-pa-highlight-range="80-83.5" data-pa-highlight-type="h04"><strong class="hl-h04">B-</strong></label>',
     '</div>',
-    '<input type="search" class="uii uikd js-ptable-search ml-2" placeholder="Search">',
+    '<input type="search" class="uii uikd js-ptable-search js-ptable-search-api ml-2" placeholder="Search">',
     '<table class="pap gtable want-gtable-fixed user-gtable" id="pa-overview-table"></table>',
     '</div><div class="pa-gradegrid">';
 $anonymity = 0;
@@ -41,8 +41,16 @@ echo '</div></form>';
 
 $Sset = new StudentSet($Me, StudentSet::ALL);
 $sj = [];
-$college = $Qreq->college || $Qreq->all || !$Qreq->extension;
-$extension = $Qreq->extension || $Qreq->all;
+$college = $extension = false;
+if (friendly_boolean($Qreq->college) || friendly_boolean($Qreq->all)) {
+    $college = true;
+}
+if (friendly_boolean($Qreq->extension) || friendly_boolean($Qreq->all)) {
+    $extension = true;
+}
+if (!$college && !$extension) {
+    $college = $extension = true;
+}
 foreach ($Sset->users() as $u) {
     if ($u->extension ? $extension : $college)
         $sj[] = StudentSet::json_basics($u, ($anonymity & 1) !== 0);

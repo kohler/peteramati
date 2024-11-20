@@ -131,6 +131,7 @@ class PtableConf {
     smap;
     uidmap;
     input_timeout;
+    has_hidden;
 
     constructor(pconf, data) {
         this.id = pconf.id;
@@ -170,6 +171,7 @@ class PtableConf {
         this.mode = 0;
         this.smap = [null];
         this.uidmap = [];
+        this.has_hidden = false;
 
         this.input_timeout = null;
     }
@@ -757,7 +759,8 @@ const gcoldef = {
             let ae = document.createElement("a");
             ae.href = this.ptconf.href(s);
             ae.classname = "track";
-            ae.append(siteinfo.psets[s.pset].title + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
+            const pset = siteinfo.psets[s.pset];
+            ae.append((pset ? pset.title : `<#${s.pset}>`) + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
             tde.append(ae);
         },
         tw: 8,
@@ -1932,6 +1935,9 @@ function make_search_keyword_compare(gi, ge, text) {
 function find_search_keyword(se, ptconf) {
     let kw = se.kword, text = se.text;
     if (!kw) {
+        if (text === "" || text === "*" || text === "ANY" || text === "ALL") {
+            return (se, su) => true;
+        }
         let m = text.match(/^([a-zA-Z][-_a-zA-Z0-9]*)((?:<=?|>=?|==?|!=?|≤|≥|≠)[^<>=!]*)$/);
         if (!m) {
             return make_search_name(se.unquoted_text());
@@ -1983,42 +1989,79 @@ function evaluate_search(se) {
 }
 
 function ptable_search(search) {
-    return function () {
-        const form = search.closest("form");
-        let ptconf = form.pa__ptconf,
-            pexpr = new SearchParser(search.value).parse_expression();
-        ptconf.input_timeout = null;
-        if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
-            pexpr = null;
+    const form = search.closest("form"),
+        ptconf = form.pa__ptconf;
+    ptconf.input_timeout = null;
+    if (hasClass(search, "js-ptable-search-api")) {
+        return ptable_search_api(search, ptconf);
+    }
+    let pexpr = new SearchParser(search.value).parse_expression();
+    if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
+        pexpr = null;
+    }
+    search_ptconf = ptconf;
+    const changed = [];
+    ptconf.has_hidden = false;
+    for (const ss of ptconf.smap) {
+        if (!ss) {
+            continue;
         }
-        search_ptconf = ptconf;
-        const changed = [];
-        for (const ss of ptconf.smap) {
-            if (!ss) {
-                continue;
+        search_target = ss;
+        const hidden = pexpr ? !pexpr.evaluate_simple(evaluate_search) : false;
+        if (ss.hidden !== hidden) {
+            changed.push(ss);
+            ss.hidden = hidden;
+        }
+        if (hidden) {
+            ptconf.has_hidden = true;
+        }
+    }
+    search_ptconf = null;
+    ptable_search_results(ptconf, form, changed);
+}
+
+function ptable_search_api(search, ptconf) {
+    $.ajax(hoturl("api/search", {q: search.value, anonymous: ptconf.anonymous ? 1 : 0}), {
+        method: "GET", cache: false, dataType: "json",
+        success: function (data) {
+            if (!data.ok) {
+                return;
             }
-            search_target = ss;
-            const hidden = pexpr ? !pexpr.evaluate_simple(evaluate_search) : false;
-            if (ss.hidden !== hidden) {
-                changed.push(ss);
-                ss.hidden = hidden;
+            const changed = [];
+            ptconf.has_hidden = false;
+            for (const ss of ptconf.smap) {
+                if (!ss) {
+                    continue;
+                }
+                const hidden = !data.uids.includes(ss.uid);
+                if (ss.hidden !== hidden) {
+                    changed.push(ss);
+                    ss.hidden = hidden;
+                }
+                if (hidden) {
+                    ptconf.has_hidden = true;
+                }
             }
+            ptable_search_results(ptconf, search.form, changed);
         }
-        search_ptconf = null;
-        if (!changed.length) {
-            return;
+    });
+}
+
+function ptable_search_results(ptconf, form, changed) {
+    if (!changed.length) {
+        return;
+    }
+    for (const tbody of form.querySelectorAll("table.user-gtable > tbody")) {
+        const rowmap = ptconf.tbody_rowmap(tbody);
+        for (const ss of changed) {
+            const tr = rowmap.rows[ss._spos];
+            tr && (tr.hidden = ss.hidden);
         }
-        for (const tbody of form.querySelectorAll("table.user-gtable > tbody")) {
-            const rowmap = ptconf.tbody_rowmap(tbody);
-            for (const ss of changed) {
-                const tr = rowmap.rows[ss._spos];
-                tr && (tr.hidden = ss.hidden);
-            }
-            ptable_recolor(tbody);
-            const cb = tbody.parentElement.tHead.querySelector(".js-range-click");
-            cb && handle_ui.trigger.call(cb, "js-range-click", "updaterange");
-        }
-    };
+        ptable_recolor(tbody);
+        const cb = tbody.parentElement.tHead.querySelector(".js-range-click");
+        cb && handle_ui.trigger.call(cb, "js-range-click", "updaterange");
+    }
+    $(form).find(".pa-grgraph").trigger("redrawgraph");
 }
 
 handle_ui.on("js-ptable-search", function (evt) {
@@ -2028,7 +2071,7 @@ handle_ui.on("js-ptable-search", function (evt) {
         timeout = 0;
     }
     ptconf.input_timeout && clearTimeout(ptconf.input_timeout);
-    ptconf.input_timeout = setTimeout(ptable_search(this), timeout);
+    ptconf.input_timeout = setTimeout(ptable_search, timeout, this);
 });
 
 

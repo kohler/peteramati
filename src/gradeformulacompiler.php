@@ -103,7 +103,7 @@ class GradeFormulaCompiler {
     private function parse_pset_grade($pset, $gkey, $self) {
         if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
             return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
-        } else if (($ge = $pset->gradelike_by_key($gkey)) && $ge !== $self) {
+        } else if (($ge = $pset->gradelike_by_key_or_title($gkey)) && $ge !== $self) {
             return $this->parse_grade_entry($ge);
         } else {
             return null;
@@ -125,18 +125,18 @@ class GradeFormulaCompiler {
             if (($gf = $this->parse_pset_grade($pset, $gkey, null))) {
                 return $gf;
             }
-            $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "<0>Undefined grade entry");
+            $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "<0>Grade entry `{$gkey}` in `{$pset->title}` not found");
             return null;
-        } else if ($this->conf->pset_category($pkey)
-                   && ($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
+        }
+        if ($this->conf->pset_category($pkey)
+            && ($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
             if (!$this->conf->pset_category_has_extra($pkey)) {
                 $f &= ~1;
             }
             return new CategoryTotal_GradeFormula($this->conf, $pkey, ($f & 1) !== 0, ($f & 4) !== 4);
-        } else {
-            $this->error_at($this->state->pos1, $this->state->pos1 + strlen($pkey), "<0>Undefined problem set");
-            return null;
         }
+        $this->error_at($this->state->pos1, $this->state->pos1 + strlen($pkey), "<0>Problem set `{$pkey}` not found");
+        return null;
     }
 
     /** @param string $gkey
@@ -458,7 +458,7 @@ class GradeFormulaCompiler {
      * @return GradeFormula */
     private function _compile_search_name($text) {
         $text = SearchParser::unquote($text);
-        if ($text === "") {
+        if ($text === "" || $text === "*" || $text === "ANY" || $text === "ALL") {
             return new Constant_GradeFormula(true);
         }
         return new NameMatch_GradeFormula($text);

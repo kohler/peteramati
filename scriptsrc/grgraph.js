@@ -150,9 +150,9 @@ export class GradeGraph {
             this.xfmt = "%.3r";
         }
 
-        this.gg.setAttribute("transform", "translate(" + this.ml + "," + this.mt + ")");
-        this.gx.setAttribute("transform", "translate(" + this.ml + "," + (this.mt + this.gh + (this.xt ? 2 : -5)) + ")");
-        this.gy.setAttribute("transform", "translate(" + (this.ml + (this.yt ? -2 : 5)) + "," + this.mt + ")");
+        this.gg.setAttribute("transform", `translate(${this.ml},${this.mt})`);
+        this.gx.setAttribute("transform", `translate(${this.ml},${this.mt + this.gh + (this.xt ? 2 : -5)})`);
+        this.gy.setAttribute("transform", `translate(${this.ml + (this.yt ? -2 : 5)},${this.mt})`);
 
         this.hlcurve = null;
         this.hlcurve_series = null;

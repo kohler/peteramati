@@ -727,6 +727,25 @@ class Pset {
         }
     }
 
+    /** @param string $key
+     * @return ?GradeEntry */
+    function gradelike_by_key_or_title($key) {
+        if (($ge = $this->gradelike_by_key($key))) {
+            return $ge;
+        }
+        $found = null;
+        $collator = $this->conf->search_collator();
+        foreach ($this->grades as $ge) {
+            if ($collator->compare($ge->title, $key) === 0) {
+                if ($found) {
+                    return null;
+                }
+                $found = $ge;
+            }
+        }
+        return $found;
+    }
+
     private function grades_by_key_list_one($gvs, $i, &$ges, $expand_section) {
         $ge = $gvs[$i];
         ++$i;
