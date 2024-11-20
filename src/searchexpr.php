@@ -17,7 +17,7 @@ class SearchExpr {
     public $pos2;
     /** @var ?SearchOperator */
     public $op;
-    /** @var ?list<SearchExpr> */
+    /** @var list<SearchExpr> */
     public $child;
     /** @var ?SearchExpr */
     public $parent;

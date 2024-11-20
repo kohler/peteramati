@@ -92,7 +92,7 @@ class QueueItem {
     private $_logstream;
     /** @var ?int */
     private $_runstatus;
-    /** @var ?array */
+    /** @var array<resource> */
     private $_runpipes;
     /** @var ?int */
     public $foreground_command_status;
@@ -1123,14 +1123,14 @@ class QueueItem {
                    && ($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0) {
             $redirects[1] = ["redirect", 2];
         }
-        $this->_runpipes = null;
+        $this->_runpipes = [];
         return proc_open($cmd, $redirects, $this->_runpipes, $cwd, $env);
     }
 
     /** @param list<string> $cmdarg
      * @param ?string $cwd
      * @param array{main?:bool,stdin?:mixed,stdout?:mixed} $opts
-     * @return resource */
+     * @return int */
     private function run_and_log($cmdarg, $cwd = null, $opts = []) {
         $proc = $this->run_and_log_proc($cmdarg, $cwd, $opts);
         return proc_close($proc);

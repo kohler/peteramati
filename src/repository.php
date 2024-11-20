@@ -375,7 +375,7 @@ class Repository {
         return SiteLoader::$root . "/repo/repo" . $cacheid;
     }
 
-    /** @param string $cacheid
+    /** @param string $repodir
      * @return string */
     static function update_repodir_at(Conf $conf, $repodir) {
         $lockfn = "{$repodir}/UPGRADE_TO_BARE";
