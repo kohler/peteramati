@@ -2825,6 +2825,7 @@ tr.gtrow-partner > td, tr.gtrow-partner > th {
 	margin-left: 0.5rem;
 	writing-mode: vertical-rl;
 	transform: rotate(180deg);
+	white-space: nowrap;
 }
 .gtable-container-2 {
 	padding-right: 24px;
