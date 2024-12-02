@@ -681,13 +681,13 @@ class PsetRequest {
             $last_myhandout = $last_handout ? $this->info->derived_handout_hash() : null;
             if ($last_handout
                 && $last_myhandout
-                && $last_handout->hash == $last_myhandout) {
+                && $last_handout->hash === $last_myhandout) {
                 /* this is ideal: they have the latest handout commit */
             } else if ($last_handout && $last_myhandout) {
                 $need_handout_hash = $pset->handout_warn_hash ? : $pset->handout_hash;
                 if ($need_handout_hash
-                    && ($hcf = $pset->handout_commits_from($need_handout_hash))
-                    && isset($hcf[$last_myhandout])) {
+                    && ($hcf = $pset->handout_commits_from($last_myhandout))
+                    && isset($hcf[$last_handout->hash])) {
                     // also fine
                 } else {
                     // they don't have the latest updates
