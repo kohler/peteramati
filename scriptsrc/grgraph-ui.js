@@ -83,6 +83,7 @@ function grgraph_draw() {
         $(self).removeData("paGradeGraph").off("redrawgraph");
         return;
     }
+    removeClass(self, "hidden");
 
     const pi = self.closest(".pa-psetinfo"),
         form = self.closest("form"),
