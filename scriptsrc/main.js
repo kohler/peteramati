@@ -1148,7 +1148,7 @@ function pa_runmany(chain) {
             if (data.hash) {
                 url += `/${data.hash}`;
             }
-            run(f.elements.run, {noclear: true, queueid: data.queueid, timestamp: data.timestamp, headline: `\x1b]8;;${url}\x07${data.u}\x1b]8;;\x07`, done_function: check});
+            run(f.elements.run, {clear: false, queueid: data.queueid, timestamp: data.timestamp, headline: `\x1b]8;;${url}\x07${data.u}\x1b]8;;\x07`, done_function: check, timed: false});
         }
         if (data && data.njobs != null) {
             progress(data.njobs);

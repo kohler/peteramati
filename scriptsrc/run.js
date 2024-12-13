@@ -164,7 +164,7 @@ export function run(button, opts) {
         therun.removeAttribute("data-pa-timestamp");
     }
 
-    if (!checkt && !opts.noclear) {
+    if (!checkt && opts.clear !== false) {
         thepre.html("");
         addClass(thepre[0].parentElement, "pa-run-short");
         thepre[0].removeAttribute("data-pa-terminal-style");
@@ -289,7 +289,7 @@ export function run(button, opts) {
                 return; // not ready yet
             }
             preamble_offset = utf8_length(ibuffer.substr(0, pos + 2));
-            let tsmsg = opts.noclear ? "" : "\x1bc";
+            let tsmsg = opts.clear === false ? "" : "\x1bc";
             if (data && data.timestamp) {
                 tsmsg += "\x1b[38;5;108;3m...started " + strftime("%l:%M:%S%P %e %b %Y", new Date(data.timestamp * 1000)) + "\x1b[m\r\n";
             }
@@ -641,6 +641,7 @@ export function run(button, opts) {
                 t += `, oldest began about ${headage} ${headage == 1 ? "second" : "seconds"} ago`;
             }
             append(t + "\x1b[m");
+            scroll_therun();
             was_onqueue = true;
             send_after(8000);
             return;
@@ -707,7 +708,8 @@ export function run(button, opts) {
         // Pure replay -> set_time_data
         if (data.done
             && data.time_data != null
-            && ibuffer === "") {
+            && ibuffer === ""
+            && opts.timed !== false) {
             // Parse timing data
             set_time_data(data);
             return;
@@ -742,7 +744,7 @@ export function run(button, opts) {
             send_after(backoff);
         } else {
             done();
-            if (data.timed && !hasClass(therun.firstChild, "pa-runrange")) {
+            if (data.timed && !hasClass(therun.firstChild, "pa-runrange") && opts.timed !== false) {
                 send({offset: 0}, succeed_add_times);
             }
         }
@@ -811,7 +813,7 @@ export function run(button, opts) {
         send({write: value});
     }
 
-    if (opts.headline && opts.noclear && thepre[0].firstChild) {
+    if (opts.headline && opts.clear === false && thepre[0].firstChild) {
         append("\r\n\r\n");
     }
     if (opts.headline) {
