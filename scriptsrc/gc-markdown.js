@@ -4,7 +4,7 @@
 
 import { GradeClass } from "./gc.js";
 import { render_onto } from "./render.js";
-import { hasClass, addClass, removeClass, handle_ui } from "./ui.js";
+import { hasClass, addClass, handle_ui } from "./ui.js";
 import { Filediff } from "./diff.js";
 import { Note } from "./note.js";
 

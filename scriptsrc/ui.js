@@ -242,7 +242,7 @@ export function form_differs(form) {
     return null;
 }
 
-function check_form_differs(form, elt) {
+export function check_form_differs(form, elt) {
     (form instanceof HTMLElement) || (form = $(form)[0]);
     const differs = (elt && form_differs(elt)) || form_differs(form);
     toggleClass(form, "differs", !!differs);

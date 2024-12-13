@@ -2,8 +2,7 @@
 // Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { addClass, hasClass, handle_ui, input_set_default_value } from "./ui.js";
-import { event_key } from "./ui-key.js";
+import { addClass, hasClass, input_set_default_value } from "./ui.js";
 import { strftime, sec2text } from "./utils.js";
 
 let map = {};
@@ -248,8 +247,7 @@ const DGSELECTOR = ".pa-dg, .pa-gradelist";
 
 function tabgroup_traverse(sb, bwd, sidebar) {
     const dir = bwd ? "previousElementSibling" : "nextElementSibling",
-        childdir = bwd ? "lastElementChild" : "firstElementChild",
-        searchclass = sidebar ? ".pa-sidebar" : ".pa-gradevalue";
+        childdir = bwd ? "lastElementChild" : "firstElementChild";
     if (sidebar) {
         sb = sb.closest(DGSELECTOR);
     }
@@ -291,7 +289,6 @@ function tab_traverse(e, bwd, sidebar) {
     if (pos < 0) {
         return null;
     }
-    let allsb, sbpos;
     while (true) {
         pos += bwd ? -1 : 1;
         if (pos < 0 || pos >= sbtabs.length) {

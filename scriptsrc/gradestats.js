@@ -140,7 +140,7 @@ class GradeSeries {
             this.mean = this.median = this.stddev = null;
             return;
         }
-        let ci = 0, cx = this.cdf[0], cy = this.cdf[1], ui = 0,
+        let ci = 0, cx = this.cdf[0], cy = this.cdf[1],
             sum = 0, sumsq = 0;
         const n = this.n;
         for (let ui = 0; ui !== n; ++ui) {

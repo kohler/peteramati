@@ -159,7 +159,7 @@ function ansistyle_render(text, style) {
 }
 
 export function render_terminal(container, string, options) {
-    var return_html = false;
+    let return_html = false;
     if (typeof container === "string") {
         options = string;
         string = container;

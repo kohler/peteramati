@@ -1869,14 +1869,14 @@ function make_search_name(text) {
 }
 
 const grade_search_keywords = {
-    any: (gidx) => { return (se) => search_target.grades[gidx] != null; },
-    none: (gidx) => { return (se) => search_target.grades[gidx] == null; },
-    eq: (gidx, v) => { return (se) => search_target.grades[gidx] == v; },
-    ne: (gidx, v) => { return (se) => search_target.grades[gidx] != v; },
-    gt: (gidx, v) => { return (se) => search_target.grades[gidx] > v; },
-    ge: (gidx, v) => { return (se) => search_target.grades[gidx] >= v; },
-    lt: (gidx, v) => { return (se) => search_target.grades[gidx] < v; },
-    le: (gidx, v) => { return (se) => search_target.grades[gidx] <= v; }
+    any: (gidx) => { return () => search_target.grades[gidx] != null; },
+    none: (gidx) => { return () => search_target.grades[gidx] == null; },
+    eq: (gidx, v) => { return () => search_target.grades[gidx] == v; },
+    ne: (gidx, v) => { return () => search_target.grades[gidx] != v; },
+    gt: (gidx, v) => { return () => search_target.grades[gidx] > v; },
+    ge: (gidx, v) => { return () => search_target.grades[gidx] >= v; },
+    lt: (gidx, v) => { return () => search_target.grades[gidx] < v; },
+    le: (gidx, v) => { return () => search_target.grades[gidx] <= v; }
 };
 
 function parse_search_compar(text) {
@@ -1914,7 +1914,7 @@ function make_compare(op) {
     } else if (op === "ge") {
         return (a, b) => a >= b;
     } else {
-        return (a, b) => false;
+        return () => false;
     }
 }
 
@@ -1936,7 +1936,7 @@ function find_search_keyword(se, ptconf) {
     let kw = se.kword, text = se.text;
     if (!kw) {
         if (text === "" || text === "*" || text === "ANY" || text === "ALL") {
-            return (se, su) => true;
+            return () => true;
         }
         let m = text.match(/^([a-zA-Z][-_a-zA-Z0-9]*)((?:<=?|>=?|==?|!=?|≤|≥|≠)[^<>=!]*)$/);
         if (!m) {
