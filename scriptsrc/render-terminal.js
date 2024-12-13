@@ -170,18 +170,16 @@ export function render_terminal(container, string, options) {
     if (options && options.clear) {
         container.removeAttribute("data-pa-terminal-style");
         container.removeAttribute("data-pa-outputpart");
-        while (container.firstChild) {
-            container.removeChild(container.firstChild);
-        }
+        container.replaceChildren();
     }
 
-    var styles = container.getAttribute("data-pa-terminal-style"),
+    let styles = container.getAttribute("data-pa-terminal-style"),
         fragment = null;
 
     function addlinepart(node, text, link) {
-        var n = ansistyle_render(text, styles);
+        const n = ansistyle_render(text, styles);
         if (link != null && link !== "") {
-            var a = document.createElement("a");
+            const a = document.createElement("a");
             a.href = link;
             a.className = "qh";
             if (n.nodeName === "SPAN") {
@@ -207,16 +205,16 @@ export function render_terminal(container, string, options) {
     }
 
     function clean_cr(line) {
-        var lineend = /\n$/.test(line);
-        if (lineend && line.indexOf("\r") === line.length - 1)
+        const lineend = /\n$/.test(line);
+        if (lineend && line.indexOf("\r") === line.length - 1) {
             return line.substring(0, line.length - 2) + "\n";
-        var curstyle = styles || "\x1b[m",
-            parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/),
-            r = [];
+        }
+        let curstyle = styles || "\x1b[m", r = [];
+        const parts = (lineend ? line.substr(0, line.length - 1) : line).split(/\r/);
         for (let partno = 0; partno < parts.length; ++partno) {
-            var g = [], glen = 0, clearafter = null;
-            var lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
-            for (var j = 0; j < lsplit.length; j += 2) {
+            const g = [], lsplit = parts[partno].split(/(\x1b\[[\d;]*m|\x1b\[0?K)/);
+            let glen = 0, clearafter = null;
+            for (let j = 0; j < lsplit.length; j += 2) {
                 if (lsplit[j] !== "") {
                     g.push(curstyle, lsplit[j]);
                     glen += lsplit[j].length;
@@ -230,7 +228,7 @@ export function render_terminal(container, string, options) {
                 }
             }
             // glen: number of characters to overwrite
-            var rpos = 0;
+            let rpos = 0;
             while (rpos < r.length && glen >= r[rpos + 1].length) {
                 glen -= r[rpos + 1].length;
                 rpos += 2;
@@ -273,12 +271,14 @@ export function render_terminal(container, string, options) {
     }
 
     function render_line(line, node) {
-        var m, mm, isnew = !node, displaylen = 0;
-        if (isnew)
+        let m, mm, isnew = !node, displaylen = 0;
+        if (isnew) {
             node = document.createElement("span");
+        }
 
-        if (/\r/.test(line))
+        if (/\r/.test(line)) {
             line = clean_cr(line);
+        }
 
         while ((m = line.match(/^(\x1b\[[\d;]*m|\x1b\[\d*K)([^]*)$/))) {
             styles = ansistyle_combine(styles, m[1]);
@@ -292,7 +292,7 @@ export function render_terminal(container, string, options) {
             line = line.substr(displaylen);
         }
 
-        var render, link = "";
+        let render, link = "";
         while (line !== "") {
             render = line;
             if ((m = line.match(/^(.*?)(\x1b\[[\d;]*m|\x1b\[\d*K|\x1b\]8;;|\x1bc)([^]*)$/))) {
@@ -305,7 +305,9 @@ export function render_terminal(container, string, options) {
                             line = "";
                         }
                     } else if (m[2] === "\x1bc") {
+                        container.replaceChildren();
                         node.replaceChildren();
+                        isnew || container.appendChild(node);
                         line = m[3];
                     } else {
                         styles = ansistyle_combine(styles, m[2]);
@@ -334,7 +336,7 @@ export function render_terminal(container, string, options) {
     }
 
     // hide newline on last line
-    var lines, lastfull;
+    let lines, lastfull;
     if (typeof string === "string") {
         lines = string.split(/^/m);
         if (lines.length && lines[lines.length - 1] === "") {
@@ -347,7 +349,7 @@ export function render_terminal(container, string, options) {
         fragment = string;
     }
 
-    var node = container.lastChild, cursor = null;
+    let node = container.lastChild, cursor = null;
     if (node
         && node.lastChild
         && hasClass(node.lastChild, "pa-runcursor")) {
@@ -372,8 +374,8 @@ export function render_terminal(container, string, options) {
         node = null;
     }
 
-    var laststyles = styles, i, j, last;
-    for (i = 0; i < lines.length; i = j) {
+    let laststyles = styles, j, last;
+    for (let i = 0; i < lines.length; i = j) {
         laststyles = styles;
         last = lines[i];
         for (j = i + 1; !last.endsWith("\n") && j < lines.length; ++j) {
@@ -393,14 +395,14 @@ export function render_terminal(container, string, options) {
         container.appendChild(fragment);
     }
 
-    var len = container.childNodes.length;
+    let len = container.childNodes.length;
     if (len >= 4000) {
-        i = container.firstChild;
+        let i = container.firstChild;
         while (i.tagName === "DIV" && i.className === "pa-rl-group") {
             i = i.nextSibling;
             --len;
         }
-        var div = null, divlen = 0;
+        let div = null, divlen = 0;
         while (i && (j = i.nextSibling)) {
             if (!div
                 || (divlen >= 4000 && len >= 2000)) {
