@@ -142,7 +142,7 @@ export function run(button, opts) {
     let thexterm,
         checkt,
         kill_checkt,
-        queueid = opts.queueid || null,
+        queueid = opts.queueid || null, was_onqueue = false,
         eventsource = null,
         sendtimeout = null;
 
@@ -178,7 +178,8 @@ export function run(button, opts) {
         if (h3 && h3.tagName === "H3") {
             const btn = $(h3).find(".pa-runstop");
             if (on && !btn.length) {
-                $("<button class=\"btn btn-danger pa-runstop\" type=\"button\">Stop</button>").click(stop).appendTo(h3);
+                const b = $e("button", {class: "btn-danger pa-runstop", type: "button"}, "Stop");
+                $(b).click(stop).appendTo(h3);
             } else if (!on && btn.length) {
                 btn.remove();
             }
@@ -186,8 +187,9 @@ export function run(button, opts) {
     }
 
     function terminal_char_width(min, max) {
-        const x = $('<span style="position:absolute">0</span>').appendTo(thepre),
-            w = Math.trunc(thepre.width() / x.width() / 1.33);
+        const x = $e("span", {style: "position:absolute"}, "0");
+        thepre.append(x);
+        const w = Math.trunc(thepre.width() / $(x).width() / 1.33);
         x.remove();
         return Math.max(min, Math.min(w, max));
     }
@@ -624,24 +626,23 @@ export function run(button, opts) {
     }
 
     function succeed(data) {
-        if (queueid) {
-            thepre.find("span.pa-runqueue").remove();
+        if (was_onqueue) {
+            append("\r\x1b[K");
+            was_onqueue = false;
         }
         if (data && data.onqueue) {
             queueid = data.queueid;
-            let t = "On queue, ".concat(data.nahead, (data.nahead == 1 ? " job" : " jobs"), " ahead");
+            let t = `\x1b[38;5;108;3mOn queue, ${data.nahead} ${data.nahead == 1 ? "job" : "jobs"} ahead`;
             if (data.headage) {
                 let headage = data.headage;
                 if (headage > 10) {
                     headage = Math.round(headage / 5 + 0.5) * 5;
                 }
-                t = t.concat(", oldest began about ", headage, (headage == 1 ? " second" : " seconds"), " ago");
+                t += `, oldest began about ${headage} ${headage == 1 ? "second" : "seconds"} ago`;
             }
-            const span = document.createElement("span");
-            span.className = "pa-runqueue";
-            span.append(t);
-            thepre[0].insertBefore(span, thepre[0].lastChild);
-            send_after(10000);
+            append(t + "\x1b[m");
+            was_onqueue = true;
+            send_after(8000);
             return;
         }
 
