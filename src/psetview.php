@@ -955,9 +955,8 @@ class PsetView {
             }
             if ($v === null
                 && !$ge->is_extra
-                && !$ge->no_total
-                && $ge->required !== false
-                && ($gvf & ~VF_TF) !== 0) {
+                && ($ge->required
+                    || ($ge->required === null && ($gvf & ~VF_TF) !== 0))) {
                 // A required non-extra-credit score is missing
                 $this->_gallreq = false;
             }
