@@ -58,6 +58,8 @@ class RunResponse implements JsonSerializable {
     public $message;
     /** @var ?mixed */
     public $result;
+    /** @var ?string */
+    public $log_file;
 
     /** @return RunResponse */
     static function make_info(RunnerConfig $runner, PsetView $info) {
@@ -123,6 +125,11 @@ class RunResponse implements JsonSerializable {
             }
         }
         return false;
+    }
+
+    /** @return string */
+    function landmark() {
+        return $this->log_file ?? "@{$this->timestamp}";
     }
 
     function jsonSerialize(): array {

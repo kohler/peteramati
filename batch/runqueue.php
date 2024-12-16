@@ -720,7 +720,7 @@ class RunEnqueue_Batch {
                 $qi->runsettings[$k] = $v;
             }
             if ($this->if_needed > 0
-                && $qi->count_compatible_responses($this->verbose, $this->if_needed) >= $this->if_needed) {
+                && $qi->count_compatible_responses($this->if_needed, $this->verbose) >= $this->if_needed) {
                 continue;
             }
             $qi->enqueue();

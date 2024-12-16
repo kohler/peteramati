@@ -185,6 +185,7 @@ class RunLogger {
             $rr->repoid = $this->repo ? $this->repo->repoid : 0;
             $rr->error = true;
             $rr->message = $s === false ? "Log missing." : "Log corrupted.";
+            $rr->log_file = $logfile;
             return $rr;
         }
 
@@ -192,6 +193,7 @@ class RunLogger {
         $rr->ok = true;
         $rr->timestamp = $jobid;
         $rr->done = $this->job_complete($jobid);
+        $rr->log_file = $logfile;
 
         if ($offset !== null) {
             if (strlen($s) < $readsz || $offset <= 0) {

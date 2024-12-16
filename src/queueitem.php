@@ -497,7 +497,7 @@ class QueueItem {
         foreach ($this->tags ?? [] as $t) {
             if (!$rr->has_tag($t)) {
                 if ($verbose) {
-                    error_log("{$rr->timestamp}: incompatible, lacks tag {$t}");
+                    error_log("{$rr->landmark()}: incompatible, lacks tag {$t}");
                 }
                 return false;
             }
@@ -505,7 +505,7 @@ class QueueItem {
         if ((!empty($this->runsettings) || !empty($rr->settings))
             && json_encode_db($this->runsettings) !== json_encode_db($rr->settings)) {
             if ($verbose) {
-                error_log("{$rr->timestamp}: incompatible settings, " . json_encode_db($rr->settings) . " vs. " . json_encode_db($this->runsettings));
+                error_log("{$rr->landmark()}: incompatible settings, " . json_encode_db($rr->settings) . " vs. " . json_encode_db($this->runsettings));
             }
             return false;
         }
@@ -526,10 +526,10 @@ class QueueItem {
         return null;
     }
 
-    /** @param bool $verbose
-     * @param ?int $max
+    /** @param ?int $max
+     * @param bool $verbose
      * @return int */
-    function count_compatible_responses($verbose = false, $max = null) {
+    function count_compatible_responses($max = null, $verbose = false) {
         $max = $max ?? PHP_INT_MAX;
         $info = $this->info();
         $runner = $this->runner();
@@ -760,7 +760,7 @@ class QueueItem {
         if ($this->status === self::STATUS_SCHEDULED
             && $this->ifneeded !== 0
             && ($rr = $this->compatible_response())
-            && $this->count_compatible_responses(false, $this->ifneeded) >= $this->ifneeded) {
+            && $this->count_compatible_responses($this->ifneeded) >= $this->ifneeded) {
             $this->swap_status(self::STATUS_EVALUATED, ["runat" => $rr->timestamp]);
             if ($this->status >= self::STATUS_CANCELLED) {
                 return true;
