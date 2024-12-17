@@ -113,11 +113,20 @@ add_format({
     }
 });
 
+function render_link_open_3(tokens, idx, options, env, self) {
+    let href = tokens[idx].attrGet("href") || "";
+    if (!href.startsWith("#")) {
+        tokens[idx].attrSet("target", "_blank");
+    }
+    return self.renderToken(tokens, idx, options, env);
+}
+
 add_format({
     format: 3,
-    render: function (text) {
+    render: function (text, context) {
         if (!md2) {
             md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true}).use(markdownit_katex).use(markdownit_attributes);
+            md2.renderer.rules.link_open = render_link_open_3;
         }
         return md2.render(text);
     }
