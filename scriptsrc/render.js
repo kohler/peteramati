@@ -163,7 +163,8 @@ export function render_onto(context, format, text) {
     }
     try {
         render_with(context, renderers[format] || renderers[0], text);
-    } catch {
+    } catch (e) {
+        window.console && window.console.error(e);
         render_with(context, renderers[0], text);
         delete renderers[format];
     }
