@@ -37,7 +37,8 @@ function attribute_block(state, startLine, endLine, silent) {
     if (t === "paragraph_close"
         || t === "blockquote_close"
         || t === "ordered_list_close"
-        || t === "bullet_list_close") {
+        || t === "bullet_list_close"
+        || t === "table_close") {
         dest = find_opener(state, state.tokens.length - 1);
     } else if (t === "fence") {
         dest = last_token;
@@ -62,5 +63,5 @@ function attribute_block(state, startLine, endLine, silent) {
 }
 
 export function markdownit_attributes(md) {
-    md.block.ruler.after("lheading", "mdattribute", attribute_block, {alt: ["list", "blockquote", "paragraph", "fence"]});
+    md.block.ruler.after("lheading", "mdattribute", attribute_block, {alt: ["list", "blockquote", "paragraph"]});
 }
