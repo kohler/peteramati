@@ -1365,25 +1365,32 @@ handle_ui.on("js-multiresolveflag", function () {
     }
 });
 
+function pa_register_psets(psets) {
+    siteinfo.psets = siteinfo.psets || {};
+    for (const p of psets) {
+        siteinfo.psets[p.psetid] = siteinfo.psets[p.pset] = p;
+    }
+}
 
 window.$pa = {
     beforeunload: pa_beforeunload,
     checklatest: pa_checklatest,
     decorate_diff_page: Filediff.decorate_page,
-    gradeentry_closest: GradeEntry.closest,
     fold: fold,
+    gradeentry_closest: GradeEntry.closest,
+    gradesheet_store: GradeSheet.store,
     grgraph: grgraph,
     hoturl: hoturl,
+    loadgrades: pa_loadgrades,
+    load_runsettings: run_settings_load,
     note_near: Note.near,
     on: handle_ui.on,
     onload: hotcrp_load,
-    loadgrades: pa_loadgrades,
-    load_runsettings: run_settings_load,
     pset_actions: pa_pset_actions,
     pset_table: pa_pset_table,
+    register_psets: pa_register_psets,
     render_text_page: render_text.on_page,
     runmany: pa_runmany,
-    gradesheet_store: GradeSheet.store,
     text_eq: text_eq,
     tooltip: tooltip,
     string_utf8_index: string_utf8_index,

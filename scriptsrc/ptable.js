@@ -228,8 +228,12 @@ class PtableConf {
     url_gradeparts(s) {
         const args = {
             u: this.ukey(s),
-            pset: s.pset || this.key
+            pset: this.key
         };
+        let p;
+        if (s.pset && (p = siteinfo.psets[s.pset])) {
+            args.pset = p.urlkey;
+        }
         if (s.commit && (!s.is_grade || this.flagged_commits)) {
             args.commit = s.commit;
         } else if (s.grade_commit) {
@@ -552,9 +556,9 @@ function ptable_make_hotlist(evt) {
         if (!su || su.hidden) {
             continue;
         }
-        let t = "~" + encodeURIComponent(ptconf.ukey(su));
-        if (ptconf.flagged_commits) {
-            t = t.concat("/pset/", su.pset);
+        let t = "~" + encodeURIComponent(ptconf.ukey(su)), p;
+        if (ptconf.flagged_commits && su.pset && (p = siteinfo.psets[su.pset])) {
+            t = t.concat("/pset/", p.urlkey);
             if (su.commit) {
                 t = t.concat("/", su.commit);
             }
@@ -759,17 +763,20 @@ const gcoldef = {
             let ae = document.createElement("a");
             ae.href = this.ptconf.href(s);
             ae.classname = "track";
-            const pset = siteinfo.psets[s.pset];
-            ae.append((pset ? pset.title : `<#${s.pset}>`) + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
+            const p = siteinfo.psets[s.pset];
+            ae.append((p ? p.title : `<#${s.pset}>`) + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
             tde.append(ae);
         },
         tw: 8,
         sort_forward: true,
         compare: function (a, b) {
-            if (a.pset != b.pset)
-                return siteinfo.psets[a.pset].pos < siteinfo.psets[b.pset].pos ? -1 : 1;
-            else
-                return a.pos < b.pos ? -1 : 1;
+            if (a.pset != b.pset) {
+                const ap = siteinfo.psets[a.pset], bp = siteinfo.psets[b.pset];
+                if (ap && bp) {
+                    return ap.pos < bp.pos ? -1 : 1;
+                }
+            }
+            return a.pos < b.pos ? -1 : 1;
         }
     },
 

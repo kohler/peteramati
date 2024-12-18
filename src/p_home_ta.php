@@ -519,23 +519,24 @@ class Home_TA_Page {
         // set `siteinfo.psets` in Javascript
         $psetj = [];
         foreach ($this->conf->psets() as $pset) {
-            if ($this->viewer->can_view_pset($pset)) {
-                $pj = [
-                    "pset" => $pset->urlkey,
-                    "psetid" => $pset->psetid,
-                    "title" => $pset->title,
-                    "pos" => count($psetj)
-                ];
-                if ($pset->gitless) {
-                    $pj["gitless"] = true;
-                }
-                if ($pset->gitless || $pset->gitless_grades) {
-                    $pj["gitless_grades"] = true;
-                }
-                $psetj[$pset->urlkey] = $pj;
+            if (!$this->viewer->can_view_pset($pset)) {
+                continue;
             }
+            $pj = [
+                "urlkey" => $pset->urlkey,
+                "psetid" => $pset->psetid,
+                "title" => $pset->title,
+                "pos" => count($psetj)
+            ];
+            if ($pset->gitless) {
+                $pj["gitless"] = true;
+            }
+            if ($pset->gitless || $pset->gitless_grades) {
+                $pj["gitless_grades"] = true;
+            }
+            $psetj[] = $pj;
         }
-        $this->conf->set_siteinfo("psets", $psetj);
+        Ht::stash_script("\$pa.register_psets(" . json_encode_browser($psetj) . ")");
 
         // set PC info in Javascript
         $pctable = [];
