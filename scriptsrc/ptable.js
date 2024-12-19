@@ -764,7 +764,7 @@ const gcoldef = {
             ae.href = this.ptconf.href(s);
             ae.classname = "track";
             const p = siteinfo.psets[s.pset];
-            ae.append((p ? p.title : `<#${s.pset}>`) + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
+            ae.append((p ? p.urlkey : `<#${s.pset}>`) + (s.commit ? "/" + s.commit.substr(0, 7) : ""));
             tde.append(ae);
         },
         tw: 8,

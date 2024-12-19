@@ -485,6 +485,7 @@ class RunQueue_Batch {
         "e::,if-needed:: {n} =N !add Run only if needed",
         "ensure !",
         "u[]+,user[]+ !add Match these users",
+        "U:,url:,key: !add Add by URL or key",
         "H:,hash:,commit: !add Use this commit",
         "commit-query:,commitq: !add Use the commit matching this search",
         "C:,c:,chain: !add Set chain ID",
@@ -631,6 +632,9 @@ class RunEnqueue_Batch {
     /** @param string $s
      * @return bool */
     function match($s) {
+        if ($s === null) {
+            return false;
+        }
         foreach ($this->usermatch as $m) {
             if (fnmatch($m, $s))
                 return true;
@@ -766,13 +770,53 @@ class RunEnqueue_Batch {
         return self::make_parsed_args($conf, $arg);
     }
 
+    /** @return CommandLineException */
+    static function bad_pset_exception(Conf $conf, $pset_arg) {
+        $pset_keys = array_values(array_map(function ($p) { return $p->key; }, $conf->psets()));
+        return (new CommandLineException($pset_arg === "" ? "`--pset` required" : "Pset `{$pset_arg}` not found"))->add_context("(Options are " . join(", ", $pset_keys) . ".)");
+    }
+
+    static function handle_url_arg(Conf $conf, &$arg, $url) {
+        $url = urldecode($url);
+        if (!preg_match('/(?:\A|\s|\/)~([^\/?\#]+)\/(?:pset\/|)([^\/?\#]+)\/?([0-9a-f]{40,}|)\/?([A-Za-z][-_0-9A-Za-z]*|)(?:\z|[?\#])/', $url, $m)) {
+            throw new CommandLineException("Invalid `--url`");
+        }
+        $pset = $conf->pset_by_key($m[2]);
+        if (!$pset) {
+            throw self::bad_pset_exception($conf, $m[2]);
+        } else if (isset($arg["p"])
+                   && $arg["p"] !== $pset->key
+                   && $arg["p"] !== $pset->urlkey) {
+            throw new CommandLineException("`--url` and `--pset` don’t match");
+        }
+        $arg["p"] = $pset->urlkey;
+        if (isset($arg["u"])) {
+            throw new CommandLineException("`--url` and `--user` are mutually exclusive");
+        }
+        $arg["u"] = [$m[1]];
+        if ($m[3] !== "") {
+            if (isset($arg["H"]) && $arg["H"] !== $m[3]) {
+                throw new CommandLineException("`--url` and `--hash` don’t match");
+            }
+            $arg["H"] = $m[3];
+        }
+        if ($m[4] !== "") {
+            if (isset($arg["r"]) && $arg["r"] !== $m[4]) {
+                throw new CommandLineException("`--url` and `--runner` don’t match");
+            }
+            $arg["r"] = $m[4];
+        }
+    }
+
     /** @return RunEnqueue_Batch */
     static function make_parsed_args(Conf $conf, $arg) {
+        if (isset($arg["U"])) {
+            self::handle_url_arg($conf, $arg, $arg["U"]);
+        }
         $pset_arg = $arg["p"] ?? "";
         $pset = $conf->pset_by_key($pset_arg);
         if (!$pset) {
-            $pset_keys = array_values(array_map(function ($p) { return $p->key; }, $conf->psets()));
-            throw (new CommandLineException($pset_arg === "" ? "`--pset` required" : "Pset `{$pset_arg}` not found"))->add_context("(Options are " . join(", ", $pset_keys) . ".)");
+            throw self::bad_pset_exception($Conf, $pset_arg);
         }
         $runner_arg = $arg["r"] ?? "";
         $runner = $pset->runner_by_key($runner_arg);
