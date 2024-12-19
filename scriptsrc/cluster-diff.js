@@ -120,6 +120,7 @@ function cluster_by_multiple_choice(sxs, mcarg) {
 			mcallow[ch] = true;
 		}
 	} else if (mcarg && /^\d+$/.test(mcarg)) {
+		mcallow = {};
 		for (let n = 1; n <= +mcarg; ++n) {
 			mcallow[n] = true;
 		}
