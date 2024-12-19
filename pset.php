@@ -1,6 +1,6 @@
 <?php
 // pset.php -- Peteramati problem set page
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");

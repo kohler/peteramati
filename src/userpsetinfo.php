@@ -187,7 +187,7 @@ class UserPsetInfo {
     function version_at($version, $student_only, Conf $conf) {
         assert($this->phantom_type !== 2);
         if (($version ?? $this->notesversion) >= $this->notesversion
-            || $this->phantom_type === 0) {
+            || $this->phantom_type === 1) {
             return $this;
         }
         $this->history_at(max($version - 1, 0), $student_only, $conf);
