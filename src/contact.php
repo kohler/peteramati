@@ -996,8 +996,8 @@ class Contact {
         $flags = PsetView::GXF_OVERRIDE_VIEW | PsetView::GXF_GRADES | PsetView::GXF_FORMULAS;
         if (($gexp = $this->ensure_gcache($pset, $flags, null))) {
             $v = $noextra ? $gexp->total_noextra() : $gexp->total();
-            if ($v !== null && $norm) {
-                $v = round(($v * 1000.0) / $pset->max_grade(VF_TF)) / 10;
+            if ($v !== null && $norm && ($max = $pset->max_grade(VF_TF)) > 0) {
+                $v = round(($v * 1000.0) / $max) / 10;
             }
             return $v;
         } else {
