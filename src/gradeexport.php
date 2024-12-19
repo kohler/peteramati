@@ -217,46 +217,47 @@ class GradeExport implements JsonSerializable {
 
     /** @return null|int|float */
     function total() {
-        if (!$this->has_total) {
-            $t = $tnx = 0;
-            $any = false;
-            foreach ($this->value_entries() as $i => $ge) {
-                if (!$ge->no_total
-                    && ($gv = $this->grades[$i] ?? null) !== null) {
-                    $t += $gv;
-                    if (!$ge->is_extra) {
-                        $tnx += $gv;
-                    }
-                    $any = true;
-                }
-            }
-            if ($any) {
-                $this->total = round_grade($t);
-                $this->total_noextra = round_grade($tnx);
-            } else {
-                $this->total = $this->total_noextra = null;
-            }
-            $this->total_type = null;
-            if ($any && $this->_fixed_values_vf !== null) {
-                foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $ge) {
-                    if (!$ge->no_total
-                        && ($this->_fixed_values_vf[$ge->pcview_index] & $this->vf) === 0) {
-                        $this->total_type = "subset";
-                        break;
-                    }
-                }
-            }
-            if ($any && $this->vf < VF_TF && $this->vf !== VF_STUDENT_ANY) {
-                foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $ge) {
-                    if (!$ge->no_total
-                        && ($this->_grades_vf[$ge->pcview_index] & $this->vf) === 0) {
-                        $this->total_type = "hidden";
-                        break;
-                    }
-                }
-            }
-            $this->has_total = true;
+        if ($this->has_total) {
+            return $this->total;
         }
+        $t = $tnx = 0;
+        $any = false;
+        foreach ($this->value_entries() as $i => $ge) {
+            if (!$ge->no_total
+                && ($gv = $this->grades[$i] ?? null) !== null) {
+                $t += $gv;
+                if (!$ge->is_extra) {
+                    $tnx += $gv;
+                }
+                $any = true;
+            }
+        }
+        if ($any) {
+            $this->total = round_grade($t);
+            $this->total_noextra = round_grade($tnx);
+        } else {
+            $this->total = $this->total_noextra = null;
+        }
+        $this->total_type = null;
+        if ($any && $this->_fixed_values_vf !== null) {
+            foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $ge) {
+                if (!$ge->no_total
+                    && ($this->_fixed_values_vf[$ge->pcview_index] & $this->vf) === 0) {
+                    $this->total_type = "subset";
+                    break;
+                }
+            }
+        }
+        if ($any && $this->vf < VF_TF && $this->vf !== VF_STUDENT_ANY) {
+            foreach ($this->pset->visible_grades(VF_STUDENT_ANY) as $ge) {
+                if (!$ge->no_total
+                    && ($this->_grades_vf[$ge->pcview_index] & $this->vf) === 0) {
+                    $this->total_type = "hidden";
+                    break;
+                }
+            }
+        }
+        $this->has_total = true;
         return $this->total;
     }
 

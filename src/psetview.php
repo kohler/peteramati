@@ -904,7 +904,7 @@ class PsetView {
         $fs = [];
         foreach ($this->pset->formula_grades() as $ge) {
             $f = $ge->formula();
-            $v = $f->evaluate($this->user, null);
+            $v = $f->evaluate($this->user, $this);
             if ($v !== null) {
                 $this->_g[$ge->pcview_index] = $v;
             } else {
@@ -2002,33 +2002,36 @@ class PsetView {
     }
 
 
-    const GRADEJSON_SLICE = 1;
-    const GRADEJSON_OVERRIDE_VIEW = 2;
-    const GRADEJSON_NO_LATE_HOURS = 4;
-    const GRADEJSON_NO_FORMULAS = 8;
-    const GRADEJSON_RECURSE = 16;
-    const GRADEJSON_NO_EDITABLE_ANSWERS = 32;
+    const GXF_OVERRIDE_VIEW = 0x01;
+    const GXF_ENTRIES = 0x02;
+    const GXF_GRADES = 0x04;
+    const GXF_FORMULAS = 0x08;
+    const GXF_LATE_HOURS = 0x10;
+
+    const GXFM_ALL = 0x1E;
+    const GXFM_TFSLICE = 0x1D;
 
     /** @param int $flags
      * @param ?list<0|4|5|7> $fixed_values_vf
      * @return ?GradeExport */
     function grade_export($flags = 0, $fixed_values_vf = null) {
-        $override_view = ($flags & self::GRADEJSON_OVERRIDE_VIEW) !== 0;
+        $flags = $flags ? : self::GXFM_ALL;
+        $override_view = ($flags & self::GXF_OVERRIDE_VIEW) !== 0;
         if (!$override_view && !$this->can_view_some_grade()) {
             return null;
         }
 
         $vf = $this->vf();
-        if ($override_view || ($flags & self::GRADEJSON_SLICE) !== 0) {
+        if ($override_view) {
             $vf |= VF_TF;
         }
         $gexp = new GradeExport($this->pset, $vf, $this);
         $gexp->uid = $this->user->contactId;
         $gexp->user = $this->user_linkpart();
-        if (($flags & self::GRADEJSON_SLICE) !== 0) {
-            $gexp->slice = true;
-        } else {
+        if (($flags & self::GXF_ENTRIES) !== 0) {
             $gexp->export_entries();
+        } else {
+            $gexp->slice = true;
         }
 
         $gexp->set_grades_vf($this->export_grades_vf($vf));
@@ -2044,7 +2047,7 @@ class PsetView {
             $this->grade_export_linenotes($gexp);
             $this->grade_export_updates($gexp);
         }
-        if (!($flags & self::GRADEJSON_NO_FORMULAS)
+        if (($flags & self::GXF_FORMULAS) !== 0
             && $this->pset->has_formula) {
             $this->grade_export_formulas($gexp);
         }
@@ -2055,7 +2058,7 @@ class PsetView {
                 $gexp->grade_commit = $this->grading_hash();
             }
         }
-        if (($flags & self::GRADEJSON_NO_LATE_HOURS) === 0) {
+        if (($flags & self::GXF_LATE_HOURS) !== 0) {
             $this->grade_export_late_hours($gexp);
         }
         if ($this->can_edit_scores()) {

@@ -1,6 +1,6 @@
 <?php
 // gradeformula.php -- Peteramati grade formulas
-// HotCRP is Copyright (c) 2006-2021 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2024 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 abstract class GradeFormula implements JsonSerializable {
@@ -126,6 +126,8 @@ class Bin_GradeFormula extends GradeFormula {
             } else {
                 $this->vtype = GradeEntry::VTTIME;
             }
+        } else if ($e1->vtype === GradeEntry::VTDURATION || $e2->vtype === GradeEntry::VTDURATION) {
+            $this->vtype = GradeEntry::VTDURATION;
         }
     }
     function evaluate(Contact $student, ?PsetView $info) {

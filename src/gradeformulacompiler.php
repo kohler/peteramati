@@ -1,6 +1,6 @@
 <?php
 // gradeformulacompiler.php -- Peteramati grade formulas
-// HotCRP is Copyright (c) 2006-2021 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2024 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 require_once(SiteLoader::$root . "/src/gradeformula.php");

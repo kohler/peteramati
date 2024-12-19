@@ -324,7 +324,7 @@ class Grade_API {
         }
         $jx["us"] = [];
         foreach ($sset as $uid => $info) {
-            $jx["us"][] = $info->grade_json(PsetView::GRADEJSON_SLICE);
+            $jx["us"][] = $info->grade_json(PsetView::GXFM_TFSLICE);
         }
         return $jx;
     }
