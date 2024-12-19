@@ -313,7 +313,7 @@ class Ht {
         } else if ($js === null) {
             $js = [];
         }
-        $type = isset($js["type"]) ? $js["type"] : "button";
+        $type = $js["type"] ?? "button";
         if (!isset($js["value"]) && isset($js["name"]) && $type !== "button") {
             $js["value"] = "1";
         }

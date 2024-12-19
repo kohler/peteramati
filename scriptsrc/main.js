@@ -35,6 +35,7 @@ import "./gc-timermark.js";
 import "./ptable-grades.js";
 import "./ptable-diff.js";
 import "./ptable-run.js";
+import "./cluster-diff.js";
 import { resolve_pinnable } from "./pinnable.js";
 import { pa_pset_table } from "./ptable.js";
 import { SearchParser, SearchExpr } from "./search.js";

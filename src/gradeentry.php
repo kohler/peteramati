@@ -1,6 +1,6 @@
 <?php
 // gradeentry.php -- Peteramati grade entry configuration
-// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class GradeEntry {

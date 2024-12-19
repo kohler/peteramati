@@ -1,6 +1,6 @@
 <?php
 // diffmany.php -- Peteramati multidiff page
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -25,6 +25,8 @@ class DiffMany_Page {
     private $fileglob = false;
     /** @var list<string> */
     private $suppress_grades = [];
+    /** @var list<GradeEntry> */
+    private $selected_grades;
     /** @var ?list<0|4|5|7> */
     private $values_vf;
     /** @var int */
@@ -62,6 +64,7 @@ class DiffMany_Page {
                     $this->suppress_grades[] = $ge->key;
                     $this->values_vf[] = 0;
                 } else {
+                    $this->selected_grades[] = $ge;
                     $this->values_vf[] = $ge->vf(null);
                 }
             }
@@ -163,11 +166,11 @@ class DiffMany_Page {
             $want_grades = true;
         }
 
-        echo "</div>\n";
+        echo "<hr>";
         if ($want_grades) {
             echo Ht::unstash_script('$pa.loadgrades.call(document.getElementById("pa-psetinfo' . $this->psetinfo_idx . '"))');
         }
-        echo "<hr>\n";
+        echo "</div>";
     }
 
     /** @return list<string> */
@@ -205,6 +208,16 @@ class DiffMany_Page {
         }
         echo "<div class=\"pa-psetinfo pa-diffset\" data-pa-gradeinfo='",
             json_escape_browser_sqattr($gexp), "'>";
+
+        $cluster_buttons = [];
+        foreach ($this->selected_grades ?? [] as $ge) {
+            if (($ge->config->cluster_by ?? null) && is_string($ge->config->cluster_by)) {
+                $cluster_buttons[] = Ht::button("Cluster by " . htmlspecialchars($ge->title), ["class" => "ui pa-cluster-diff mr-3", "data-pa-grade" => $ge->key, "data-pa-clustering" => $ge->config->cluster_by]);
+            }
+        }
+        if (!empty($cluster_buttons)) {
+            echo '<div class="mt-3 mb-3">', join("", $cluster_buttons), '<hr></div>';
+        }
 
         if (trim((string) $this->qreq->users) === "") {
             $want = [];
@@ -251,7 +264,7 @@ class DiffMany_Page {
             if ($gradeentry->landmark_buttons) {
                 foreach ($gradeentry->landmark_buttons as $lb) {
                     if (is_object($lb) && isset($lb->summary_className)) {
-                        echo '<button type="button" class="ui btn ', $lb->summary_className, '" data-pa-class="', $lb->className, '">Summarize ', $lb->title, '</button>';
+                        echo '<button type="button" class="ui ', $lb->summary_className, '" data-pa-class="', $lb->className, '">Summarize ', $lb->title, '</button>';
                     }
                 }
             }
