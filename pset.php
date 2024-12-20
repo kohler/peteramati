@@ -768,7 +768,7 @@ class PsetRequest {
         }
 
         $rpi = $this->info->rpi();
-        echo '<div>';
+        echo '<div class="no-print">';
         $gradelock = $rpi->placeholder === 0;
         if ($admin) {
             echo '<div class="btnbox mr-3">',
@@ -807,7 +807,7 @@ class PsetRequest {
 
         if (!empty($rbrunners)) {
             $want_plus = $viewer->isPC && $viewer !== $user;
-            echo '<div class="pa-p"><div class="pa-pt"></div><div class="pa-pv">',
+            echo '<div class="pa-p no-print"><div class="pa-pt"></div><div class="pa-pv">',
                 Ht::form($this->info->hoturl("=run"));
             $nrunners = count($rbrunners);
             for ($i = 0; $i !== $nrunners; ++$i) {

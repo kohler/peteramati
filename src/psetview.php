@@ -2541,7 +2541,7 @@ class PsetView {
                 $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $this->rawfile($file)]) . '" class="btn need-tooltip" aria-label="Download"><span class="icon-download"></span></a>';
             }
             if (!empty($bts)) {
-                echo '<div class="hdr-actions btnbox">', join("", $bts), '</div>';
+                echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';
             }
             echo '</h3>';
         }

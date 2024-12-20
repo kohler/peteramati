@@ -322,7 +322,7 @@ class ContactView {
             $value = htmlspecialchars($repo_url ? $repo_url : "(none)");
         }
         if ($repo_url) {
-            $value .= ' <button class="btn ui js-repo-copy need-tooltip" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
+            $value .= ' <button class="btn ui js-repo-copy need-tooltip no-print" data-pa-repo="' . htmlspecialchars($repo->ssh_url()) . '"';
             if ($user->is_anonymous) {
                 $value .= ' data-tooltip="[anonymous]"';
             } else {
@@ -331,7 +331,7 @@ class ContactView {
             $value .= ' type="button">Copy URL to clipboard</button>';
         }
         if ($repo && $info->viewer->privChair) {
-            $value .= " <small style=\"padding-left:1em;font-size:60%\">{$repo->repoid}/{$repo->repogid}</small>";
+            $value .= " <small class=\"no-print\" style=\"padding-left:1em;font-size:60%\">{$repo->repoid}/{$repo->repogid}</small>";
         }
 
         // check repo

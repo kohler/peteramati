@@ -2938,6 +2938,11 @@ h3.gdialog-userids {
 	padding-right: 24px;
 	margin: 0 0 0.5rem -24px;
 }
+@media print {
+.pa-fileref {
+	position: static !important;
+}
+}
 
 .pa-filediff {
 	margin-bottom: 1.5rem;
@@ -3020,15 +3025,22 @@ h3.gdialog-userids {
 }
 .pa-gi > .pa-dd::before {
 	content: "+";
+	font-weight: bold;
 	display: inline-block;
+	color: #005500;
 	width: 1.5em;
 	margin-left: -1.5em;
 }
 .pa-gd > .pa-dd::before {
 	content: "-";
+	font-weight: bold;
 	display: inline-block;
+	color: #550000;
 	width: 1.5em;
 	margin-left: -1.5em;
+}
+.no-print {
+	display: none !important;
 }
 }
 .pa-line-highlight {
