@@ -3248,9 +3248,13 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 }
 .pa-gd, .pa-gdsamp {
 	background-color: #ffdddd;
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
 }
 .pa-gi, .pa-gisamp {
 	background-color: #ddffdd;
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
 }
 .pa-hide-left .pa-gd {
 	display: none;
