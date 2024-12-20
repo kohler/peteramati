@@ -2311,7 +2311,7 @@ class Conf {
             } else if ($this->_category_weight_default[$pset->category] === $pset->weight_default) {
                 $this->_category_weight[$pset->category] += $pset->weight;
             } else {
-                throw new Exception("pset category `{$pset->category}` has not all group weights set");
+                throw new Exception("pset `{$pset->urlkey}` in category `{$pset->category}` needs `weight`");
             }
         }
         $this->_psets_sorted = false;

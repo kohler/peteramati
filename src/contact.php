@@ -1018,14 +1018,15 @@ class Contact {
             $gw = $this->conf->category_weight($group);
             $x = null;
             foreach ($this->conf->psets() as $p) {
-                if (!$p->disabled && $p->category === $group) {
-                    $v = $this->gcache_total($p, $noextra, $norm);
-                    if ($v !== null) {
-                        if ($norm) {
-                            $v *= $p->weight / $gw;
-                        }
-                        $x = ($x === null ? 0.0 : $x) + $v;
+                if ($p->disabled || $p->category !== $group) {
+                    continue;
+                }
+                $v = $this->gcache_total($p, $noextra, $norm);
+                if ($v !== null) {
+                    if ($norm) {
+                        $v *= $p->weight / $gw;
                     }
+                    $x = ($x === null ? 0.0 : $x) + $v;
                 }
             }
             $this->_gcache_group[$group][$i] = $x !== null ? round($x * 10.0) / 10 : null;

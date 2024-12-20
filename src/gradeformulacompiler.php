@@ -102,7 +102,7 @@ class GradeFormulaCompiler {
      * @return ?GradeFormula */
     private function parse_pset_grade($pset, $gkey, $self) {
         if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
-            return new PsetTotal_GradeFormula($pset, ($f & 1) !== 0, ($f & 2) !== 0);
+            return new PsetTotal_GradeFormula($pset, $f & 3);
         } else if (($ge = $pset->gradelike_by_key_or_title($gkey)) && $ge !== $self) {
             return $this->parse_grade_entry($ge);
         } else {
@@ -147,16 +147,33 @@ class GradeFormulaCompiler {
             && !$no_local
             && ($gf = $this->parse_pset_grade($this->state->pset, $gkey, $this->state->entry))) {
             return $gf;
-        } else if (($gf = $this->conf->formula_by_name($gkey))) {
+        }
+        if (($gf = $this->conf->formula_by_name($gkey))) {
             $e = $gf->formula();
             if (!$e || $e instanceof Error_GradeFormula) {
                 $this->error_at($this->state->pos1, $this->state->pos2, "<0>References invalid formula");
             }
             return $e;
-        } else if (($pset = $this->conf->pset_by_key_or_title($gkey))) {
-            return new PsetTotal_GradeFormula($pset, false, false);
+        }
+        $tf = 0;
+        while (strpos($gkey, "_") !== false) {
+            if (str_ends_with($gkey, "_noextra")) {
+                $tf |= GradeFormula::TOTAL_NOEXTRA;
+                $gkey = substr($gkey, 0, -8);
+            } else if (str_ends_with($gkey, "_norm")) {
+                $tf |= GradeFormula::TOTAL_NORM;
+                $gkey = substr($gkey, 0, -5);
+            } else if (str_ends_with($gkey, "_raw")) {
+                $tf |= GradeFormula::TOTAL_RAW;
+                $gkey = substr($gkey, 0, -4);
+            } else {
+                break;
+            }
+        }
+        if (($pset = $this->conf->pset_by_key_or_title($gkey))) {
+            return new PsetTotal_GradeFormula($pset, $tf);
         } else if ($this->conf->pset_category($gkey)) {
-            return new CategoryTotal_GradeFormula($this->conf, $gkey, false, true);
+            return new CategoryTotal_GradeFormula($this->conf, $gkey, $tf);
         } else {
             $this->error_at($this->state->pos1, $this->state->pos2, "<0>Undefined problem set or category");
             return null;
@@ -254,7 +271,7 @@ class GradeFormulaCompiler {
         } else if ($s[$p] === "!") {
             list($e, $p) = $this->parse_prefix($p + 1, self::UNARY_PRECEDENCE);
             $e = $e ? new Not_GradeFormula($e) : null;
-        } else if (preg_match('/\G(?:\d+\.?\d*|\.\d+)/s', $s, $m, 0, $p)) {
+        } else if (preg_match('/\G(?:\d+\.?\d*|\.\d+)(?!\w)/s', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Constant_GradeFormula((float) $m[0]);
         } else if (preg_match('/\G(?:pi|π|m_pi)\b/si', $s, $m, 0, $p)) {

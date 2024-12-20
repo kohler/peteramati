@@ -17,6 +17,10 @@ abstract class GradeFormula implements JsonSerializable {
     /** @var ?array<int,mixed> */
     protected $_allv;
 
+    const TOTAL_NOEXTRA = 1;
+    const TOTAL_NORM = 2;
+    const TOTAL_RAW = 4;
+
     static public $evaluation_stack = [];
 
     /** @param string $op
@@ -312,13 +316,12 @@ class PsetTotal_GradeFormula extends GradeFormula {
     private $norm;
 
     /** @param Pset $pset
-     * @param bool $noextra
-     * @param bool $norm */
-    function __construct($pset, $noextra, $norm) {
+     * @param 0|1|2|3|4|5|6|7 $flags */
+    function __construct($pset, $flags = 0) {
         parent::__construct("gpt", []);
         $this->pset = $pset;
-        $this->noextra = $noextra;
-        $this->norm = $norm;
+        $this->noextra = ($flags & GradeFormula::TOTAL_NOEXTRA) !== 0;
+        $this->norm = ($flags & GradeFormula::TOTAL_NORM) !== 0;
     }
     function evaluate(Contact $student, ?PsetView $info) {
         return $student->gcache_total($this->pset, $this->noextra, $this->norm);
@@ -346,12 +349,14 @@ class CategoryTotal_GradeFormula extends GradeFormula {
     /** @var bool */
     private $norm;
 
-    function __construct(Conf $conf, $category, $noextra, $norm) {
+    /** @param string $category
+     * @param 0|1|2|3|4|5|6|7 $flags */
+    function __construct(Conf $conf, $category, $flags) {
         parent::__construct("ggt", []);
         $this->conf = $conf;
         $this->category = $category;
-        $this->noextra = $noextra;
-        $this->norm = $norm;
+        $this->noextra = ($flags & GradeFormula::TOTAL_NOEXTRA) !== 0;
+        $this->norm = ($flags & GradeFormula::TOTAL_RAW) === 0;
     }
     function evaluate(Contact $student, ?PsetView $info) {
         return $student->gcache_category_total($this->category, $this->noextra, $this->norm);
