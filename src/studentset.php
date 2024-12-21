@@ -1,6 +1,6 @@
 <?php
 // studentset.php -- Peteramati set of students
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class StudentSet implements ArrayAccess, Iterator, Countable {

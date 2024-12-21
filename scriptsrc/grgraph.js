@@ -6,6 +6,7 @@ import * as svgutil from "./svgpathutil.js";
 import IntervalSeq from "./intervalseq.js";
 import { sprintf } from "./utils.js";
 import { hasClass, addClass } from "./ui.js";
+import { GradeClass } from "./gc.js";
 
 function mksvg(tag) {
     return document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -138,7 +139,7 @@ export class GradeGraph {
             return -(ay - gh) / gh;
         };
         if (d.entry && d.entry.type) {
-            const gt = window.pa_grade_types[d.entry.type];
+            const gt = GradeClass.find(d.entry.type);
             if (gt && gt.tics)
                 this.xtics = gt.tics.call(gt);
         }

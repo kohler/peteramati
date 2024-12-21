@@ -1,6 +1,6 @@
 <?php
 // contactview.php -- HotCRP helper class for user related printouts
-// Peteramati is Copyright (c) 2006-2020 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class ContactView {
@@ -584,47 +584,6 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
         }
 
         echo '</div>';
-    }
-
-    static function pset_grade($notesj, $pset) {
-        if (!$pset->grades()) {
-            return null;
-        }
-
-        $total = $nonextra = 0;
-        $r = [];
-        $g = $notesj->grades ?? null;
-        $ag = $notesj->autogrades ?? null;
-        $rag = array();
-        foreach ($pset->grades() as $ge) {
-            $key = $ge->key;
-            $gv = null;
-            if ($ag && isset($ag->$key)) {
-                $gv = $rag[$key] = $ag->$key;
-            }
-            if ($g && isset($g->$key)) {
-                $gv = $g->$key;
-            }
-            if ($gv !== null) {
-                $r[$key] = $gv;
-                if (!$ge->no_total) {
-                    $total += $gv;
-                    if (!$ge->is_extra) {
-                        $nonextra += $gv;
-                    }
-                }
-            }
-        }
-        if (!empty($r)) {
-            $r["total"] = $total;
-            $r["total_noextra"] = $nonextra;
-            if (!empty($rag)) {
-                $r["autogrades"] = (object) $rag;
-            }
-            return (object) $r;
-        } else {
-            return null;
-        }
     }
 
     static function error_exit($status, $title) {

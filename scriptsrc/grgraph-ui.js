@@ -250,8 +250,14 @@ function grgraph_draw() {
 }
 
 export function grgraph() {
-    const self = this, p = self.getAttribute("data-pa-pset");
-    $.ajax(hoturl("=api/gradestatistics", p ? {pset: p} : {}), {
+    const self = this, arg = {};
+    if (self.hasAttribute("data-pa-pset")) {
+        arg.pset = self.getAttribute("data-pa-pset");
+    }
+    if (self.hasAttribute("data-pa-grade")) {
+        arg.grade = self.getAttribute("data-pa-grade");
+    }
+    $.ajax(hoturl("=api/gradestatistics", arg), {
         type: "GET", cache: true, dataType: "json",
         success: function (d) {
             if (d.series && d.series.all) {

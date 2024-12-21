@@ -109,12 +109,12 @@ class Series {
 
 class GradeStatistics_API {
     /** @param bool $pcview */
-    static function compute(Pset $pset, $pcview) {
+    static private function compute(Pset $pset, ?GradeEntry $ge, $pcview) {
         $vf = ($pcview ? VF_TF : 0) | VF_STUDENT_ANY;
 
         $series = new Series;
         $xseries = $noextra_series = $xnoextra_series = null;
-        if ($pset->has_extra) {
+        if (!$ge && $pset->has_extra) {
             $noextra_series = new Series;
         }
         if ($pset->separate_extension_grades) {
@@ -124,44 +124,40 @@ class GradeStatistics_API {
             $xnoextra_series = new Series;
         }
         $has_extra = $has_xextra = false;
+        $sva = $pset->scores_visible_at;
 
-        if ($pset->scores_visible_at) {
-            $notdropped = "(not c.dropped or c.dropped<{$pset->scores_visible_at})";
-        } else {
-            $notdropped = "not c.dropped";
-        }
-        $q = "select c.contactId, cn.notes, c.extension, cn.notesOverflow from ContactInfo c\n";
-        if ($pset->gitless_grades) {
-            $q .= "\t\tjoin ContactGrade cn on (cn.cid=c.contactId and cn.pset={$pset->id})";
-        } else {
-            $q .= "\t\tjoin ContactLink l on (l.cid=c.contactId and l.type=" . LINK_REPO . " and l.pset={$pset->id})
-                join RepositoryGrade rg on (rg.repoid=l.link and rg.pset={$pset->id} and rg.placeholder<=0)
-                join CommitNotes cn on (cn.pset=rg.pset and cn.bhash=rg.gradebhash)\n";
-        }
-        $result = $pset->conf->qe_raw($q . " where $notdropped");
-        while (($row = $result->fetch_row())) {
-            if (($jstr = $row[3] ?? $row[1])
-                && ($g = ContactView::pset_grade(json_decode($jstr), $pset))) {
-                $cid = +$row[0];
-                $series->add($cid, $g->total);
-                if ($xseries && $row[2]) {
-                    $xseries->add($cid, $g->total);
-                }
-                if ($noextra_series) {
-                    $noextra_series->add($cid, $g->total_noextra);
-                    if ($g->total_noextra != $g->total) {
-                        $has_extra = true;
-                    }
-                }
-                if ($xnoextra_series && $row[2]) {
-                    $xnoextra_series->add($cid, $g->total_noextra);
-                    if ($g->total_noextra != $g->total) {
-                        $has_xextra = true;
-                    }
-                }
+        $sset = new StudentSet($pset->conf->root_user(), StudentSet::ALL);
+        $sset->set_pset($pset);
+        $total = $noextra = null;
+
+        foreach ($sset as $info) {
+            if ($info->user->dropped
+                && (!$sva || $info->user->dropped < $sva)) {
+                continue;
+            }
+            if ($ge) {
+                $total = $info->grade_value($ge);
+            } else {
+                $total = $info->visible_total();
+            }
+            if ($total === null) {
+                continue;
+            }
+            $series->add($info->user->contactId, $total);
+            if ($xseries && $info->user->extension) {
+                $xseries->add($info->user->contactId, $total);
+            }
+            if (!$noextra_series
+                || ($noextra = $info->visible_total_noextra()) === null) {
+                continue;
+            }
+            $noextra_series->add($info->user->contactId, $noextra);
+            $has_extra = $has_extra || ($total != $noextra);
+            if ($xnoextra_series && $info->user->extension) {
+                $xnoextra_series->add($info->user->contactId, $noextra);
+                $has_xextra = $has_xextra || ($total != $noextra);
             }
         }
-        Dbl::free($result);
 
         $r = (object) [
             "pset" => $pset->urlkey,
@@ -178,11 +174,22 @@ class GradeStatistics_API {
             $r->series["extension_noextra"] = $xnoextra_series->summary($pcview);
         }
 
-        $nge = 0;
-        $lastge = null;
         $maxtotal = 0;
-        foreach ($pset->visible_grades($vf) as $ge) {
-            if (!$ge->no_total) {
+        if ($ge) {
+            $nge = 1;
+            $lastge = $ge;
+            if ($pcview || $ge->max_visible) {
+                $maxtotal = $ge->max;
+            } else {
+                $maxtotal = 0;
+            }
+        } else {
+            $nge = 0;
+            $lastge = null;
+            foreach ($pset->visible_grades($vf) as $ge) {
+                if ($ge->no_total) {
+                    continue;
+                }
                 ++$nge;
                 $lastge = $ge;
                 if ($ge->max
@@ -220,7 +227,20 @@ class GradeStatistics_API {
             }
         }
 
+        $ge = null;
+        if ($qreq->grade) {
+            $ge = $pset->gradelike_by_key($qreq->grade);
+            if (!$user->isPC) {
+                return ["error" => "Permission error"];
+            } else if (!$ge) {
+                return ["error" => "No such grade"];
+            }
+        }
+
         $suffix = ($user->isPC ? ".pp" : ".p") . $pset->id;
+        if ($ge) {
+            $suffix .= ".g{$ge->key}";
+        }
         $gradets = $pset->conf->setting("__gradets{$suffix}");
         if ($gradets < @filemtime(__FILE__)) {
             $gradets = 0;
@@ -240,7 +260,7 @@ class GradeStatistics_API {
                 $r->series = (array) $r->series;
             }
         } else {
-            $r = self::compute($pset, $user->isPC);
+            $r = self::compute($pset, $ge, $user->isPC);
             $gradets = Conf::$now;
             $pset->conf->save_setting("__gradets{$suffix}", Conf::$now);
             $pset->conf->save_gsetting("__gradestat{$suffix}", Conf::$now, $r);
