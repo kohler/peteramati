@@ -237,12 +237,13 @@ class GradeStatistics_API {
             }
         }
 
-        $suffix = ($user->isPC ? ".pp" : ".p") . $pset->id;
+        $psuffix = $gsuffix = ($user->isPC ? ".pp" : ".p") . $pset->id;
         if ($ge) {
-            $suffix .= ".g{$ge->key}";
+            $gsuffix .= ".g{$ge->key}";
         }
-        $gradets = $pset->conf->setting("__gradets{$suffix}");
-        if ($gradets < @filemtime(__FILE__)) {
+        $gradets = $pset->conf->setting("__gradets{$psuffix}") ?? 0;
+        if ($gradets < @filemtime(__FILE__)
+            || $gradets < $pset->config_mtime) {
             $gradets = 0;
         }
         if ($gradets
@@ -255,15 +256,15 @@ class GradeStatistics_API {
         }
 
         if ($gradets
-            && ($r = $pset->conf->gsetting_json("__gradestat{$suffix}"))) {
+            && ($r = $pset->conf->gsetting_json("__gradestat{$gsuffix}"))) {
             if (isset($r->series)) {
                 $r->series = (array) $r->series;
             }
         } else {
             $r = self::compute($pset, $ge, $user->isPC);
             $gradets = Conf::$now;
-            $pset->conf->save_setting("__gradets{$suffix}", Conf::$now);
-            $pset->conf->save_gsetting("__gradestat{$suffix}", Conf::$now, $r);
+            $pset->conf->save_setting("__gradets{$psuffix}", Conf::$now);
+            $pset->conf->save_gsetting("__gradestat{$gsuffix}", Conf::$now, $r);
         }
 
         $r->ok = true;

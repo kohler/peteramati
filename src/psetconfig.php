@@ -219,7 +219,9 @@ class Pset {
     /** @var array<string,object> */
     public $api = [];
 
+    /** @var string */
     public $config_signature;
+    /** @var int */
     public $config_mtime;
 
     const URLKEY_REGEX = '/\A[0-9A-Za-z][-0-9A-Za-z_.]*\z/';
