@@ -101,8 +101,8 @@ class Contact {
     private $_gcache = [];
     /** @var array<int,int> */
     private $_gcache_flags = [];
-    /** @var array<string,list<null|false|float>> */
-    private $_gcache_group = [];
+    /** @var list<null|false|float> */
+    private $_gcatcache = [];
 
     // Roles
     const ROLE_PC = 1;
@@ -931,7 +931,7 @@ class Contact {
                         "__gradets.p{$psetid}", "__gradets.pp{$psetid}");
         $this->conf->qe("update ContactInfo set gradeUpdateTime=greatest(?,gradeUpdateTime+1) where contactId=?", Conf::$now, $this->contactId);
         $this->gradeUpdateTime = max(Conf::$now, $this->gradeUpdateTime + 1);
-        $this->_gcache = $this->_gcache_flags = $this->_gcache_group = [];
+        $this->_gcache = $this->_gcache_flags = $this->_gcatcache = [];
     }
 
     /** @return ?GradeExport */
@@ -1005,33 +1005,33 @@ class Contact {
         }
     }
 
-    /** @param string $group
+    /** @param PsetCategory $cat
      * @param bool $noextra
      * @param bool $norm
      * @return ?float */
-    function gcache_category_total($group, $noextra, $norm) {
-        if (!isset($this->_gcache_group[$group])) {
-            $this->_gcache_group[$group] = [false, false, false, false];
+    function gcache_category_total($cat, $noextra, $norm) {
+        $catx = $cat->catid * 4 + ($noextra ? 1 : 0) + ($norm ? 2 : 0);
+        while (count($this->_gcatcache) <= $catx) {
+            $this->_gcatcache[] = false;
         }
-        $i = ($noextra ? 1 : 0) | ($norm ? 2 : 0);
-        if ($this->_gcache_group[$group][$i] === false) {
-            $gw = $this->conf->category_weight($group);
-            $x = null;
-            foreach ($this->conf->psets() as $p) {
-                if ($p->disabled || $p->category !== $group) {
-                    continue;
+        if ($this->_gcatcache[$catx] !== false) {
+            return $this->_gcatcache[$catx];
+        }
+        $x = null;
+        foreach ($cat->psets as $p) {
+            $v = $this->gcache_total($p, $noextra, $norm);
+            if ($v !== null) {
+                if ($norm) {
+                    $v *= $cat->weight_factor($p);
                 }
-                $v = $this->gcache_total($p, $noextra, $norm);
-                if ($v !== null) {
-                    if ($norm) {
-                        $v *= $p->weight / $gw;
-                    }
-                    $x = ($x === null ? 0.0 : $x) + $v;
-                }
+                $x = ($x === null ? 0.0 : $x) + $v;
             }
-            $this->_gcache_group[$group][$i] = $x !== null ? round($x * 10.0) / 10 : null;
         }
-        return $this->_gcache_group[$group][$i];
+        if ($x !== null) {
+            $x = round($x * 10.0) / 10;
+        }
+        $this->_gcatcache[$catx] = $x;
+        return $x;
     }
 
 

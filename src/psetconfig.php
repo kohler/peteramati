@@ -48,12 +48,9 @@ class Pset {
     /** @var ?string
      * @readonly */
     public $category;
-    /** @var float
+    /** @var null|int|float
      * @readonly */
     public $weight;
-    /** @var bool
-     * @readonly */
-    public $weight_default = false;
     /** @var float
      * @readonly */
     public $order;
@@ -292,11 +289,6 @@ class Pset {
         }
         $this->category = self::cstr($p, "category", "group");
         $this->weight = self::cnum($p, "weight");
-        if ($this->weight === null) {
-            $this->weight = 1.0;
-            $this->weight_default = true;
-        }
-        $this->weight = (float) $this->weight;
         $this->order = (float) (Pset::cnum($p, "order", "position") ?? 0.0);
 
         $this->disabled = self::cbool($p, "disabled");

@@ -130,14 +130,8 @@ class Conf {
     private $_psets_sorted = false;
     /** @var ?list<Pset> */
     private $_psets_newest_first;
-    /** @var array<string,float> */
-    private $_category_weight = [];
-    /** @var array<string,bool> */
-    private $_category_weight_default = [];
-    /** @var array<string,list<Pset>> */
-    private $_psets_by_category;
-    /** @var array<string,bool> */
-    private $_category_has_extra;
+    /** @var array<string,PsetCategory> */
+    private $_categories;
     /** @var array<string,QueueConfig> */
     private $_queues = [];
 
@@ -2304,16 +2298,6 @@ class Conf {
             throw new Exception("pset urlkey `{$pset->urlkey}` reused");
         }
         $this->_psets_by_urlkey[$pset->urlkey] = $pset;
-        if (!$pset->disabled && $pset->category) {
-            if (!isset($this->_category_weight[$pset->category])) {
-                $this->_category_weight[$pset->category] = $pset->weight;
-                $this->_category_weight_default[$pset->category] = $pset->weight_default;
-            } else if ($this->_category_weight_default[$pset->category] === $pset->weight_default) {
-                $this->_category_weight[$pset->category] += $pset->weight;
-            } else {
-                throw new Exception("pset `{$pset->urlkey}` in category `{$pset->category}` needs `weight`");
-            }
-        }
         $this->_psets_sorted = false;
         $this->_psets_newest_first = null;
     }
@@ -2375,48 +2359,18 @@ class Conf {
         return $tm;
     }
 
-    /** @param string $group
-     * @return float */
-    function category_weight($group) {
-        return $this->_category_weight[$group] ?? 0.0;
-    }
-
-    /** @return array<string,list<Pset>> */
-    function psets_by_category() {
-        if ($this->_psets_by_category === null) {
-            $this->_psets_by_category = [];
-            $this->_category_has_extra = [];
-            foreach ($this->psets() as $pset) {
-                if (!$pset->disabled) {
-                    $category = $pset->category ?? "";
-                    $this->_psets_by_category[$category][] = $pset;
-                    if ($pset->has_extra) {
-                        $this->_category_has_extra[$category] = true;
-                    }
-                }
-            }
-            uksort($this->_psets_by_category, function ($a, $b) {
-                if ($a === "") {
-                    return 1;
-                } else {
-                    return strnatcmp($a, $b);
-                }
-            });
+    /** @return array<string,PsetCategory> */
+    function categories() {
+        if ($this->_categories === null) {
+            $this->_categories = PsetCategory::make_map($this->psets());
         }
-        return $this->_psets_by_category;
+        return $this->_categories;
     }
 
     /** @param string $category
-     * @return list<Pset> */
-    function pset_category($category) {
-        return ($this->psets_by_category())[$category] ?? [];
-    }
-
-    /** @param string $category
-     * return bool */
-    function pset_category_has_extra($category) {
-        $this->psets_by_category();
-        return $this->_category_has_extra[$category] ?? false;
+     * @return ?PsetCategory */
+    function category($category) {
+        return ($this->categories())[$category] ?? null;
     }
 
 

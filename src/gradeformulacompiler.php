@@ -128,12 +128,12 @@ class GradeFormulaCompiler {
             $this->error_at($this->state->pos2 - strlen($gkey), $this->state->pos2, "<0>Grade entry `{$gkey}` in `{$pset->title}` not found");
             return null;
         }
-        if ($this->conf->pset_category($pkey)
+        if (($cat = $this->conf->category($pkey))
             && ($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
-            if (!$this->conf->pset_category_has_extra($pkey)) {
+            if (!$cat->has_extra) {
                 $f &= ~1;
             }
-            return new CategoryTotal_GradeFormula($this->conf, $pkey, ($f & 1) !== 0, ($f & 4) !== 4);
+            return new CategoryTotal_GradeFormula($this->conf, $cat, $f);
         }
         $this->error_at($this->state->pos1, $this->state->pos1 + strlen($pkey), "<0>Problem set `{$pkey}` not found");
         return null;
@@ -172,8 +172,8 @@ class GradeFormulaCompiler {
         }
         if (($pset = $this->conf->pset_by_key_or_title($gkey))) {
             return new PsetTotal_GradeFormula($pset, $tf);
-        } else if ($this->conf->pset_category($gkey)) {
-            return new CategoryTotal_GradeFormula($this->conf, $gkey, $tf);
+        } else if (($cat = $this->conf->category($gkey))) {
+            return new CategoryTotal_GradeFormula($this->conf, $cat, $tf);
         } else {
             $this->error_at($this->state->pos1, $this->state->pos2, "<0>Undefined problem set or category");
             return null;

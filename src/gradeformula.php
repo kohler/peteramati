@@ -342,14 +342,14 @@ class PsetTotal_GradeFormula extends GradeFormula {
 class CategoryTotal_GradeFormula extends GradeFormula {
     /** @var Conf */
     private $conf;
-    /** @var string */
+    /** @var PsetCategory */
     private $category;
     /** @var bool */
     private $noextra;
     /** @var bool */
     private $norm;
 
-    /** @param string $category
+    /** @param PsetCategory $category
      * @param 0|1|2|3|4|5|6|7 $flags */
     function __construct(Conf $conf, $category, $flags) {
         parent::__construct("ggt", []);
@@ -362,18 +362,18 @@ class CategoryTotal_GradeFormula extends GradeFormula {
         return $student->gcache_category_total($this->category, $this->noextra, $this->norm);
     }
     function export_grade_names(&$v) {
-        foreach ($this->conf->pset_category($this->category) as $pset) {
+        foreach ($this->category->psets as $pset) {
             $v[] = "{$pset->id}.total" . ($this->noextra ? "_noextra" : "");
         }
     }
     function export_psets(&$psets) {
-        foreach ($this->conf->pset_category($this->category) as $pset) {
+        foreach ($this->category->psets as $pset) {
             if (!in_array($pset, $psets)) {
                 $psets[] = $pset;
             }
         }
     }
     function jsonSerialize(): string {
-        return $this->category . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_raw");
+        return $this->category->name . ".total" . ($this->noextra ? "_noextra" : "") . ($this->norm ? "" : "_raw");
     }
 }
