@@ -296,12 +296,11 @@ export class Linediff {
     expansion_contains(isb, lineno) {
         const em = this.element.getAttribute("data-expandmark"),
             m = em ? em.match(/^a(\d+)b(\d+)\+(\d*)$/) : null;
-        if (m) {
-            const delta = m[isb ? 2 : 1] - lineno;
-            return delta >= 0 && (!m[3] || delta < m[3]);
-        } else {
+        if (!m) {
             return false;
         }
+        const delta = lineno - m[isb ? 2 : 1];
+        return delta >= 0 && (!m[3] || delta < m[3]);
     }
     expand() {
         const e = this.element,
@@ -478,20 +477,25 @@ function goto_hash(hash) {
         fd = m ? Filediff.by_hash("#" + m[2]) : null;
     if (!fd) {
         return;
-    } else if (lineid) {
-        fd.line(lineid).then(ln => {
-            fd.toggle(true);
-            const e = ln.visible_predecessor().element;
-            hasClass(e, "pa-gd") && fd.toggle_show_left(true);
-            addClass(e, "pa-line-highlight");
-            window.scrollTo(0, Math.max($(e).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
-        }).catch(null);
-    } else {
+    }
+    if (!lineid) {
         fd.load().then(() => {
             fd.toggle(true);
             window.scrollTo(0, fd.scroll_position());
+        }).catch(() => {
+            window.console && window.console.error(`File \`${m[2]}\` not loadable`);
         });
+        return;
     }
+    fd.line(lineid).then(ln => {
+        fd.toggle(true);
+        const e = ln.visible_predecessor().element;
+        hasClass(e, "pa-gd") && fd.toggle_show_left(true);
+        addClass(e, "pa-line-highlight");
+        window.scrollTo(0, Math.max($(e).geometry().top - Math.max(window.innerHeight * 0.1, 24), 0));
+    }).catch(() => {
+        window.console && window.console.error(`Line \`${m[1]}${m[2]}\` not loadable`);
+    });
 }
 
 if (!hasClass(document.body, "want-grgraph-hash")) {
