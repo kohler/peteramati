@@ -5,6 +5,7 @@
 import { hasClass } from "./ui.js";
 import { render_text } from "./render.js";
 import { Filediff } from "./diff.js";
+import { regexp_quote } from "./encoders.js";
 
 
 const ansistyle_map = {
@@ -174,7 +175,11 @@ export function render_terminal(container, string, options) {
     }
 
     let styles = container.getAttribute("data-pa-terminal-style"),
-        fragment = null;
+        fragment = null,
+        directoryre = null;
+    if (options && options.directory) {
+        directoryre = new RegExp("^(|.*/)(" + regexp_quote(options.directory) + "/[^:\\s]+):(\\d+)(?!\\w)");
+    }
 
     function addlinepart(node, text, link) {
         const n = ansistyle_render(text, styles);
@@ -286,7 +291,8 @@ export function render_terminal(container, string, options) {
         }
 
         if (((m = line.match(/^([ \t]*)([^:\s]+):(\d+)(?=:)/))
-             || (m = line.match(/^([ \t]*)file "(.*?)", line (\d+)/i)))
+             || (m = line.match(/^([ \t]*)file "(.*?)", line (\d+)/i))
+             || (directoryre && (m = line.match(directoryre))))
             && add_file_link(node, m[1], m[2], m[3], m[0])) {
             displaylen = m[0].length;
             line = line.substr(displaylen);
