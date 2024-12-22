@@ -816,7 +816,7 @@ class RunEnqueue_Batch {
         $pset_arg = $arg["p"] ?? "";
         $pset = $conf->pset_by_key($pset_arg);
         if (!$pset) {
-            throw self::bad_pset_exception($Conf, $pset_arg);
+            throw self::bad_pset_exception($conf, $pset_arg);
         }
         $runner_arg = $arg["r"] ?? "";
         $runner = $pset->runner_by_key($runner_arg);
