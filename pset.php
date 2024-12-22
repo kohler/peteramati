@@ -111,7 +111,7 @@ class PsetRequest {
                 && (!$dl->visible
                     || (is_int($dl->visible) && $dl->visible > Conf::$now)))) {
             header("HTTP/1.0 404 Not Found");
-            exit;
+            exit(0);
         }
         $content = @file_get_contents($dl->file);
         if ($content === false) {
@@ -122,7 +122,7 @@ class PsetRequest {
             } else {
                 header("HTTP/1.0 500 Internal Server Error");
             }
-            exit;
+            exit(0);
         }
         if ($dl->timed) {
             $dls = $this->info->user_jnote("downloaded_at") ?? null;
@@ -137,7 +137,7 @@ class PsetRequest {
         // Etag
         header("Content-Length: " . strlen($content));
         echo $content;
-        exit;
+        exit(0);
     }
 
     function handle_tabwidth() {

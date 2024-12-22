@@ -15,7 +15,7 @@ function error_exit($conf, $msg) {
     $conf->header("GitHub authorization", "home");
     $conf->errorMsg($msg);
     $conf->footer();
-    exit;
+    exit(0);
 }
 
 if (!$clientid || !$clientsecret) {

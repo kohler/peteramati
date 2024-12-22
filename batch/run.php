@@ -186,7 +186,7 @@ class Run_Batch {
             }
         }
         if (isset($arg["H"])) {
-            if (!($hp = CommitRecord::canonicalize_hashpart($arg["H"]))) {
+            if (!($hp = CommitRecord::parse_hashpart($arg["H"]))) {
                 throw new CommandLineException("bad `--commit`");
             }
             $self->hash = $hp;

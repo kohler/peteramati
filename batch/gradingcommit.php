@@ -185,7 +185,7 @@ class GradingCommit_Batch {
                 $self->clear = true;
             } else if ($arg["H"] === "no-grade" || $arg["H"] === "nograde") {
                 $self->nograde = true;
-            } else if (($hp = CommitRecord::canonicalize_hashpart($arg["H"]))) {
+            } else if (($hp = CommitRecord::parse_hashpart($arg["H"]))) {
                 $self->hash = $hp;
             } else {
                 throw new CommandLineException("bad `--commit`");

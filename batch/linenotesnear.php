@@ -28,7 +28,7 @@ class LineNotesNear_Batch {
         $upi = $this->pset->gitless_grades && str_starts_with($this->file, "/");
         $hdr = $upi ? ["email"] : ["repourl", "hash"];
         array_push($hdr, "file", "lineid", "linea", "ftext");
-        $csv = (new CsvGenerator)->select($hdr, true);
+        $csv = (new CsvGenerator)->select($hdr);
         foreach (LineNote_API::all_linenotes_near($this->pset, $this->file, $this->linea,
                                                   $this->linea ? 5 : 0) as $ln) {
             if (!$this->lineid || $ln->lineid === $this->lineid) {

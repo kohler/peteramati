@@ -41,7 +41,7 @@ function initialize_request() {
         && $qreq->method() !== "HEAD"
         && ($qreq->method() !== "OPTIONS" || $nav->page !== "api")) {
         header("HTTP/1.0 405 Method Not Allowed");
-        exit;
+        exit(0);
     }
 
     // mark as already expired to discourage caching, but allow the browser

@@ -80,22 +80,40 @@ class CommitRecord implements JsonSerializable {
     function jsonSerialize(): string {
         return $this->hash;
     }
-    /** @param ?string $hashpart
+
+    /** @param ?string $s
      * @return ?non-empty-string */
-    static function canonicalize_hashpart($hashpart) {
-        if ($hashpart === null || $hashpart === "") {
+    static function parse_hashpart($s, $full = false) {
+        if ($s === null || $s === "") {
             return null;
         }
-        $hashpart = strtolower($hashpart);
+        $s = strtolower($s);
         // NB all special hashparts are not ctype_xdigit
-        if ($hashpart === "handout" || $hashpart === "base") {
+        if (($full
+             ? strlen($s) === 40 || strlen($s) === 64
+             : strlen($s) >= 5)
+            && ctype_xdigit($s)) {
+            return $s;
+        } else if ($s === "handout" || $s === "base") {
             return "handout";
-        } else if ($hashpart === "latest" || $hashpart === "head") {
+        } else if ($s === "latest" || $s === "head") {
             return "latest";
-        } else if ($hashpart === "grading" || $hashpart === "grade") {
+        } else if ($s === "grading" || $s === "grade") {
             return "grading";
-        } else if (strlen($hashpart) >= 5 && ctype_xdigit($hashpart)) {
-            return $hashpart;
+        } else {
+            return null;
+        }
+    }
+
+    /** @param ?string $s
+     * @return ?non-empty-string */
+    static function parse_userpart($s, $explicit = false) {
+        if ($s === null || $s === "") {
+            return null;
+        } else if (strlen($s) > 1 && ($s[0] === "@" || $s[0] === "~")) {
+            return substr($s, 1);
+        } else if (!$explicit) {
+            return $s;
         } else {
             return null;
         }

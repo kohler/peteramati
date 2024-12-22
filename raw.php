@@ -27,7 +27,7 @@ ContactView::set_path_request($Qreq, ["/@", "/@/p", "/@/p/h/f", "/@/p/f",
 $User = $Me;
 if (isset($Qreq->u)
     && !($User = ContactView::prepare_user($Qreq, $Me))) {
-    exit;
+    exit(0);
 }
 assert($User == $Me || $Me->isPC);
 
@@ -38,7 +38,7 @@ $Info = raw_user_pset_info();
 $Repo = $Info->repo;
 $Commit = $Info->commit_hash();
 if (!$Repo || !$Commit || !$Info->can_view_repo_contents() || !$Qreq->file) {
-    exit;
+    exit(0);
 }
 
 // file
@@ -46,7 +46,7 @@ $result = $Repo->gitrun(["git", "cat-file", "blob", "{$Commit}:{$Qreq->file}"]);
 if ($result === null || $result === "") {
     $sizeresult = $Repo->gitrun(["git", "cat-file", "-s", "{$Commit}:{$Qreq->file}"]);
     if (trim($sizeresult) !== "0") {
-        exit;
+        exit(0);
     }
 }
 
@@ -89,7 +89,7 @@ if (isset($_SERVER["HTTP_ACCEPT"])) {
     }
     if (!$acceptable) {
         header("HTTP/1.0 406 Not Acceptable");
-        exit;
+        exit(0);
     }
 }
 

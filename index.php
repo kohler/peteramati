@@ -30,7 +30,7 @@ function choose_page($nav) {
         return "cacheable.php";
     } else {
         header("HTTP/1.0 404 Not Found");
-        exit;
+        exit(0);
     }
 }
 

@@ -557,8 +557,8 @@ class Repository {
 
     /** @param string $arg
      * @return ?string */
-    private function rev_parse($arg) {
-        $grr = $this->gitruninfo(["git", "rev-parse", "--verify", $arg]);
+    function resolve_commit($arg) {
+        $grr = $this->gitruninfo(["git", "rev-parse", "--verify", "{$arg}^{commit}"]);
         if ($grr->ok && $grr->stdout) {
             return trim($grr->stdout);
         } else {
@@ -1032,7 +1032,7 @@ class Repository {
             return null;
         }
 
-        return $this->rev_parse("trunc{$pset->id}_{$hash}");
+        return $this->resolve_commit("trunc{$pset->id}_{$hash}");
     }
 
     /** @param string $refname
@@ -1040,13 +1040,13 @@ class Repository {
     function truncated_hash(Pset $pset, $refname) {
         $hash = $refname;
         if (!git_refname_is_full_hash($hash)) {
-            $hash = $this->rev_parse($hash);
+            $hash = $this->resolve_commit($hash);
         }
         if ($hash === null) {
             return null;
         }
         if (!array_key_exists($hash, $this->_truncated_hashes)) {
-            $this->_truncated_hashes[$hash] = $this->rev_parse("trunc{$pset->key}_{$hash}")
+            $this->_truncated_hashes[$hash] = $this->resolve_commit("trunc{$pset->key}_{$hash}")
                 ?? $this->prepare_truncated_hash($pset, $hash);
         }
         return $this->_truncated_hashes[$hash];

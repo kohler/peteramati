@@ -7,7 +7,7 @@ require_once("src/initweb.php");
 
 // access only allowed through index.php
 if (!$Conf) {
-    exit;
+    exit(0);
 }
 
 global $Qreq;
@@ -169,7 +169,7 @@ if ($Me->privChair && !$User) {
   <h3>administration</h3>
   <ul>
     <!-- <li><a href='", $Conf->hoturl("settings"), "'>Settings</a></li>
-    <li><a href='", $Conf->hoturl("users", "t=all"), "'>Users</a></li> -->
+    <li><a href='", $Conf->hoturl("users", ["t" => "all"]), "'>Users</a></li> -->
     <li><a href='", $Conf->hoturl("mail"), "'>Send mail</a></li>\n";
 
     $pclike = Contact::ROLE_PCLIKE;
@@ -180,13 +180,13 @@ if ($Me->privChair && !$User) {
 
     $m = [];
     if ($row[0]) {
-        $m[] = '<a href="' . $Conf->hoturl("=index", "enable_user=college-empty") . '">college users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", ["enable_user" => "college-empty"]) . '">college users</a>';
     }
     if ($row[1]) {
-        $m[] = '<a href="' . $Conf->hoturl("=index", "enable_user=extension-empty") . '">extension users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", ["enable_user" => "extension-empty"]) . '">extension users</a>';
     }
     if ($row[2]) {
-        $m[] = '<a href="' . $Conf->hoturl("=index", "enable_user=ta-empty") . '">TAs</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", ["enable_user" => "ta-empty"]) . '">TAs</a>';
     }
     if (!empty($m)) {
         echo '    <li>Enable ', join(", ", $m), "</li>\n";
@@ -194,15 +194,15 @@ if ($Me->privChair && !$User) {
 
     $m = [];
     if ($row[3])
-        $m[] = '<a href="' . $Conf->hoturl("=index", "send_account_info=college-nologin") . '">college users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", ["send_account_info" => "college-nologin"]) . '">college users</a>';
     if ($row[4])
-        $m[] = '<a href="' . $Conf->hoturl("=index", "send_account_info=extension-nologin") . '">extension users</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", ["send_account_info" => "extension-nologin"]) . '">extension users</a>';
     if ($row[5])
-        $m[] = '<a href="' . $Conf->hoturl("=index", "send_account_info=ta-nologin") . '">TAs</a>';
+        $m[] = '<a href="' . $Conf->hoturl("=index", ["send_account_info" => "ta-nologin"]) . '">TAs</a>';
     if (!empty($m))
         echo '    <li>Send account info to ', join(", ", $m), "</li>\n";
 
-    echo "    <li><a href='", $Conf->hoturl("=index", "report=nonanonymous"), "'>Overall grade report</a> (<a href='", $Conf->hoturl("=index", "report=nonanonymous+college"), "'>college</a>, <a href='", $Conf->hoturl("=index", "report=nonanonymous+extension"), "'>extension</a>)</li>
+    echo "    <li><a href='", $Conf->hoturl("=index", ["report" => "nonanonymous"]), "'>Overall grade report</a> (<a href='", $Conf->hoturl("=index", ["report" => "nonanonymous college"]), "'>college</a>, <a href='", $Conf->hoturl("=index", ["report" => "nonanonymous extension"]), "'>extension</a>)</li>
     <!-- <li><a href='", $Conf->hoturl("log"), "'>Action log</a></li> -->
   </ul>
 </div>\n";
@@ -287,7 +287,7 @@ if (!$Me->is_empty() && $User) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
     if ($User !== $Me && !$User->is_anonymous && $User->contactImageId) {
-        echo '<img class="pa-face float-left" src="' . $Conf->hoturl("face", array("u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId)) . '" />';
+        echo '<img class="pa-face float-left" src="' . $Conf->hoturl("face", ["u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId]) . '" />';
     }
     if ($u) {
         echo '<h2 class="homeemail"><a class="q" href="',

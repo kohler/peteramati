@@ -489,7 +489,7 @@ class Contact {
             unset($qreq->actas, $_GET["actas"], $_POST["actas"]);
             $actascontact = $this->actas_user($actas);
             if ($actascontact !== $this) {
-                Conf::$hoturl_defaults["actas"] = urlencode($actascontact->email);
+                Conf::$hoturl_defaults["actas"] = $actascontact->email;
                 $qreq->set_gsession("last_actas", $actascontact->email);
                 self::$base_auth_user = $this;
                 return $actascontact->activate($qreq);
@@ -678,7 +678,7 @@ class Contact {
         $this->conf->header("Permission error");
         $this->conf->msg("You don’t have permission to access this page.", 2);
         $this->conf->footer();
-        exit;
+        exit(0);
     }
 
     function save() {
@@ -1136,7 +1136,7 @@ class Contact {
         if ($acct->save_json($cj, null, $send)) {
             if ($Me && $Me->privChair) {
                 $type = $acct->disabled ? "disabled " : "";
-                $conf->infoMsg("Created {$type}account for <a href=\"" . $conf->hoturl("profile", "u=" . urlencode($acct->email)) . "\">" . Text::user_html_nolink($acct) . "</a>.");
+                $conf->infoMsg("Created {$type}account for <a href=\"" . $conf->hoturl("profile", ["u" => $acct->email]) . "\">" . Text::user_html_nolink($acct) . "</a>.");
             }
             return $acct;
         } else {
@@ -1148,7 +1148,7 @@ class Contact {
     function mark_create($send_email, $message_chair) {
         global $Me;
         if ($Me && $Me->privChair && $message_chair)
-            $this->conf->infoMsg("Created account for <a href=\"" . $this->conf->hoturl("profile", "u=" . urlencode($this->email)) . "\">" . Text::user_html_nolink($this) . "</a>.");
+            $this->conf->infoMsg("Created account for <a href=\"" . $this->conf->hoturl("profile", ["u" => $this->email]) . "\">" . Text::user_html_nolink($this) . "</a>.");
         if ($send_email)
             $this->sendAccountInfo("create", false);
         if ($Me && $Me->has_email() && $Me->email !== $this->email)
@@ -1460,6 +1460,16 @@ class Contact {
         if (!$this->is_anonymous_user()) {
             $this->conf->log($text . " by $this->email", $user, $paperId);
         }
+    }
+
+    /** @param string $key
+     * @return bool */
+    function matches_key($key, $is_self = false) {
+        return ($key ?? "") !== ""
+            && (($is_self && $key === "me")
+                || strcasecmp($key, $this->email ?? "") === 0
+                || strcasecmp($key, $this->github_username ?? "") === 0
+                || $key === $this->anon_username);
     }
 
     function change_username($prefix, $username) {

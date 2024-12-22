@@ -300,7 +300,7 @@ function json_exit($json, $arg2 = null) {
         }
         header("Content-Type: application/json; charset=utf-8");
         echo json_encode_browser($json->content);
-        exit;
+        exit(0);
     }
 }
 

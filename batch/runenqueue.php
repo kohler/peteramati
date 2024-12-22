@@ -6,7 +6,7 @@
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
     require_once(__DIR__ . "/runqueue.php");
-    exit(RunQueue_Batch::make_args(Conf::$main, $argv)->run());
+    exit(RunEnqueue_Batch::make_args(Conf::$main, $argv)->run());
 } else {
     require_once(__DIR__ . "/runqueue.php");
 }

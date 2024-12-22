@@ -1627,6 +1627,8 @@ class Conf {
     const HOTURL_SITE_RELATIVE = 8;
     const HOTURL_NO_DEFAULTS = 16;
 
+    /** @param ?array<string,mixed> $param
+     * @return string */
     function hoturl($page, $param = null, $flags = 0) {
         global $Me;
         $qreq = Qrequest::$main_request;
@@ -1636,93 +1638,48 @@ class Conf {
             $page = substr($page, 1);
             $flags |= self::HOTURL_POST;
         }
-        $t = $page . $nav->php_suffix;
-        $are = '/\A(|.*?(?:&|&amp;))';
-        $zre = '(?:&(?:amp;)?|\z)(.*)\z/';
-        // parse options, separate anchor
-        $anchor = "";
-        if (is_array($param)) {
-            $x = "";
-            foreach ($param as $k => $v) {
-                if ($v === null || $v === false) {
-                } else if ($k === "anchor") {
-                    $anchor = "#" . urlencode($v);
-                } else {
-                    $x .= ($x === "" ? "" : $amp) . $k . "=" . urlencode($v);
-                }
+        if (is_string($param)) {
+            $p = [];
+            if (($hash = strpos($param, "#")) !== false) {
+                $p["anchor"] = substr($param, $hash + 1);
+                $param = substr($param, 0, $hash);
             }
-            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
-                foreach (Conf::$hoturl_defaults as $k => $v) {
-                    if (!array_key_exists($k, $param))
-                        $x .= ($x === "" ? "" : $amp) . $k . "=" . $v;
-                }
+            if (str_starts_with($param, "?")) {
+                $param = substr($param, 1);
             }
-            $param = $x;
-        } else {
-            $param = (string) $param;
-            if (($pos = strpos($param, "#"))) {
-                $anchor = substr($param, $pos);
-                $param = substr($param, 0, $pos);
+            preg_match_all('/([^?=&;])+(?:=([^?=&;]*)|(?=[&;]))/', $param, $mx, PREG_SET_ORDER);
+            foreach ($mx as $m) {
+                $p[urldecode($m[1])] = urldecode($m[2] ?? "");
             }
-            if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
-                foreach (Conf::$hoturl_defaults as $k => $v) {
-                    if (!preg_match($are . preg_quote($k) . '=/', $param))
-                        $param .= ($param === "" ? "" : $amp) . $k . "=" . $v;
+            $param = $p;
+        }
+        if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
+            foreach (Conf::$hoturl_defaults as $k => $v) {
+                if (!array_key_exists($k, $param)) {
+                    $param[$k] = $v;
                 }
             }
         }
         if ($flags & self::HOTURL_POST) {
-            $param .= ($param === "" ? "" : $amp) . "post=" . $qreq->post_value();
+            $param["post"] = $qreq->post_value();
         }
         // create slash-based URLs if appropriate
+        $t = $page . $nav->php_suffix;
         if ($param) {
-            $has_commit = false;
-            if (in_array($page, ["index", "pset", "diff", "run", "raw", "file"])
-                && preg_match($are . 'u=([^&#?]+)' . $zre, $param, $m)) {
-                $t = "~" . $m[2] . ($page === "index" ? "" : "/$t");
-                $param = $m[1] . $m[3];
-            }
-            if (in_array($page, ["pset", "diff", "raw", "file"])
-                && preg_match($are . 'pset=(\w+)' . $zre, $param, $m)) {
-                $t .= "/" . $m[2];
-                $param = $m[1] . $m[3];
-                if (preg_match($are . 'commit=([0-9a-f]+)' . $zre, $param, $m)) {
-                    $t .= "/" . $m[2];
-                    $param = $m[1] . $m[3];
-                    $has_commit = true;
-                }
-            }
-            if (($page === "raw" || $page === "file")
-                && preg_match($are . 'file=([^&#?]+)' . $zre, $param, $m)) {
-                $t .= "/" . str_replace("%2F", "/", $m[2]);
-                $param = $m[1] . $m[3];
-            } else if ($page == "diff"
-                       && $has_commit
-                       && preg_match($are . 'commit1=([0-9a-f]+)' . $zre, $param, $m)) {
-                $t .= "/" . $m[2];
-                $param = $m[1] . $m[3];
-            } else if (($page == "profile" || $page == "face")
-                       && preg_match($are . 'u=([^&#?]+)' . $zre, $param, $m)) {
-                $t .= "/" . $m[2];
-                $param = $m[1] . $m[3];
-            } else if ($page == "help"
-                       && preg_match($are . 't=(\w+)' . $zre, $param, $m)) {
-                $t .= "/" . $m[2];
-                $param = $m[1] . $m[3];
-            } else if (preg_match($are . '__PATH__=([^&]+)' . $zre, $param, $m)) {
-                $t .= "/" . urldecode($m[2]);
-                $param = $m[1] . $m[3];
-            }
-            $param = preg_replace('/&(?:amp;)?\z/', "", $param);
+            $t = $this->_complete_hoturl($t, $page, $param);
         }
-        if ($param !== "" && preg_match('/\A&(?:amp;)?(.*)\z/', $param, $m))
-            $param = $m[1];
-        if ($param !== "")
-            $t .= "?" . $param;
-        if ($anchor !== "")
-            $t .= $anchor;
-        if ($flags & self::HOTURL_SITE_RELATIVE)
+        $anchor = "";
+        if (isset($param["anchor"])) {
+            $anchor = "#" . urlencode($param["anchor"]);
+            unset($param["anchor"]);
+        }
+        if ($param && ($q = http_build_query($param) ?? "") !== "") {
+            $t .= "?" . $q;
+        }
+        $t .= $anchor;
+        if ($flags & self::HOTURL_SITE_RELATIVE) {
             return $t;
+        }
         $need_site_path = false;
         if ($page === "index") {
             $expect = "index" . $nav->php_suffix;
@@ -1743,14 +1700,98 @@ class Conf {
         }
     }
 
+    /** @param string $t
+     * @param string $page
+     * @param array<string,mixed> &$param
+     * @return string */
+    private function _complete_hoturl($t, $page, &$param) {
+        if ($page === "diff") {
+            if (isset($param["u"])
+                && $param["u"] !== ""
+                && ($param["u1"] ?? $param["u"]) === $param["u"]) {
+                $t = "~" . urlencode($param["u"]) . "/{$t}";
+                unset($param["u"], $param["u1"]);
+            }
+            if (isset($param["pset"])
+                && preg_match('/\A\w+\z/', $param["pset"])) {
+                $t .= "/" . $param["pset"];
+                unset($param["pset"]);
+                if (isset($param["u"])
+                    && $param["u"] !== "") {
+                    $t .= "/~" . urlencode($param["u"]);
+                    unset($param["u"]);
+                }
+                if (isset($param["commit"])
+                    && ctype_alnum($param["commit"])) {
+                    $t .= "/" . $param["commit"];
+                    unset($param["commit"]);
+                    if (isset($param["u1"])
+                        && $param["u1"] !== "") {
+                        $t .= "/~" . urlencode($param["u1"]);
+                        unset($param["u1"]);
+                    }
+                    if (isset($param["commit1"])
+                        && ctype_alnum($param["commit1"])) {
+                        $t .= "/" . $param["commit1"];
+                        unset($param["commit1"]);
+                    }
+                }
+            }
+            return $t;
+        }
+        if (in_array($page, ["index", "pset", "run", "raw", "file"])
+            && isset($param["u"])
+            && $param["u"] !== "") {
+            $t = "~" . urlencode($param["u"]) . ($page === "index" ? "" : "/{$t}");
+            unset($param["u"]);
+        }
+        if (in_array($page, ["pset", "raw", "file"])
+            && isset($param["pset"])
+            && preg_match('/\A\w+\z/', $param["pset"])) {
+            $t .= "/" . $param["pset"];
+            unset($param["pset"]);
+            if (isset($param["commit"])
+                && ctype_alnum($param["commit"])) {
+                $t .= "/" . $param["commit"];
+                unset($param["commit"]);
+            }
+        }
+        if (($page === "raw" || $page === "file")
+            && isset($param["file"])
+            && $param["file"] !== "") {
+            $t .= "/" . str_replace("%2F", "/", $param["file"]);
+            unset($param["file"]);
+        } else if (($page === "profile" || $page === "face")
+                   && isset($param["u"])
+                   && $param["u"] !== "") {
+            $t .= "/" . urlencode($param["u"]);
+            unset($param["u"]);
+        } else if ($page === "help"
+                   && isset($param["t"])
+                   && preg_match('/\A\w+\z/', $param["t"])) {
+            $t .= "/" . $param["t"];
+            unset($param["t"]);
+        } else if (isset($param["__PATH__"])) {
+            $t .= "/" . $param["__PATH__"];
+            unset($param["__PATH__"]);
+        }
+        return $t;
+    }
+
+    /** @param ?array<string,mixed> $param
+     * @return string */
     function hoturl_absolute($page, $param = null, $flags = 0) {
         return $this->hoturl($page, $param, self::HOTURL_ABSOLUTE | $flags);
     }
 
+    /** @param ?array<string,mixed> $param
+     * @return string */
     function hoturl_site_relative_raw($page, $param = null) {
         return $this->hoturl($page, $param, self::HOTURL_SITE_RELATIVE | self::HOTURL_RAW);
     }
 
+    /** @param ?array<string,mixed> $param
+     * @return string */
     function hotlink($html, $page, $param = null, $js = null) {
         return Ht::link($html, $this->hoturl($page, $param), $js);
     }
@@ -1762,9 +1803,11 @@ class Conf {
         "forceShow" => true, "sort" => true, "t" => true, "group" => true
     ];
 
-    function selfurl(?Qrequest $qreq = null, $params = null, $flags = 0) {
+    /** @param ?array<string,mixed> $param
+     * @return string */
+    function selfurl(?Qrequest $qreq = null, $param = null, $flags = 0) {
         $qreq = $qreq ?? Qrequest::$main_request;
-        $params = $params ?? [];
+        $param = $param ?? [];
 
         $x = [];
         foreach ($qreq as $k => $v) {
@@ -1774,12 +1817,12 @@ class Conf {
             }
             if ($ak
                 && ($ak === $k || !isset($qreq[$ak]))
-                && !array_key_exists($ak, $params)
+                && !array_key_exists($ak, $param)
                 && !is_array($v)) {
                 $x[$ak] = $v;
             }
         }
-        foreach ($params as $k => $v) {
+        foreach ($param as $k => $v) {
             $x[$k] = $v;
         }
         return $this->hoturl($qreq->page(), $x, $flags);
@@ -2031,7 +2074,7 @@ class Conf {
         if (self::$hoturl_defaults) {
             $siteinfo["defaults"] = [];
             foreach (self::$hoturl_defaults as $k => $v) {
-                $siteinfo["defaults"][$k] = urldecode($v);
+                $siteinfo["defaults"][$k] = $v;
             }
         }
         if ($Me && $Me->email) {
@@ -2122,9 +2165,9 @@ class Conf {
             // help, sign out
             $x = ($id == "search" ? "t=$id" : ($id == "settings" ? "t=chair" : ""));
             if (!$Me->has_email() && !isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . $this->hoturl("index", "signin=1") . '">Sign&nbsp;in</a>';
+                $profile_parts[] = '<a href="' . $this->hoturl("index", ["signin" => 1]) . '">Sign&nbsp;in</a>';
             if (!$Me->is_empty() || isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . $this->hoturl("=index", "signout=1") . '">Sign&nbsp;out</a>';
+                $profile_parts[] = '<a href="' . $this->hoturl("=index", ["signout" => 1]) . '">Sign&nbsp;out</a>';
 
             if (!empty($profile_parts))
                 echo join(' <span class="barsep">·</span> ', $profile_parts);

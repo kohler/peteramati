@@ -170,14 +170,28 @@ class Qrequest implements ArrayAccess, IteratorAggregate, Countable, JsonSeriali
     /** @param int $n
      * @return ?string */
     function path_component($n, $decoded = false) {
-        if ((string) $this->_path !== "") {
-            $p = explode("/", substr($this->_path, 1));
-            if ($n + 1 < count($p)
-                || ($n + 1 === count($p) && $p[$n] !== "")) {
-                return $decoded ? urldecode($p[$n]) : $p[$n];
-            }
+        if ($this->_path === null || $this->_path === "") {
+            return null;
+        }
+        $p = explode("/", substr($this->_path, 1));
+        if ($n + 1 < count($p)
+            || ($n + 1 === count($p) && $p[$n] !== "")) {
+            return $decoded ? urldecode($p[$n]) : $p[$n];
         }
         return null;
+    }
+    /** @return list<string> */
+    function split_path($decoded = false) {
+        if ($this->_path === null || $this->_path === "") {
+            return [];
+        }
+        $p = explode("/", substr($this->_path, 1));
+        if ($decoded) {
+            foreach ($p as &$s) {
+                $s = urldecode($s);
+            }
+        }
+        return $p;
     }
 
     /** @return ?string */

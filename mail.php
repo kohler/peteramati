@@ -447,7 +447,7 @@ else if (($Qreq->check || $Qreq->group || $Qreq->ungroup)
     MailSender::check($recip);
 
 
-echo Ht::form_div($Conf->hoturl("=mail", "check=1")),
+echo Ht::form_div($Conf->hoturl("=mail", ["check" => 1])),
     Ht::hidden_default_submit("default", 1), "
 
 <div class='aa' style='padding-left:8px'>

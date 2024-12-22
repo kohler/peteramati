@@ -110,7 +110,7 @@ class Eval_Batch {
      * @return string */
     private function unparse_key($info, $hash = null) {
         $hash = $hash ?? $info->hash() ?? "none";
-        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}/{$this->runner->name}";
+        return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}";
     }
 
     /** @return int */
@@ -177,7 +177,7 @@ class Eval_Batch {
             $self->verbose = true;
         }
         if (isset($arg["H"])) {
-            if (!($hp = CommitRecord::canonicalize_hashpart($arg["H"]))) {
+            if (!($hp = CommitRecord::parse_hashpart($arg["H"]))) {
                 throw new CommandLineException("bad `--commit`");
             }
             $self->hash = $hp;

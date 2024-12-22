@@ -14,20 +14,20 @@ class Overview_Page {
     public $conf;
     /** @var Contact
      * @readonly */
-    public $user;
+    public $viewer;
     /** @var Qrequest
      * @readonly */
     public $qreq;
 
 
-    function __construct(Contact $user, Qrequest $qreq)  {
-        $this->conf = $user->conf;
-        $this->user = $user;
+    function __construct(Contact $viewer, Qrequest $qreq)  {
+        $this->conf = $viewer->conf;
+        $this->viewer = $viewer;
         $this->qreq = $qreq;
     }
 
-    static function go(Contact $user, Qrequest $qreq) {
-        $op = new Overview_Page($user, $qreq);
+    static function go(Contact $viewer, Qrequest $qreq) {
+        $op = new Overview_Page($viewer, $qreq);
         $op->handle_requests();
         $op->render_page();
     }
@@ -65,14 +65,14 @@ class Overview_Page {
             } else {
                 $psets = [];
                 foreach ($this->conf->psets() as $pset) {
-                    if ($this->user->can_view_pset($pset)
+                    if ($this->viewer->can_view_pset($pset)
                         && !$pset->disabled
                         && !in_array($pset->key, $have))
                         $psets[] = $pset;
                 }
             }
             foreach ($psets as $pset) {
-                if (!$this->user->can_view_pset($pset) || $pset->disabled) {
+                if (!$this->viewer->can_view_pset($pset) || $pset->disabled) {
                     continue;
                 }
                 $have[] = $ge ? "{$pset->key}.{$ge->key}" : $pset->key;
@@ -108,7 +108,7 @@ class Overview_Page {
         if (($sset_flags & (StudentSet::COLLEGE | StudentSet::DCE)) === 0) {
             $sset_flags |= StudentSet::COLLEGE | StudentSet::DCE;
         }
-        $sset = new StudentSet($this->user, $sset_flags);
+        $sset = new StudentSet($this->viewer, $sset_flags);
 
         $sj = [];
         foreach ($sset->users() as $u) {

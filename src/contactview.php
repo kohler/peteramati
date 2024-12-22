@@ -25,39 +25,24 @@ class ContactView {
             $commitsuf = "";
             $settings = array();
             while ($ppos < strlen($p) && $xpos < count($x)) {
-                if ($p[$ppos] === "/") {
+                $pch = $p[$ppos];
+                if ($pch === "/") {
                     ++$xpos;
-                } else if ($p[$ppos] === "p"
+                } else if ($pch === "p"
                            && isset($x[$xpos])
                            && $conf->pset_by_key($x[$xpos])) {
                     $settings["pset"] = $x[$xpos];
-                } else if ($p[$ppos] === "H"
-                           // all special hashparts aren’t xdigit
-                           && (strlen($x[$xpos]) === 40 || strlen($x[$xpos]) === 64 || !ctype_xdigit($x[$xpos]))
-                           && ($hp = CommitRecord::canonicalize_hashpart($x[$xpos]))) {
+                } else if (($pch === "H" || $pch === "h")
+                           && ($hp = CommitRecord::parse_hashpart($x[$xpos], $pch === "H"))) {
                     $settings["commit" . $commitsuf] = $hp;
                     $commitsuf = (int) $commitsuf + 1;
-                } else if ($p[$ppos] === "h"
-                           && ($hp = CommitRecord::canonicalize_hashpart($x[$xpos]))) {
-                    $settings["commit" . $commitsuf] = $hp;
-                    $commitsuf = (int) $commitsuf + 1;
-                } else if ($p[$ppos] === "u"
-                           && strlen($x[$xpos])) {
-                    if ($x[$xpos][0] !== "@" && $x[$xpos][0] !== "~") {
-                        $settings["u"] = $x[$xpos];
-                    } else if (strlen($x[$xpos]) > 1) {
-                        $settings["u"] = substr($x[$xpos], 1);
-                    }
-                } else if ($p[$ppos] === "@"
-                           && strlen($x[$xpos])
-                           && ($x[$xpos][0] === "@" || $x[$xpos][0] === "~")) {
-                    if (strlen($x[$xpos]) > 1) {
-                        $settings["u"] = substr($x[$xpos], 1);
-                    }
-                } else if ($p[$ppos] === "f") {
+                } else if (($pch === "@" || $pch === "u")
+                           && ($up = CommitRecord::parse_userpart($x[$xpos], $pch === "@"))) {
+                    $settings["u"] = $up;
+                } else if ($pch === "f") {
                     $settings["file"] = join("/", array_slice($x, $xpos));
                     $xpos = count($x) - 1;
-                } else if ($p[$ppos] === "*") {
+                } else if ($pch === "*") {
                     $xpos = count($x) - 1;
                 } else {
                     $settings = null;
@@ -591,6 +576,6 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
         Conf::$main->header($title, "home");
         echo "<hr class=\"c\">\n";
         Conf::$main->footer();
-        exit;
+        exit(0);
     }
 }

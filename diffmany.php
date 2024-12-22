@@ -190,12 +190,9 @@ class DiffMany_Page {
     }
 
     function run() {
-        $title = $this->pset->title;
-        if ($this->files) {
-            $title .= " > " . join(" ", $this->files);
-        }
+        $suffix = $this->files ? htmlspecialchars(" > " . join(" ", $this->files)) : "";
         $this->conf->set_multiuser_page();
-        $this->conf->header('<span class="pset-title">' . htmlspecialchars($title) . '</span>', "home");
+        $this->conf->header('<span class="pset-title">' . htmlspecialchars($this->pset->title) . '</span>' . $suffix, "home");
 
         foreach ($this->pset->grade_script ?? [] as $gs) {
             Ht::stash_html($this->conf->make_script_file($gs));
