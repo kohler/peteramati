@@ -178,7 +178,7 @@ export function render_terminal(container, string, options) {
         fragment = null,
         directoryre = null;
     if (options && options.directory) {
-        directoryre = new RegExp("^(|.*/)(" + regexp_quote(options.directory) + "/[^:\\s]+):(\\d+)(?!\\w)");
+        directoryre = new RegExp("^(|.*[/\\s])(" + regexp_quote(options.directory) + "[^:\\s]+):(\\d+)(?!\\w)");
     }
 
     function addlinepart(node, text, link) {
