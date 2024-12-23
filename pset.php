@@ -610,9 +610,8 @@ class PsetRequest {
         $fold_viewoptions = !isset($this->qreq->tab) && !isset($this->qreq->wdiff);
         $value .= '<div class="pa-viewoptions">'
             . '<button type="button" class="q ui js-pset-viewoptions">'
-            . '<span class="foldarrow">'
-            . ($fold_viewoptions ? '&#x25B6;' : '&#x25BC;')
-            . '</span> options</button><span style="padding-left:1em"'
+            . foldarrow($fold_viewoptions)
+            . ' options</button><span style="padding-left:1em"'
             . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
             $value .= '&nbsp;<a href="' . $this->conf->selfurl($this->qreq, ["tab" => $i]) . '"'
@@ -853,7 +852,7 @@ class PsetRequest {
             echo ' hidden';
         }
         echo '"><h3><button type="button" class="qo ui pa-run-show">',
-            '<span class="foldarrow">&#x25B6;</span>',
+            foldarrow(false),
             htmlspecialchars($runner->display_title), '</button></h3>',
             '<div class="pa-run pa-run-short need-run hidden"',
             $runner->div_attributes($info->pset);

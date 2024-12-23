@@ -845,6 +845,6 @@ handle_ui.on("pa-run-show", function () {
         const thebutton = jQuery(".pa-runner[value='" + name + "']")[0];
         run(thebutton, {unfold: true});
     } else {
-        fold61(therun, jQuery("#run-" + name));
+        fold61(therun, document.getElementById("run-" + name));
     }
 });

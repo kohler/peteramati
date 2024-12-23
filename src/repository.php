@@ -236,23 +236,24 @@ class Repository {
     /** @param int|float $delta
      * @param bool $foreground */
     function refresh($delta, $foreground = false) {
-        if ((!$this->snapcheckat || $this->snapcheckat + $delta <= Conf::$now)
-            && !$this->conf->opt("disableRemote")) {
-            $this->conf->qe("update Repository set snapcheckat=? where repoid=?", Conf::$now, $this->repoid);
-            $this->snapcheckat = Conf::$now;
-            if ($foreground) {
-                set_time_limit(30);
-            }
-            $this->ensure_repodir();
-            $this->reposite->gitfetch($this, $this->cacheid, $foreground);
-            if ($foreground) {
-                $this->_commits = $this->_commit_lists = [];
-                $this->_branches = null;
-                $this->_heads_loaded = 0;
-                ++$this->_refresh_count;
-            }
-        } else {
+        if ($this->snapcheckat && $this->snapcheckat + $delta > Conf::$now) {
+            return;
+        } else if ($this->conf->opt("disableRemote")) {
             RepositorySite::disabled_remote_error($this->conf);
+            return;
+        }
+        $this->conf->qe("update Repository set snapcheckat=? where repoid=?", Conf::$now, $this->repoid);
+        $this->snapcheckat = Conf::$now;
+        if ($foreground) {
+            set_time_limit(30);
+        }
+        $this->ensure_repodir();
+        $this->reposite->gitfetch($this, $this->cacheid, $foreground);
+        if ($foreground) {
+            $this->_commits = $this->_commit_lists = [];
+            $this->_branches = null;
+            $this->_heads_loaded = 0;
+            ++$this->_refresh_count;
         }
     }
 

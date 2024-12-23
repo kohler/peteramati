@@ -132,9 +132,10 @@ export function fold61(sel, arrowholder, direction) {
         direction = !direction;
     }
     toggleClass(sel, "hidden", direction);
-    arrowholder && $(arrowholder).find("span.foldarrow").html(
-        hasClass(sel, "hidden") ? "&#x25B6;" : "&#x25BC;"
-    );
+    if (arrowholder) {
+        const fa = arrowholder.querySelector("span.foldarrow");
+        fa && fa.classList.toggle("isopen", !hasClass(sel, "hidden"));
+    }
     return false;
 }
 

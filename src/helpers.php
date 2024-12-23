@@ -304,12 +304,9 @@ function json_exit($json, $arg2 = null) {
     }
 }
 
-function foldbutton($foldtype, $title, $foldnum = 0) {
-    $showtitle = ($title ? " title='" . htmlspecialchars("Show $title") . "'" : "");
-    $hidetitle = ($title ? " title='" . htmlspecialchars("Hide $title") . "'" : "");
-    $foldclass = ($foldnum ? $foldnum : "");
-    $foldnum = ($foldnum ? ",$foldnum" : "");
-    return "<a href=\"javascript:void fold('$foldtype',0$foldnum)\" class='foldbutton fn$foldclass'$showtitle>+</a><a href=\"javascript:void fold('$foldtype',1$foldnum)\" class='foldbutton fx$foldclass'$hidetitle>&minus;</a>";
+function foldarrow($open) {
+    $t = $open ? " isopen" : "";
+    return "<span class=\"foldarrow{$t}\"></span>";
 }
 
 /** @param string|Contact $link

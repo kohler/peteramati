@@ -25,9 +25,12 @@ export class Filediff {
     }
     static referenced(e) {
         const er = e.closest(".pa-fileref");
-        let fd;
-        if (er.firstChild.tagName === "A") {
-            fd = Filediff.by_hash(er.firstChild.hash);
+        let a = er.firstChild, fd;
+        while (a && a.nodeName === "SPAN") {
+            a = a.nextSibling;
+        }
+        if (a.tagName === "A") {
+            fd = Filediff.by_hash(a.hash);
         }
         return fd || Filediff.closest(e);
     }

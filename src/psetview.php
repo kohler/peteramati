@@ -2521,9 +2521,7 @@ class PsetView {
         if (!$no_heading) {
             echo '<div class="pa-dg pa-with-fixed">',
                 // NB Javascript depend on `h3 > a:first-child[href=#FILEID]`
-                '<h3 class="pa-fileref"><a class="q ui pa-diff-unfold" href="#', $tabid, '"><span class="foldarrow">',
-                ($expand && $dinfo->loaded ? "&#x25BC;" : "&#x25B6;"),
-                "</span>";
+                '<h3 class="pa-fileref"><a class="q ui pa-diff-unfold" href="#', $tabid, '"><span class="foldarrow', $expand && $dinfo->loaded ? " open" : "", '"></span>';
             if ($args["diffcontext"] ?? false) {
                 echo '<span class="pa-fileref-context">', $args["diffcontext"], '</span>';
             }

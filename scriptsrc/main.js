@@ -874,6 +874,7 @@ function pa_resolve_gradelist() {
 
     // add links
     if (this.classList.contains("want-psetinfo-links")) {
+        this.classList.remove("want-psetinfo-links");
         const bb = document.createElement("div");
         bb.className = "pa-psetinfo-links btnbox mt-2 mb-2 hidden";
         this.append(bb);

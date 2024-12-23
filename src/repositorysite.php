@@ -114,14 +114,14 @@ class RepositorySite {
     }
     /** @return 0|-1 */
     static function disabled_remote_error(Conf $conf) {
-        if (($dr = $conf->opt("disableRemote"))) {
-            if (is_string($dr)) {
-                self::chair_error(htmlspecialchars($dr));
-            }
-            return -1;
-        } else {
+        $dr = $conf->opt("disableRemote") ?? 0;
+        if (!$dr) {
             return 0;
         }
+        if (is_string($dr)) {
+            self::chair_error(htmlspecialchars($dr));
+        }
+        return -1;
     }
     /** @param string $clientid
      * @param string $token
