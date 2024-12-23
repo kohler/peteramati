@@ -179,7 +179,7 @@ function cancel() {
 }
 
 function textarea_keydown(evt) {
-    if (event_key(evt) === "Escape" && !event_key.modecode(evt) && unedit(Note.closest(this))) {
+    if (event_key(evt) === "Escape" && !event_key.modcode(evt) && unedit(Note.closest(this))) {
         return false;
     } else if (event_key(evt) === "Enter" && event_key.modcode(evt) === event_key.META) {
         $(this).closest("form").submit();
