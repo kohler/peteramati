@@ -2910,6 +2910,7 @@ h3.gdialog-userids {
 }
 .pa-fileref-context {
 	font-weight: 500;
+	padding-right: 0.3rem;
 }
 .pa-fileref {
 	padding-left: 24px;
@@ -4049,7 +4050,11 @@ a.help {
 	bottom: 0;
 	left: 0;
 	right: 0;
-	z-index: 59;
+	z-index: 14;
+}
+.modal.transparent {
+	background-color: transparent;
+	z-index: 10;
 }
 .modal-open .modal {
 	overflow-x: hidden;
@@ -4059,7 +4064,7 @@ a.help {
 	position: relative;
 	min-width: 15em;
 	max-width: 32em;
-	z-index: 60;
+	z-index: 16;
 	pointer-events: none;
 }
 .modal-dialog-wide {
@@ -4094,6 +4099,107 @@ a.help {
 	float: left;
 	margin-left: 0;
 	margin-right: 1em;
+}
+
+.dropmenu-details {
+	display: inline-block;
+	position: relative;
+}
+.dropmenu-details > summary {
+	display: inline-block;
+	list-style-type: none;
+}
+.dropmenu-details > summary::-webkit-details-marker {
+	display: none;
+}
+.dropmenu-container {
+	font-size: 0.875rem;
+	text-align: initial;
+	text-indent: initial;
+	position: absolute;
+	background: white;
+	color: #333333;
+	border: 1px solid silver;
+	border-radius: 8px;
+	z-index: 12;
+	cursor: default;
+	box-shadow: 0px 1.5px 5px 1px rgba(0, 0, 0, 0.2);
+	/* can be overridden by .dropmenu-sw */
+	left: 0;
+	right: auto;
+	top: 120%;
+}
+.dropmenu-container::before, .dropmenu-container::after {
+	position: absolute;
+	display: inline-block;
+	content: "";
+}
+.dropmenu-container::before {
+	border: 8px solid transparent;
+	border-bottom-color: silver;
+	/* can be overridden by .dropmenu-sw */
+	top: -16px;
+	left: 9px;
+	right: auto;
+}
+.dropmenu-container::after {
+	border: 7px solid transparent;
+	border-bottom-color: white;
+	/* can be overridden by .dropmenu-sw */
+	top: -14px;
+	left: 10px;
+	right: auto;
+}
+.dropmenu {
+	margin: 0.5rem 0;
+	padding-left: 0 !important;
+	list-style-type: none;
+	width: max-content;
+	max-height: 90vh;
+	overflow-y: auto;
+}
+.dropmenu-draghandle {
+	left: -12px;
+}
+.dropmenu-sw {
+	right: 0;
+	left: auto;
+	top: 120%;
+}
+.dropmenu-sw::before {
+	top: -16px;
+	right: 9px;
+	left: auto;
+}
+.dropmenu-sw::after {
+	top: -14px;
+	right: 10px;
+	left: auto;
+}
+.dropmenu a, .dropmenu .link {
+	color: inherit !important;
+	text-decoration: none;
+}
+.dropmenu > li {
+	padding: 0.25em 2em 0.25em 1em;
+}
+.dropmenu > li.has-link,
+.dropmenu > li.has-quiet-link {
+	cursor: pointer;
+}
+.dropmenu.dropmenu-hovering > li:focus-within {
+	background-color: inherit;
+	color: inherit;
+}
+.dropmenu > li:focus-within,
+.dropmenu-hovering > li.has-link:hover {
+	background-color: #004daa;
+	color: white;
+}
+.dropmenu > li.separator {
+	margin: 0.35em 0;
+	padding: 0;
+	border-bottom: 1px solid silver;
 }
 
 @keyframes spinner {

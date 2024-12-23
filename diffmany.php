@@ -84,11 +84,11 @@ class DiffMany_Page {
             return;
         }
 
-        $linkpart_html = htmlspecialchars($this->viewer->user_linkpart($user));
+        $u = $this->viewer->user_linkpart($user);
         echo '<div id="pa-psetinfo', $this->psetinfo_idx,
             '" class="pa-psetinfo pa-psetinfo-partial pa-diffcontext',
             '" data-pa-pset="', htmlspecialchars($pset->urlkey),
-            '" data-pa-user="', $linkpart_html;
+            '" data-pa-user="', htmlspecialchars($u);
         if (!$pset->gitless && $info->hash()) {
             echo '" data-pa-commit="', htmlspecialchars($info->hash());
         }
@@ -104,7 +104,6 @@ class DiffMany_Page {
         }
         echo '" data-pa-gradeinfo=\'', json_escape_browser_sqattr($gj), '\'>';
 
-        $u = $this->viewer->user_linkpart($user);
         if ($user !== $this->viewer && !$user->is_anonymous && $user->contactImageId) {
             echo '<img class="pa-smallface" src="' . $info->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
         }
@@ -125,6 +124,10 @@ class DiffMany_Page {
             echo '<h3>', Text::user_html($user), '</h3>';
         }
         echo '<hr class="c">';
+        $linkdetails = '<details class="dropmenu-details" role="menu">'
+            . '<summary>'
+            . Ht::button(htmlspecialchars($u), ["class" => "ui js-dropmenu-open need-dropmenu pa-dropmenu-diffmany q", "aria-haspopup" => "menu"])
+            . '</summary><div class="dropmenu-container dropmenu-se"></div></details> /';
 
         if (!$pset->gitless && $info->hash() && $info->commit()) {
             $lnorder = $info->visible_line_notes();
@@ -154,7 +157,7 @@ class DiffMany_Page {
                         "expand" => true,
                         "hide_left" => true,
                         "no_heading" => $onefile,
-                        "diffcontext" => "{$linkpart_html} / "
+                        "diffcontext" => $linkdetails
                     ]);
                 }
                 PsetView::print_sidebar_close($sbflags);

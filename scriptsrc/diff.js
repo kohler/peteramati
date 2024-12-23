@@ -3,7 +3,8 @@
 // See LICENSE for open-source distribution terms
 
 import { ImmediatePromise } from "./utils.js";
-import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui } from "./ui.js";
+import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui, $e } from "./ui.js";
+import { dropmenu } from "./dropmenu.js";
 import { hoturl } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
 
@@ -516,3 +517,29 @@ handle_ui.on("pa-gx", function (evt) {
 });
 
 $(Filediff.decorate_page);
+
+
+function diffmany_dropmenu_toggle(evt) {
+    const h3 = this.closest(".pa-fileref");
+    if (this.open) {
+        h3 && (h3.style.zIndex = 2);
+        const menu = this.lastElementChild.firstChild;
+        $(menu).awaken().find(".want-focus").focus();
+    } else {
+        h3 && (h3.style.zIndex = null);
+        this.removeEventListener("toggle", diffmany_dropmenu_toggle);
+    }
+}
+
+dropmenu.add_builder("pa-dropmenu-diffmany", function (e) {
+    const psim = this.closest(".pa-diffset"),
+        pme = this.closest(".pa-psetinfo"),
+        menu = $e("ul", "dropmenu need-dropmenu-events");
+    for (let e = psim.firstElementChild; e; e = e.nextElementSibling) {
+        menu.appendChild($e("li", "has-link",
+            $e("a", {href: "#" + e.id, class: "dropmenu-close" + (e === pme ? " want-focus" : ""), role: "menuitem"}, e.getAttribute("data-pa-user"))));
+    }
+    const details = this.closest("details");
+    details.lastElementChild.replaceChildren(menu);
+    details.addEventListener("toggle", diffmany_dropmenu_toggle);
+});
