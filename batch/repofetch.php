@@ -96,9 +96,14 @@ class RepoFetch_Batch {
     /** @param list<string> $command
      * @return string */
     static function unparse_command($command) {
-        return Subprocess::unparse_command(array_map(function ($w) {
-            return str_starts_with($w, "credential.helper=") ? "credential.helper=REDACTED" : $w;
-        }, $command));
+        for ($i = 0; $i + 1 < count($command); ) {
+            if ($command[$i] === "-c" && str_starts_with($command[$i + 1], "credential.helper=")) {
+                array_splice($command, $i, 2);
+            } else {
+                ++$i;
+            }
+        }
+        return Subprocess::unparse_command($command);
     }
 
     /** @param list<string> $command
@@ -419,9 +424,6 @@ Usage: php batch/repofetch.php [-r REPOID | -u USER | --refresh]")
         }
         $self->force = isset($arg["f"]);
         $self->verbose = isset($arg["V"]);
-        if ($self->verbose) {
-            Repository::$verbose = true;
-        }
         $self->cacheid = $arg["d"] ?? null;
         $self->upgrade = isset($arg["upgrade"]);
         if (isset($arg["bg"]) && pcntl_fork() > 0) {
