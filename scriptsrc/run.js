@@ -165,7 +165,7 @@ export function run(button, opts) {
         therun.removeAttribute("data-pa-timestamp");
     }
     if (!checkt && opts.clear !== false) {
-        thepre.replaceChildren();
+        thepre[0].replaceChildren();
         addClass(thepre[0].parentElement, "pa-run-short");
         thepre[0].removeAttribute("data-pa-terminal-style");
         $(therun).children(".pa-runrange").remove();
