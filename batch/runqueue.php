@@ -840,29 +840,22 @@ class RunEnqueue_Batch {
         $self->quiet = isset($arg["q"]);
         $self->verbose = isset($arg["V"]);
         if (isset($arg["C"])) {
-            $chain = $arg["C"][0] === "C" ? substr($arg["C"], 1) : $arg["C"];
-            if (ctype_digit($chain)
-                && QueueItem::valid_chain(intval($chain))) {
-                $self->chainid = intval($chain);
-            } else {
+            if (($chain = QueueItem::parse_chain($arg["C"])) === false) {
                 throw new CommandLineException("bad `--chain`");
             }
+            $self->chainid = $chain;
         }
-        if (isset($arg["t"])) {
-            foreach ($arg["t"] as $tag) {
-                if (!preg_match('/\A' . TAG_REGEX_NOTWIDDLE . '\z/', $tag)) {
-                    throw new CommandLineException("bad `--tag`");
-                }
-                $self->tags[] = $tag;
+        foreach ($arg["t"] ?? [] as $tag) {
+            if (!preg_match('/\A' . TAG_REGEX_NOTWIDDLE . '\z/', $tag)) {
+                throw new CommandLineException("bad `--tag`");
             }
+            $self->tags[] = $tag;
         }
-        if (isset($arg["s"])) {
-            foreach ($arg["s"] as $setting) {
-                if (!preg_match('/\A([A-Za-z][_A-Za-z0-9]*)=([-._A-Za-z0-9]*)\z/', $setting, $m)) {
-                    throw new CommandLineException("bad `--setting`");
-                }
-                $self->runsettings[$m[1]] = $m[2];
+        foreach ($arg["s"] ?? [] as $setting) {
+            if (!preg_match('/\A([A-Za-z][_A-Za-z0-9]*)=([-._A-Za-z0-9]*)\z/', $setting, $m)) {
+                throw new CommandLineException("bad `--setting`");
             }
+            $self->runsettings[$m[1]] = $m[2];
         }
         if (isset($arg["H"])) {
             if (!($hp = CommitRecord::parse_hashpart($arg["H"]))) {

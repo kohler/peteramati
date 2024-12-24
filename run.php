@@ -229,87 +229,100 @@ class RunRequest {
         ];
     }
 
+    function runmany_chain() {
+        if ($this->pset->has_xterm_js) {
+            $this->conf->add_stylesheet("stylesheets/xterm.css");
+            $this->conf->add_javascript("scripts/xterm.js");
+        }
+
+        $t = $this->pset->title;
+        if ($this->if_needed) {
+            $t .= " (if needed)";
+        }
+        $t .= " {$this->runner->title}";
+        $this->conf->header(htmlspecialchars($t), "home");
+
+        echo '<h2 id="pa-runmany-who"></h2>',
+            Ht::form($this->conf->hoturl("=run"), ["id" => "pa-runmany-form"]),
+            '<div class="f-contain">',
+            Ht::hidden("u", ""),
+            Ht::hidden("pset", $this->pset->urlkey),
+            Ht::hidden("commit", ""),
+            Ht::hidden("jobs", "", ["disabled" => 1]);
+        if ($this->if_needed) {
+            echo Ht::hidden("ifneeded", 1);
+        }
+        echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany"]),
+            '</div></form>';
+
+        echo '<div id="run-', $this->runner->name, '">',
+            '<div class="pa-run pa-run-short"',
+            $this->runner->div_attributes($this->pset), '>',
+            '<pre class="pa-runpre"></pre></div>',
+            '</div>';
+
+        if (($chain = QueueItem::parse_chain($this->qreq->chain)) !== false) {
+            Ht::stash_script("\$pa.runmany({$chain})");
+        } else {
+            $this->conf->errorMsg("Invalid chain");
+        }
+
+        echo "<hr class=\"c\">\n";
+        $this->conf->footer();
+        exit(0);
+    }
 
     function runmany() {
         if (!$this->viewer->isPC) {
             self::quit("Command reserved for TFs");
         } else if (($err = $this->check_view(true))) {
             self::quit($err);
-        } else if (isset($this->qreq->chain) && ctype_digit($this->qreq->chain)) {
-            if ($this->pset->has_xterm_js) {
-                $this->conf->add_stylesheet("stylesheets/xterm.css");
-                $this->conf->add_javascript("scripts/xterm.js");
-            }
-
-            $t = $this->pset->title;
-            if ($this->if_needed) {
-                $t .= " (if needed)";
-            }
-            $t .= " {$this->runner->title}";
-            $this->conf->header(htmlspecialchars($t), "home");
-
-            echo '<h2 id="pa-runmany-who"></h2>',
-                Ht::form($this->conf->hoturl("=run"), ["id" => "pa-runmany-form"]),
-                '<div class="f-contain">',
-                Ht::hidden("u", ""),
-                Ht::hidden("pset", $this->pset->urlkey),
-                Ht::hidden("commit", ""),
-                Ht::hidden("jobs", "", ["disabled" => 1]);
-            if ($this->if_needed) {
-                echo Ht::hidden("ifneeded", 1);
-            }
-            echo Ht::hidden("run", $this->runner->name, ["id" => "pa-runmany"]),
-                '</div></form>';
-
-            echo '<div id="run-', $this->runner->name, '">',
-                '<div class="pa-run pa-run-short"',
-                $this->runner->div_attributes($this->pset), '>',
-                '<pre class="pa-runpre"></pre></div>',
-                '</div>';
-
-            Ht::stash_script("\$pa.runmany({$this->qreq->chain})");
-            echo "<hr class=\"c\">\n";
-            $this->conf->footer();
-        } else if (!$this->qreq->valid_post()) {
-            self::quit("Session out of date");
-        } else {
-            $users = [];
-            foreach ($this->qreq as $k => $v) {
-                if (substr($k, 0, 2) === "s:"
-                    && $v
-                    && ($uname = urldecode(substr($k, 2)))) {
-                    $users[] = $uname;
-                }
-            }
-            if (empty($users) && ($this->qreq->slist ?? $this->qreq->users)) {
-                $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
-            }
-            $runorder = QueueItem::unscheduled_runorder();
-            $chain = QueueItem::new_chain();
-            $commitq = PsetView::parse_commit_query($this->qreq->commitq);
-            foreach ($users as $uname) {
-                if (!($u = $this->conf->user_by_whatever($uname))) {
-                    continue;
-                }
-                $info = PsetView::make($this->pset, $u, $this->viewer);
-                if ($this->runner->command && !$info->repo) {
-                    continue;
-                }
-                if ($commitq && !$info->select_commit($commitq)) {
-                    continue;
-                }
-                $qi = QueueItem::make_info($info, $this->runner);
-                $qi->chain = $chain;
-                $qi->runorder = $runorder;
-                $qi->flags |= QueueItem::FLAG_UNWATCHED;
-                if ($this->if_needed) {
-                    $qi->ifneeded = 1;
-                }
-                $qi->enqueue();
-                $runorder += 10;
-            }
-            $this->conf->redirect_hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain]);
         }
+
+        if (($this->qreq->chain ?? "") !== "") {
+            return $this->runmany_chain();
+        }
+
+        if (!$this->qreq->valid_post()) {
+            self::quit("Session out of date");
+        }
+
+        $users = [];
+        foreach ($this->qreq as $k => $v) {
+            if (substr($k, 0, 2) === "s:"
+                && $v
+                && ($uname = urldecode(substr($k, 2)))) {
+                $users[] = $uname;
+            }
+        }
+        if (empty($users) && ($this->qreq->slist ?? $this->qreq->users)) {
+            $users = preg_split('/\s+/', $this->qreq->slist ?? $this->qreq->users, -1, PREG_SPLIT_NO_EMPTY);
+        }
+        $runorder = QueueItem::unscheduled_runorder();
+        $chain = QueueItem::new_chain();
+        $commitq = PsetView::parse_commit_query($this->qreq->commitq);
+        foreach ($users as $uname) {
+            if (!($u = $this->conf->user_by_whatever($uname))) {
+                continue;
+            }
+            $info = PsetView::make($this->pset, $u, $this->viewer);
+            if ($this->runner->command && !$info->repo) {
+                continue;
+            }
+            if ($commitq && !$info->select_commit($commitq)) {
+                continue;
+            }
+            $qi = QueueItem::make_info($info, $this->runner);
+            $qi->chain = $chain;
+            $qi->runorder = $runorder;
+            $qi->flags |= QueueItem::FLAG_UNWATCHED;
+            if ($this->if_needed) {
+                $qi->ifneeded = 1;
+            }
+            $qi->enqueue();
+            $runorder += 10;
+        }
+        $this->conf->redirect_hoturl("run", ["pset" => $this->pset->urlkey, "run" => $this->runner->name, "runmany" => 1, "chain" => $chain]);
     }
 
     function download() {

@@ -413,15 +413,36 @@ class QueueItem {
     }
 
     /** @return int */
-    static function new_chain() {
+    static function max_chainid() {
         // make sure JS can represent chain as int
-        return random_int(1, min(PHP_INT_MAX, (1 << 52) - 1));
+        if (PHP_INT_SIZE < 8) {
+            return PHP_INT_MAX - 1;
+        } else {
+            return (1 << 52) - 1;
+        }
     }
 
-    /** @param int $chain
-     * @return bool */
-    static function valid_chain($chain) {
-        return $chain >= 0 && $chain <= PHP_INT_MAX && $chain <= (1 << 52) - 1;
+    /** @return int */
+    static function new_chain() {
+        return random_int(1, self::max_chainid());
+    }
+
+    /** @param null|int|string $chain
+     * @return int|false */
+    static function parse_chain($chain) {
+        if (is_string($chain)) {
+            if (str_starts_with($chain, "C")) {
+                $chain = substr($chain, 1);
+            }
+            if (!ctype_digit($chain) || str_starts_with($chain, "0")) {
+                return false;
+            }
+            $chain = intval($chain);
+        }
+        if (is_int($chain) && $chain > 0 && $chain <= self::max_chainid()) {
+            return $chain;
+        }
+        return false;
     }
 
     /** @param PsetView $info
