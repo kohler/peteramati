@@ -610,7 +610,7 @@ class PsetRequest {
         $fold_viewoptions = !isset($this->qreq->tab) && !isset($this->qreq->wdiff);
         $value .= '<div class="pa-viewoptions">'
             . '<button type="button" class="q ui js-pset-viewoptions">'
-            . foldarrow($fold_viewoptions)
+            . foldarrow(!$fold_viewoptions)
             . ' options</button><span style="padding-left:1em"'
             . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
