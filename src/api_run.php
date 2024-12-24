@@ -6,31 +6,80 @@
 class Run_API {
     static function runchainhead(Contact $user, Qrequest $qreq, APIData $api) {
         if (($chain = QueueItem::parse_chain($qreq->chain)) === false) {
-            return ["ok" => false, "error" => "Invalid request."];
+            return ["ok" => false, "error" => "Invalid request"];
         }
-        $qi = QueueItem::by_chain($user->conf, $chain);
-        if (!$qi) {
-            return ["ok" => true, "done" => true, "njobs" => 0];
-        } else if (!$user->isPC && $qi->reqcid !== $user->contactId) {
-            return ["ok" => false, "error" => "Permission error."];
-        } else if (!($pset = $qi->pset())) {
-            return ["ok" => false, "error" => "Invalid pset."];
-        } else if (!($u = $qi->user())) {
-            return ["ok" => false, "error" => "Invalid user."];
+        $cursor = PHP_INT_MAX;
+        if (isset($qreq->cursor) && ctype_digit($qreq->cursor)) {
+            $cursor = intval($qreq->cursor);
         }
-        if ($qi->schedulable()) {
-            $qi->schedule(0);
+
+        for ($ntries = 0; $ntries < 5; ++$ntries) {
+            // load and check chain
+            $qis = QueueItem::list_by_chain($user->conf, $chain, true);
+            if (empty($qis)) {
+                return ["ok" => false, "error" => "Queue not found"];
+            } else if (!$user->isPC && $qis[0]->reqcid !== $user->contactId) {
+                return ["ok" => false, "error" => "Permission error"];
+            }
+
+            // enumerate chain
+            $njobs = $ncancelled = $ndone = $nscheduled = $nunscheduled = 0;
+            $active = [];
+            foreach ($qis as $qi) {
+                ++$njobs;
+                if ($qi->status() >= QueueItem::STATUS_DONE) {
+                    ++$ndone;
+                } else if ($qi->status() >= QueueItem::STATUS_CANCELLED) {
+                    ++$ncancelled;
+                } else if ($qi->status() >= QueueItem::STATUS_SCHEDULED) {
+                    ++$nscheduled;
+                } else if ($qi->status() >= QueueItem::STATUS_UNSCHEDULED) {
+                    ++$nunscheduled;
+                }
+                if ($qi->status() >= QueueItem::STATUS_SCHEDULED && $qi->queueid > $cursor) {
+                    $active[] = $qi;
+                }
+            }
+
+            // maybe step chain
+            if ($nscheduled === 0
+                && $nunscheduled > 0
+                && QueueItem::step_chain($user->conf, $chain)) {
+                continue;
+            }
+            break;
         }
-        $anon = $qreq->anonymous ?? $pset->anonymous;
-        return [
+
+        // prepare result
+        $r = [
             "ok" => true,
-            "u" => $user->user_linkpart($u, !!$anon),
-            "pset" => $pset->urlkey,
-            "hash" => $qi->hash(),
-            "queueid" => $qi->queueid,
-            "runner" => $qi->runnername,
-            "timestamp" => $qi->runat,
-            "njobs" => $user->conf->fetch_ivalue("select count(*) from ExecutionQueue where chain=? and status<?", $chain, QueueItem::STATUS_CANCELLED)
+            "njobs" => $njobs,
+            "nleft" => $njobs - $ncancelled - $ndone,
+            "ncancelled" => $ncancelled,
+            "ndone" => $ndone
         ];
+
+        // sort active jobs, expose them
+        usort($active, function ($a, $b) {
+            return $a->queueid <=> $b->queueid;
+        });
+        $anon = friendly_boolean($qreq->anonymous);
+        foreach ($active as $qi) {
+            $pset = $qi->pset();
+            $u = $qi->user();
+            if ($pset && $u) {
+                $r["active"][] = [
+                    "queueid" => $qi->queueid,
+                    "u" => $user->user_linkpart($u, $anon ?? $pset->anonymous),
+                    "pset" => $pset->urlkey,
+                    "runner" => $qi->runnername,
+                    "timestamp" => $qi->runat,
+                    "status" => $qi->status_text(),
+                    "cursor" => $qi->queueid
+                ];
+            }
+        }
+
+        return $r;
     }
 }

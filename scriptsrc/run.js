@@ -144,28 +144,28 @@ export function run(button, opts) {
         kill_checkt,
         queueid = opts.queueid || null, was_onqueue = false,
         eventsource = null,
-        sendtimeout = null;
+        sendtimeout = null,
+        completed = false;
 
     therunout && removeClass(therunout, "hidden");
     removeClass(therun, "need-run");
     fold61(therun, therunout, true);
+
+    if (hasClass(therun, "pa-run-active")) {
+        return true;
+    }
+    addClass(therun, "pa-run-active");
 
     if (opts.unfold && therun.hasAttribute("data-pa-timestamp")) {
         checkt = +therun.getAttribute("data-pa-timestamp");
     } else if (opts.timestamp) {
         checkt = opts.timestamp;
     }
-
-    if (hasClass(therun, "pa-run-active")) {
-        return true;
-    }
-    addClass(therun, "pa-run-active");
     if (!checkt) {
         therun.removeAttribute("data-pa-timestamp");
     }
-
     if (!checkt && opts.clear !== false) {
-        thepre.html("");
+        thepre.replaceChildren();
         addClass(thepre[0].parentElement, "pa-run-short");
         thepre[0].removeAttribute("data-pa-terminal-style");
         $(therun).children(".pa-runrange").remove();
@@ -260,14 +260,15 @@ export function run(button, opts) {
         }
     }
 
-    function done(complete) {
+    function complete(isdone) {
         removeClass(therun, "pa-run-active");
-        if (complete !== false) {
+        if (isdone !== false && !completed) {
             hide_cursor();
             if (button.hasAttribute("data-pa-run-grade")) {
                 grades_fetch(psetinfo); // XXX not on replay
             }
             opts.done_function && opts.done_function();
+            completed = true;
         }
         send_after(-1);
     }
@@ -668,9 +669,9 @@ export function run(button, opts) {
             }
             append("\x1b[1;3;31m" + x + "\x1b[m\r\n");
             scroll_therun();
-            return done();
+            return complete();
         } else if (data.done) {
-            done(false);
+            complete(false);
         }
 
         if (data.eventsource
@@ -699,8 +700,8 @@ export function run(button, opts) {
         // Stay on alternate screen when done (rather than clearing it)
         let m;
         if (data.data
-            && !data.partial
             && data.done
+            && data.end_offset < data.size
             && (m = data.data.match(/\x1b\[\?1049l(?:[\r\n]|\x1b\[\?1l|\x1b\[23;0;0t|\x1b>)*$/))) {
             data.data = data.data.substring(0, data.data.length - m[0].length);
         }
@@ -725,7 +726,7 @@ export function run(button, opts) {
         }
 
         if (data.result) {
-            if (!data.done || data.partial) {
+            if (!data.done || data.end_offset < data.size) {
                 throw new Error("data.result must only be present on last");
             }
             if (ibuffer !== null) {
@@ -740,11 +741,13 @@ export function run(button, opts) {
         scroll_therun();
         if (data.status === "old") {
             send_after(2000);
-        } else if (!data.done || data.partial) {
+        } else if (!data.done || data.end_offset < data.size) {
             send_after(backoff);
         } else {
-            done();
-            if (data.timed && !hasClass(therun.firstChild, "pa-runrange") && opts.timed !== false) {
+            complete();
+            if (data.timed
+                && !hasClass(therun.firstChild, "pa-runrange")
+                && opts.timed !== false) {
                 send({offset: 0}, succeed_add_times);
             }
         }

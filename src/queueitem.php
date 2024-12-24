@@ -342,10 +342,18 @@ class QueueItem {
 
     /** @return bool */
     function abandoned() {
-        return ($this->status === self::STATUS_UNSCHEDULED
-                || $this->status === self::STATUS_SCHEDULED)
-            && ($this->flags & (self::FLAG_UNWATCHED | self::FLAG_FOREGROUND)) === 0
-            && $this->updateat < Conf::$now - 180;
+        if (($this->flags & (self::FLAG_UNWATCHED | self::FLAG_FOREGROUND)) !== 0) {
+            return false;
+        }
+        if ($this->status === self::STATUS_UNSCHEDULED) {
+            // Unscheduled jobs on a chain abandoned after 1 day;
+            // unscheduled jobs not on a chain abandoned after 5 minutes
+            return $this->updateat < Conf::$now - ($this->chain ? 172800 : 500);
+        } else if ($this->status === self::STATUS_SCHEDULED) {
+            // Scheduled jobs abandoned after 3 minutes
+            return $this->updateat < Conf::$now - 180;
+        }
+        return false;
     }
 
     /** @return bool */
@@ -398,18 +406,33 @@ class QueueItem {
     static function by_id(Conf $conf, $queueid, $info = null) {
         $conf->clean_queue();
         $result = $conf->qe("select * from ExecutionQueue where queueid=?", $queueid);
-        return self::fetch($conf, $result, $info);
+        $qi = self::fetch($conf, $result, $info);
+        $result->close();
+        return $qi;
+    }
+
+    /** @param int $chain
+     * @param bool $all
+     * @param int $limit
+     * @return list<QueueItem> */
+    static function list_by_chain(Conf $conf, $chain, $all, $limit = -1) {
+        $param = $all ? "" : " and status<" . self::STATUS_CANCELLED;
+        $limit = $limit < 0 ? "" : " order by runorder asc, queueid asc limit {$limit}";
+        $conf->clean_queue();
+        $result = $conf->qe("select * from ExecutionQueue where chain=?{$param}{$limit}", $chain);
+        $qis = [];
+        while (($qi = self::fetch($conf, $result, null))) {
+            $qis[] = $qi;
+        }
+        $result->close();
+        return $qis;
     }
 
     /** @param int $chain
      * @return ?QueueItem */
     static function by_chain(Conf $conf, $chain) {
-        $conf->clean_queue();
-        $result = $conf->qe("select * from ExecutionQueue
-                where chain=? and status<?
-                order by runorder asc, queueid asc limit 1",
-            $chain, self::STATUS_CANCELLED);
-        return self::fetch($conf, $result, null);
+        $qis = self::list_by_chain($conf, $chain, false, 1);
+        return $qis[0] ?? null;
     }
 
     /** @return int */
@@ -600,38 +623,51 @@ class QueueItem {
         if ($this->queueid === 0) {
             $this->enqueue();
         }
+        if ($this->status !== self::STATUS_PAUSED
+            && $this->status !== self::STATUS_UNSCHEDULED) {
+            return;
+        }
 
-        if ($this->status === self::STATUS_PAUSED
-            || $this->status === self::STATUS_UNSCHEDULED) {
-            if (($userid ?? 0) > 0) {
-                $this->conf->qe("update ExecutionQueue
-                        set status=?, scheduleat=?,
-                        runorder=greatest(coalesce((select last_runorder+1 from ContactInfo where contactId=?),0),?)+?+runstride
-                        where queueid=? and status=?",
-                    self::STATUS_SCHEDULED, Conf::$now,
-                    $userid, Conf::$now, $priority,
-                    $this->queueid, $this->status);
-            } else {
-                $this->conf->qe("update ExecutionQueue
-                        set status=?, scheduleat=?, runorder=?+runstride
-                        where queueid=? and status=?",
-                    self::STATUS_SCHEDULED, Conf::$now,
-                    Conf::$now + $priority,
-                    $this->queueid, $this->status);
-            }
-            if (($row = $this->conf->fetch_first_row("select status, scheduleat, runorder, runstride from ExecutionQueue where queueid=?", $this->queueid))) {
-                $this->status = (int) $row[0];
-                $this->scheduleat = (int) $row[1];
-                $this->runorder = (int) $row[2];
-                $this->runstride = (int) $row[3];
-                if (($userid ?? 0) > 0) {
-                    $last_runorder = $this->runorder - $this->runstride - $priority;
-                    $this->conf->qe("update ContactInfo
-                            set last_runorder=?
-                            where contactId=? and last_runorder<?",
-                        $last_runorder, $userid, $last_runorder);
-                }
-            }
+        // schedule
+        if (($userid ?? 0) > 0) {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?, scheduleat=?, updateat=?,
+                    runorder=greatest(coalesce((select last_runorder+1 from ContactInfo where contactId=?),0),?)+?+runstride
+                    where queueid=? and status=?",
+                self::STATUS_SCHEDULED, Conf::$now, Conf::$now,
+                $userid, Conf::$now, $priority,
+                $this->queueid, $this->status);
+        } else {
+            $this->conf->qe("update ExecutionQueue
+                    set status=?, scheduleat=?, updateat=?,
+                    runorder=?+runstride
+                    where queueid=? and status=?",
+                self::STATUS_SCHEDULED, Conf::$now, Conf::$now,
+                Conf::$now + $priority,
+                $this->queueid, $this->status);
+        }
+
+        // maybe mark chain as active
+        if ($this->chain > 0 && $this->updateat < Conf::$now - 43200) {
+            $this->conf->qe("update ExecutionQueue set updateat=? where chain=? and status=?",
+                Conf::$now, $this->chain, self::STATUS_UNSCHEDULED);
+        }
+
+        // update this QueueItem
+        $row = $this->conf->fetch_first_row("select status, scheduleat, runorder, runstride from ExecutionQueue where queueid=?", $this->queueid);
+        if (!$row) {
+            return;
+        }
+        $this->status = (int) $row[0];
+        $this->scheduleat = (int) $row[1];
+        $this->runorder = (int) $row[2];
+        $this->runstride = (int) $row[3];
+        if (($userid ?? 0) > 0) {
+            $last_runorder = $this->runorder - $this->runstride - $priority;
+            $this->conf->qe("update ContactInfo
+                    set last_runorder=?
+                    where contactId=? and last_runorder<?",
+                $last_runorder, $userid, $last_runorder);
         }
     }
 
@@ -736,9 +772,11 @@ class QueueItem {
         $result = $conf->qe("update ExecutionQueue
                 set runorder=if(status=?,?+runstride,runorder),
                     scheduleat=if(status=?,?,scheduleat),
+                    updateat=if(status=?,?,updateat),
                     status=if(status=?,?,status)
                 where status>=? and status<? and chain=?
                 order by status>? desc, runorder asc, queueid asc limit 1",
+            self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, Conf::$now,
             self::STATUS_UNSCHEDULED, self::STATUS_SCHEDULED,

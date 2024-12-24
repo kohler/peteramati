@@ -32,6 +32,9 @@ class RunRequest {
         return ["ok" => false, "error" => $err];
     }
 
+    /** @param ?string $err
+     * @param ?array<string,mixed> $js
+     * @return never */
     static function quit($err = null, $js = null) {
         json_exit(["ok" => false, "error" => $err] + ($js ?? []));
     }
@@ -82,28 +85,34 @@ class RunRequest {
         }
     }
 
+    /** @param ?string $s
+     * @param string $param
+     * @return ?int */
+    static private function check_int_param($s, $param) {
+        if ($s === null || $s === "") {
+            return null;
+        } else if (ctype_digit($s)) {
+            return intval($s);
+        }
+        self::quit("Invalid {$param} parameter");
+    }
+
     function run() {
         $qreq = $this->qreq;
         if ($qreq->run === null || !$qreq->valid_post()) {
-            return self::error("Permission error");
+            self::quit("Permission error");
         } else if (($err = $this->check_view(false))) {
-            return self::error($err);
+            self::quit($err);
         }
 
+        // parse parameters
+        $queueid = self::check_int_param($qreq->queueid, "queueid");
+        $check = self::check_int_param($qreq->check, "check");
+        $offset = self::check_int_param($qreq->offset, "offset");
         $info = PsetView::make($this->pset, $this->user, $this->viewer, $qreq->newcommit ?? $qreq->commit);
-        if ($qreq->queueid === "") {
-            unset($qreq->queueid);
-        } else if (isset($qreq->queueid) && !ctype_digit($qreq->queueid)) {
-            return self::error("Bad queueid");
-        }
-        if ($qreq->check === "") {
-            unset($qreq->check);
-        } else if (isset($qreq->check) && !ctype_digit($qreq->check)) {
-            return self::error("Bad check timestamp");
-        }
 
         // can we run this?
-        if (isset($qreq->check) && !$this->runner->evaluate_function
+        if ($check !== null && !$this->runner->evaluate_function
             ? !$this->viewer->can_view_run($this->pset, $this->runner, $this->user)
             : !$this->viewer->can_run($this->pset, $this->runner, $this->user)) {
             return self::error("You can’t run that command");
@@ -116,22 +125,22 @@ class RunRequest {
 
         // load queue item
         $qi = null;
-        if (isset($qreq->queueid) && isset($qreq->check)) {
-            $qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info);
+        if ($queueid !== null && $check !== null) {
+            $qi = QueueItem::by_id($this->conf, $queueid, $info);
         }
-        if (!$qi && isset($qreq->check)) {
-            $rr = $info->run_logger()->job_response(intval($qreq->check));
+        if (!$qi && $check !== null) {
+            $rr = $info->run_logger()->job_response($check);
             if (!$rr
                 || ($rr->pset !== $info->pset->urlkey
                     && $this->conf->pset_by_key($rr->pset) !== $info->pset)
                 || $rr->runner !== $this->runner->name) {
-                return self::error("Unknown check timestamp {$qreq->check}");
+                return self::error("Unknown check timestamp {$check}");
             }
             $qi = QueueItem::for_run_response($info, $rr);
         }
-        if (!$qi && isset($qreq->queueid)) {
-            if (!($qi = QueueItem::by_id($this->conf, intval($qreq->queueid), $info))) {
-                return self::error("Unknown queueid {$qreq->queueid}");
+        if (!$qi && $queueid !== null) {
+            if (!($qi = QueueItem::by_id($this->conf, $queueid, $info))) {
+                return self::error("Unknown queueid {$queueid}");
             }
         }
         if (!$qi && $this->if_needed) {
@@ -161,7 +170,7 @@ class RunRequest {
                 return self::error("Wrong runner");
             }
             if ($qi->has_response()) {
-                return $qi->full_response(cvtint($qreq->offset, 0), $qreq->write ?? "", !!$qreq->stop);
+                return $qi->full_response($offset ?? 0, $qreq->write ?? "", !!$qreq->stop);
             }
         }
 

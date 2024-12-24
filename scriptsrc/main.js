@@ -1044,7 +1044,7 @@ function pa_beforeunload(evt) {
 function pa_runmany(chain) {
     const f = document.getElementById("pa-runmany-form"),
         doneinfo = [];
-    let timeout;
+    let timeout, cursor = 0;
     if (f && !f.hasAttribute("data-pa-runmany-unload")) {
         $(window).on("beforeunload", function () {
             const progress = document.getElementById("pa-runmany-progress");
@@ -1087,25 +1087,24 @@ function pa_runmany(chain) {
         f.elements.jobs.value = JSON.stringify(doneinfo);
         f.elements.u.value = "";
         if (doneinfo.length === 1) { // just added first output
-            const button = document.createElement("button");
-            button.append("Download");
-            button.className = "ui js-runmany-download";
-            statusui().lastChild.append(button);
+            statusui().lastChild.append($e("button", {type: "button", class: "ui js-runmany-download"}, "Download"));
         }
     }
     function check() {
         const button = f.elements.run,
             category = button.getAttribute("data-pa-run-category") || button.value,
             therun = document.getElementById("pa-run-" + category);
+        timeout && clearTimeout(timeout);
+        timeout = null;
         if (therun && hasClass(therun, "pa-run-active")) {
-            timeout = timeout || setTimeout(check, 2000);
+            timeout = setTimeout(check, 2000);
             return;
         }
         if (f.elements.jobs && category && therun && therun.hasAttribute("data-pa-timestamp")) {
             mark_job_complete(category, +therun.getAttribute("data-pa-timestamp"));
             therun.removeAttribute("data-pa-timestamp");
         }
-        $.ajax(hoturl("=api/runchainhead", {chain: chain}), {
+        $.ajax(hoturl("=api/runchainhead", {chain: chain, cursor: cursor}), {
             type: "POST", cache: false, dataType: "json", timeout: 30000,
             success: success
         });
@@ -1124,7 +1123,7 @@ function pa_runmany(chain) {
         }
         return e;
     }
-    function progress(njobs) {
+    function progress(nleft, njobs) {
         let progress = document.getElementById("pa-runmany-progress");
         if (!progress) {
             progress = document.createElement("progress");
@@ -1132,31 +1131,36 @@ function pa_runmany(chain) {
             progress.className = "ml-3 mr-3";
             statusui().firstChild.append("Progress: ", progress);
         }
-        progress.max = Math.max(progress.max, njobs + 1);
-        progress.value = progress.max - njobs;
+        progress.max = Math.max(njobs, nleft + 1);
+        progress.value = progress.max - nleft;
         progress.textContent = sprintf("%d%%", progress.value / progress.max);
-        if (njobs === 0) {
-            progress.after("Done!");
+        const have_done = progress.nextElementSibling && hasClass(progress.nextElementSibling, "pa-runmany-done");
+        if (nleft === 0 && !have_done) {
+            progress.after($e("span", "pa-runmany-done", "Done!"));
+        } else if (nleft !== 0 && have_done) {
+            progress.nextElementSibling.remove();
         }
     }
     function success(data) {
         timeout && clearTimeout(timeout);
         timeout = null;
-        if (data && data.ok && data.queueid) {
-            f.elements.u.value = data.u;
-            f.elements.pset.value = data.pset;
-            f.elements.commit.value = data.hash || "";
-            let url = `${siteinfo.site_relative}~${encodeURIComponent(data.u)}/pset/${data.pset}`;
-            if (data.hash) {
-                url += `/${data.hash}`;
+        if (data && data.active && data.active.length) {
+            const aqi = data.active[0];
+            f.elements.u.value = aqi.u;
+            f.elements.pset.value = aqi.pset;
+            f.elements.commit.value = aqi.hash || "";
+            let url = `${siteinfo.site_relative}~${encodeURIComponent(aqi.u)}/pset/${aqi.pset}`;
+            if (aqi.hash) {
+                url += `/${aqi.hash}`;
             }
-            run(f.elements.run, {clear: false, queueid: data.queueid, timestamp: data.timestamp, headline: `\x1b]8;;${url}\x07${data.u}\x1b]8;;\x07`, done_function: check, timed: false});
+            run(f.elements.run, {clear: false, queueid: aqi.queueid, timestamp: aqi.timestamp, headline: `\x1b]8;;${url}\x07${aqi.u}\x1b]8;;\x07`, done_function: check, timed: false});
+            cursor = aqi.cursor;
+            timeout = setTimeout(check, 30000);
+        } else if (!data || data.nleft !== 0) {
+            timeout = setTimeout(check, 4000);
         }
         if (data && data.njobs != null) {
-            progress(data.njobs);
-        }
-        if (!data || data.njobs !== 0) {
-            timeout = setTimeout(check, 4000);
+            progress(data.nleft || 0, data.njobs);
         }
     }
     check();

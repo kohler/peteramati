@@ -195,45 +195,47 @@ class RunLogger {
         $rr->done = $this->job_complete($jobid);
         $rr->log_file = $logfile;
 
-        if ($offset !== null) {
-            if (strlen($s) < $readsz || $offset <= 0) {
-                $sshort = strlen($s) === $readsz;
-                $s = substr($s, max($offset, 0));
-            } else {
-                $s = @file_get_contents($logfile, false, null, $offset, self::MAXREADSZ);
-                $sshort = $s !== false && strlen($s) === self::MAXREADSZ;
-            }
-            if ($s === false) {
-                $s = "";
-            }
-            if ($sshort) {
-                $rr->partial = true;
-                $rr->size = filesize($logfile);
-            }
+        if ($offset === null) {
+            return $rr;
+        }
 
-            // Fix up $data if it is not valid UTF-8.
+        if (strlen($s) < $readsz || $offset <= 0) {
+            $sshort = strlen($s) === $readsz;
+            $s = substr($s, max($offset, 0));
+        } else {
+            $s = @file_get_contents($logfile, false, null, $offset, self::MAXREADSZ);
+            $sshort = $s !== false && strlen($s) === self::MAXREADSZ;
+        }
+        if ($s === false) {
+            $s = "";
+        }
+
+        // Fix up $data if it is not valid UTF-8.
+        if (!is_valid_utf8($s)) {
+            $s = UnicodeHelper::utf8_truncate_invalid($s);
             if (!is_valid_utf8($s)) {
-                $s = UnicodeHelper::utf8_truncate_invalid($s);
-                if (!is_valid_utf8($s)) {
-                    $s = UnicodeHelper::utf8_replace_invalid($s);
-                }
+                $s = UnicodeHelper::utf8_replace_invalid($s);
             }
+        }
 
-            $rr->offset = max($offset, 0);
-            $rr->end_offset = $rr->offset + strlen($s);
-            $rr->data = $s;
+        $rr->offset = max($offset, 0);
+        $rr->end_offset = $rr->offset + strlen($s);
+        $rr->data = $s;
+        if ($sshort || $rr->done) {
+            $rr->size = filesize($logfile);
+            $rr->partial = !$rr->done || $rr->end_offset < $rr->size;
+        }
 
-            // Get time data, if it exists
-            $runner = $this->pset->all_runners[$rr->runner];
-            if ($runner && $runner->timed_replay) {
-                $rr->timed = true;
-                if ($offset <= 0
-                    && $rr->done
-                    && ($time = @file_get_contents("{$logbase}.log.time")) !== false) {
-                    $rr->time_data = $time;
-                    if ($runner->timed_replay !== true) {
-                        $rr->time_factor = $runner->timed_replay;
-                    }
+        // Get time data, if it exists
+        $runner = $this->pset->all_runners[$rr->runner];
+        if ($runner && $runner->timed_replay) {
+            $rr->timed = true;
+            if ($offset <= 0
+                && $rr->done
+                && ($time = @file_get_contents("{$logbase}.log.time")) !== false) {
+                $rr->time_data = $time;
+                if ($runner->timed_replay !== true) {
+                    $rr->time_factor = $runner->timed_replay;
                 }
             }
         }
