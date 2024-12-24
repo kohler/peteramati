@@ -540,7 +540,7 @@ export class GradeSheet {
                 this.vpos[this.value_order[i]] = i;
             }
             if (old_value_order) {
-                this.grades = this.autogrades = this.maxtotal = null;
+                this.grades = this.autogrades = null;
             }
         }
         if (x.grades) {
@@ -663,24 +663,21 @@ export class GradeSheet {
                 }
             }
         }
-        return total !== null ? Math.round(total * 1000) / 1000 : total;
+        return total !== null ? Math.round(total * 1000) / 1000 : null;
     }
 
-    get grade_maxtotal() {
-        if (this.maxtotal == null) {
-            let maxtotal = 0;
-            for (let i = 0; i !== this.value_order.length; ++i) {
-                const ge = this.entries[this.value_order[i]];
-                if (ge && ge.in_total && !ge.is_extra && ge.max
-                    && (!ge.required
-                        || this.scores_editable
-                        || (this.grades && this.grades[i] !== null))) {
-                    maxtotal += ge.max;
-                }
+    grade_maxtotal() {
+        let maxtotal = null;
+        for (let i = 0; i !== this.value_order.length; ++i) {
+            const ge = this.entries[this.value_order[i]];
+            if (ge && ge.in_total && !ge.is_extra && ge.max
+                && (!ge.required
+                    || this.scores_editable
+                    || (this.grades && this.grades[i] !== null))) {
+                maxtotal = (maxtotal || 0) + ge.max;
             }
-            this.maxtotal = Math.round(maxtotal * 1000) / 1000;
         }
-        return this.maxtotal;
+        return maxtotal !== null ? Math.round(maxtotal * 1000) / 1000 : null;
     }
 
     file_anchor(file) {

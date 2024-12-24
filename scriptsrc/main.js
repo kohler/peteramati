@@ -924,29 +924,23 @@ handle_ui.on("pa-psetinfo-link", function () {
 });
 
 function pa_render_total(gi, tm) {
-    var ne = 0, nv = 0;
-    for (var k in gi.entries) {
-        if (gi.entries[k].in_total) {
+    let ne = 0, nv = 0;
+    for (const k in gi.entries) {
+        const ge = gi.entries[k];
+        if (ge.in_total) {
             ++ne;
-            if (gi.entries[k].student_visible(gi))
+            if (ge.student_visible(gi)) {
                 ++nv;
+            }
         }
     }
-    const pdiv = document.createElement("div"),
-        ptdiv = document.createElement("div"),
-        pvdiv = document.createElement("div"),
-        gvspan = document.createElement("span"),
-        gdspan = document.createElement("span");
-    pdiv.className = "pa-total pa-p" + (ne <= 1 ? " hidden" : "") + (nv < ne ? " pa-p-hidden" : "");
-    ptdiv.className = "pa-pt";
-    ptdiv.append(gi.total_type === "subset" ? "subtotal" : "total");
-    pvdiv.className = "pa-pv";
-    gvspan.className = "pa-gradevalue pa-gradewidth";
-    gdspan.className = "pa-gradedesc";
-    gdspan.append("of " + tm[1]);
-    pdiv.append(ptdiv, pvdiv);
-    pvdiv.append(gvspan, " ", gdspan);
-    return pdiv;
+    const pv = $e("div", "pa-pv", $e("span", "pa-gradevalue pa-gradewidth"));
+    if (tm[1] != null) {
+        pv.append(" ", $e("span", "pa-gradedesc", "of " + tm[1]));
+    }
+    return $e("div", "pa-total pa-p" + (ne <= 1 ? " hidden" : "") + (nv < ne ? " pa-p-hidden" : ""),
+        $e("div", "pa-pt", gi.total_type === "subset" ? "subtotal" : "total"),
+        pv);
 }
 
 function pa_loadgrades() {
@@ -971,7 +965,7 @@ function pa_loadgrades() {
     });
 
     // print totals
-    const tm = gi.total_type === "hidden" ? [null, null] : [gi.grade_total(), gi.grade_maxtotal],
+    const tm = gi.total_type === "hidden" ? [null, null] : [gi.grade_total(), gi.grade_maxtotal()],
           total = tm[0] === null ? "" : "" + tm[0];
     if (tm[0] !== null) {
         $(this).find(".pa-gradelist:not(.pa-gradebox)").each(function () {
