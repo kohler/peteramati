@@ -133,7 +133,10 @@ class DiffMany_Page {
             $lnorder = $info->visible_line_notes();
             $onlyfiles = $this->fileglob ? $this->expand_files($info) : $this->files;
             $onefile = count($onlyfiles ?? []) === 1 && !$this->fileglob;
-            $diff = $info->diff($info->base_handout_commit(), $info->commit(), $lnorder, ["onlyfiles" => $onlyfiles, "no_full" => true, "no_local_diffconfig" => true]);
+            $dctx = $info->diff_context($info->base_handout_commit(), $info->commit(), $lnorder, PsetView::DCTX_NO_LOCAL_DIFFCONFIG);
+            $dctx->set_allowed_files($onlyfiles);
+            $dctx->no_full = true;
+            $diff = $info->diff($dctx);
             if ($onefile
                 && isset($diff[$onlyfiles[0]])
                 && $this->qreq->lines

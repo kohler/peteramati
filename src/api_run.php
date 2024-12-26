@@ -12,6 +12,7 @@ class Run_API {
         if (isset($qreq->cursor) && ctype_digit($qreq->cursor)) {
             $cursor = intval($qreq->cursor);
         }
+        $njobs = $ncancelled = $ndone = 0; // shut up phan
 
         for ($ntries = 0; $ntries < 5; ++$ntries) {
             // load and check chain

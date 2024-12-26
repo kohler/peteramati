@@ -259,10 +259,11 @@ class Diff_Page {
             ContactView::echo_group("notes", join(", ", $notelinks));
         }
 
-        $diff = $this->info1->diff($this->commit, $this->commit1, $lnorder, [
-            "no_full" => !$this->commit->is_handout($this->pset) || $this->commit1->is_handout($this->pset),
-            "no_user_collapse" => true
-        ]);
+        $dctx = $this->info1->diff_context($this->commit, $this->commit1, $lnorder);
+        $dctx->no_full = !$this->commit->is_handout($this->pset)
+            || $this->commit1->is_handout($this->pset);
+        $dctx->no_user_collapse = true;
+        $diff = $this->info1->diff($dctx);
         if ($diff) {
             echo '<div class="pa-diffset">';
             // diff and line notes

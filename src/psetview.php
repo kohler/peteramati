@@ -2246,6 +2246,36 @@ class PsetView {
         }
     }
 
+    const DCTX_NO_LOCAL_DIFFCONFIG = 1;
+
+    /** @param 0|1 $flags
+     * @return DiffContext */
+    function diff_context(CommitRecord $commita, CommitRecord $commitb,
+                          ?LineNotesOrder $lnorder, $flags = 0) {
+        if (($flags & self::DCTX_NO_LOCAL_DIFFCONFIG) !== 0) {
+            $this->pset->set_local_diffconfig_source(null);
+        } else if ($this->pset->set_local_diffconfig_source($this)) {
+            if (($tw = $this->commit_jnote("tabwidth"))) {
+                $this->pset->add_local_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));
+            }
+            if (($diffs = $this->repository_jnote("diffs"))) {
+                $this->_add_local_diffconfigs($diffs, 100.0);
+            }
+            if (($diffs = $this->commit_jnote("diffs"))) {
+                $this->_add_local_diffconfigs($diffs, 101.0);
+            }
+        }
+
+        $dctx = new DiffContext($this->repo, $this->pset, $commita, $commitb);
+        if ($lnorder) {
+            $dctx->lnorder = $lnorder;
+            foreach ($lnorder->fileorder() as $fn => $x) {
+                $dctx->add_required_file($fn);
+            }
+        }
+        return $dctx;
+    }
+
     /** @param array &$args */
     private function _prepare_diff_args(?LineNotesOrder $lnorder, &$args) {
         if ($args["no_local_diffconfig"] ?? false) {
@@ -2268,23 +2298,22 @@ class PsetView {
         }
     }
 
-    /** param array $args
-     * @return array<string,DiffInfo> */
-    private function _read_diff(CommitRecord $commita, CommitRecord $commitb, $args) {
+    /** @return array<string,DiffInfo> */
+    private function _read_diff(DiffContext $dctx) {
         // both repos must be in the same directory; assume handout
         // is only potential problem
-        if ($commita->is_handout($this->pset) !== $commitb->is_handout($this->pset)) {
+        if ($dctx->commita->is_handout($this->pset) !== $dctx->commitb->is_handout($this->pset)) {
             $this->conf->handout_repo($this->pset, $this->repo);
         }
 
         // obtain diff
-        $diff = $this->repo->diff($this->pset, $commita, $commitb, $args);
+        $diff = $this->repo->diff($dctx);
 
         // update `emptydiff_at`
-        if (!isset($args["onlyfiles"])
+        if ($dctx->only_files === null
             && ($rpi = $this->rpi())
-            && $commitb->hash === $rpi->gradehash
-            && $commita === $this->base_handout_commit()
+            && $dctx->commitb->hash === $rpi->gradehash
+            && $dctx->commita === $this->base_handout_commit()
             && ($lhc = $this->pset->latest_handout_commit())) {
             $eda = empty($diff) ? $lhc->commitat : null;
             if ($rpi->emptydiff_at !== $eda) {
@@ -2297,9 +2326,8 @@ class PsetView {
     }
 
     /** @param array<string,DiffInfo> $diff
-     * @param array $args
      * @return array<string,DiffInfo> */
-    private function _complete_diff($diff, ?LineNotesOrder $lnorder, $args) {
+    private function _complete_diff($diff, DiffContext $dctx) {
         // expand diff to include all grade landmarks
         if ($this->pset->has_grade_landmark
             && $this->pc_view) {
@@ -2318,34 +2346,40 @@ class PsetView {
             }
         }
 
-        if ($lnorder) {
-            $onlyfiles = Repository::fix_diff_files($args["onlyfiles"] ?? null);
-            foreach ($lnorder->fileorder() as $fn => $order) {
-                if (isset($diff[$fn])) {
-                    // expand diff to include notes
-                    $di = $diff[$fn];
-                    foreach ($lnorder->file($fn) as $lineid => $note) {
-                        if (!$di->contains_lineid($lineid)) {
-                            $l = (int) substr($lineid, 1);
-                            $di->expand_line($lineid[0], $l - 2, $l + 3);
-                        }
+        if ($dctx->lnorder) {
+            // expand diff to include notes
+            $ndiff = count($diff);
+
+            foreach ($dctx->lnorder->fileorder() as $fn => $order) {
+                $di = $diff[$fn] ?? null;
+                if (!$di) {
+                    if (!$dctx->file_allowed($fn)) {
+                        continue;
                     }
-                } else {
-                    // expand diff to include fake files
-                    if (($diffc = $this->pset->find_diffconfig($fn))
-                        && $diffc->fileless
-                        && (!$onlyfiles || ($onlyfiles[$fn] ?? null))) {
-                        $diff[$fn] = $diffi = new DiffInfo($fn, $diffc);
-                        foreach ($lnorder->file($fn) as $note) {
-                            $diffi->add("Z", null, (int) substr($note->lineid, 1), "");
+                    $diffc = $this->pset->find_diffconfig($fn);
+                    $diff[$fn] = $di = new DiffInfo($fn, $diffc, $dctx);
+                    if ($diffc->fileless) {
+                        // add fake file
+                        foreach ($dctx->lnorder->file($fn) as $lineid => $note) {
+                            $l = (int) substr($lineid, 1);
+                            $di->add("Z", null, $l, "");
                         }
-                        uasort($diff, "DiffInfo::compare");
+                        continue;
+                    }
+                }
+                foreach ($dctx->lnorder->file($fn) as $lineid => $note) {
+                    if (!$di->contains_lineid($lineid)) {
+                        $l = (int) substr($lineid, 1);
+                        $di->expand_line($lineid[0], $l - 2, $l + 3);
                     }
                 }
             }
 
             // add diff to linenotes
-            $lnorder->set_diff($diff);
+            if (count($diff) !== $ndiff) {
+                uasort($diff, "DiffInfo::compare");
+            }
+            $dctx->lnorder->set_diff($diff);
         }
 
         // restrict diff
@@ -2360,28 +2394,23 @@ class PsetView {
     }
 
     /** @return array<string,DiffInfo> */
-    function diff(CommitRecord $commita, CommitRecord $commitb,
-                  ?LineNotesOrder $lnorder = null, $args = []) {
-        $this->_prepare_diff_args($lnorder, $args);
-        $diff = $this->_read_diff($commita, $commitb, $args);
-        return $this->_complete_diff($diff, $lnorder, $args);
+    function diff(DiffContext $dctx) {
+        assert($dctx->repo === $this->repo && $dctx->pset === $this->pset);
+        $diff = $this->_read_diff($dctx);
+        return $this->_complete_diff($diff, $dctx);
     }
 
     /** @return array<string,DiffInfo> */
-    function base_diff(CommitRecord $commitb,
-                       ?LineNotesOrder $lnorder = null,
-                       $args = []) {
-        $commita = $this->diff_base_commit();
+    function base_diff(DiffContext $dctx) {
+        assert($dctx->repo === $this->repo && $dctx->pset === $this->pset);
         if (!$this->pset->has_diff_base) {
-            return $this->diff($commita, $commitb, $lnorder, $args);
+            return $this->diff($dctx);
         }
 
         // collect bases that differ from pset-wide base
-        $onlyfiles = Repository::fix_diff_files($args["onlyfiles"] ?? null);
         $bases = $cbyhash = $fbyhash = [];
-        foreach ($this->repo->ls_files($commitb->hash) as $fn) {
-            if ($onlyfiles !== null
-                && !isset($onlyfiles[$fn])) {
+        foreach ($this->repo->ls_files($dctx->hashb) as $fn) {
+            if (!$dctx->file_allowed($fn)) {
                 continue;
             }
             $diffc = $this->pset->find_diffconfig($fn);
@@ -2392,7 +2421,7 @@ class PsetView {
             }
             if (!array_key_exists($diffc->base, $bases)) {
                 $c = $this->commit_in_base($diffc->base);
-                if ($c !== null && $c !== $commita) {
+                if ($c !== null && $c !== $dctx->commita) {
                     $bases[$diffc->base] = $c;
                     $cbyhash[$c->hash] = $c;
                 } else {
@@ -2405,19 +2434,20 @@ class PsetView {
         }
 
         // merge diff on pset-wide base with diffs on file bases
-        $this->_prepare_diff_args($lnorder, $args);
-        $diff = $this->_read_diff($commita, $commitb, $args);
+        $diff = $this->_read_diff($dctx);
         if (!empty($fbyhash)) {
             foreach ($fbyhash as $hash => $flist) {
                 foreach ($flist as $fn) {
                     unset($diff[$fn]);
                 }
-                $args["onlyfiles"] = $flist;
-                $diff = array_merge($diff, $this->_read_diff($cbyhash[$hash], $commitb, $args));
+                $dctx1 = clone $dctx;
+                $dctx1->set_commita($cbyhash[$hash]);
+                $dctx1->set_allowed_files($flist);
+                $diff = array_merge($diff, $this->_read_diff($dctx1));
             }
             uasort($diff, "DiffInfo::compare");
         }
-        return $this->_complete_diff($diff, $lnorder, $args);
+        return $this->_complete_diff($diff, $dctx);
     }
 
     private function diff_line_code($t) {

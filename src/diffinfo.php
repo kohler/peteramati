@@ -70,7 +70,8 @@ class DiffInfo implements Iterator {
     ];
 
     /** @param string $filename */
-    function __construct($filename, ?DiffConfig $diffconfig = null) {
+    function __construct($filename, ?DiffConfig $diffconfig = null,
+                         ?DiffContext $dctx = null) {
         $this->filename = $filename;
         $ismd = str_ends_with($filename, ".md");
         if ($diffconfig) {
@@ -88,6 +89,14 @@ class DiffInfo implements Iterator {
             $this->tabwidth = $diffconfig->tabwidth ?? 4;
         } else {
             $this->markdown = $this->markdown_allowed = $ismd;
+        }
+        if ($dctx) {
+            $this->_repoa = $dctx->repo;
+            $this->_pset = $dctx->pset;
+            $this->_hasha = $dctx->hasha;
+            $this->_hasha_hrepo = $dctx->commita->is_handout($this->_pset);
+            $this->_filenamea = substr($filename, strlen($dctx->truncpfx));
+            $this->wdiff = $dctx->wdiff;
         }
     }
 
@@ -414,11 +423,19 @@ class DiffInfo implements Iterator {
         }
         $this->_diffsz = count($this->_diff);
 
-        // remove last context line if appropriate
-        if ($line_rx === count($lines)
-            && $this->_diffsz > 0 && $this->_diff[$this->_diffsz - 4] === "@") {
-            $this->_diffsz -= 4;
-            array_splice($this->_diff, $this->_diffsz, 4);
+        // add or remove last context line if appropriate
+        if ($line_rx === count($lines)) {
+            if ($this->_diffsz > 0
+                && $this->_diff[$this->_diffsz - 4] === "@") {
+                $this->_diffsz -= 4;
+                array_splice($this->_diff, $this->_diffsz, 4);
+            }
+        } else {
+            if ($this->_diffsz === 0
+                || $this->_diff[$this->_diffsz - 4] !== "@") {
+                array_push($this->_diff, "@", null, null, "");
+                $this->_diffsz += 4;
+            }
         }
 
         return true;

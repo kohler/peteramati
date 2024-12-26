@@ -214,7 +214,10 @@ class LineNote_API {
         if (($err = $api->prepare_commit($info))) {
             return $err;
         }
-        $diff = $info->repo->diff($api->pset, $info->derived_handout_commit(), $info->commit(), ["needfiles" => [$file], "onlyfiles" => [$file]]);
+        $dctx = new DiffContext($info->repo, $api->pset, $info->derived_handout_commit(), $info->commit());
+        $dctx->add_allowed_file($file);
+        $dctx->add_required_file($file);
+        $diff = $info->repo->diff($dctx);
         if (!isset($diff[$file])) {
             return ["ok" => false, "error" => "No such file."];
         } else if (($linea = $diff[$file]->linea_for($lineid)) !== null) {

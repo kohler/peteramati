@@ -216,7 +216,7 @@ class Repo_API {
             return ["ok" => false, "error" => "Permission denied"];
         }
         if (!$qreq->file) {
-            return ["ok" => false, "error" => "Invalid request."];
+            return ["ok" => false, "error" => "Invalid request"];
         }
         $info = PsetView::make($api->pset, $api->user, $user);
         if (($qreq->base_commit ?? $qreq->base_hash ?? "") === "") {
@@ -229,7 +229,11 @@ class Repo_API {
         }
         $info->set_commit($api->commit);
         $lnorder = $info->visible_line_notes();
-        $diff = $info->repo->diff($api->pset, $base_commit, $info->commit(), ["needfiles" => [$qreq->file], "onlyfiles" => [$qreq->file], "wdiff" => !!$qreq->wdiff]);
+        $dctx = new DiffContext($info->repo, $api->pset, $base_commit, $info->commit());
+        $dctx->add_allowed_file($qreq->file);
+        $dctx->add_required_file($qreq->file);
+        $dctx->wdiff = !!friendly_boolean($qreq->wdiff);
+        $diff = $info->repo->diff($dctx);
         if (empty($diff)) {
             return ["ok" => false, "error" => "No diff."];
         }

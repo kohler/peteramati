@@ -1063,13 +1063,12 @@ class Repository {
             return $files;
         } else if (is_string($files)) {
             return [$files => true];
-        } else {
-            $xfiles = [];
-            foreach ($files as $f) {
-                $xfiles[$f] = true;
-            }
-            return $xfiles;
         }
+        $xfiles = [];
+        foreach ($files as $f) {
+            $xfiles[$f] = true;
+        }
+        return $xfiles;
     }
 
     /** @param array<string,DiffInfo> $diffargs
@@ -1135,49 +1134,22 @@ class Repository {
     }
 
     /** @return array<string,DiffInfo> */
-    function diff(Pset $pset, CommitRecord $commita, CommitRecord $commitb, $options = null) {
-        $options = (array) $options;
+    function diff(DiffContext $dctx) {
+        assert($dctx->repo === $this);
+        $pset = $dctx->pset;
+        $ignore_diffconfig = $dctx->commita->is_handout($pset) && $dctx->commitb->is_handout($pset);
         $diffs = [];
 
-        $repodir = $truncpfx = "";
-        if ($pset->directory_noslash !== "") {
-            if ($this->truncated_psetdir($pset)) {
-                $truncpfx = $pset->directory_noslash . "/";
-            } else {
-                $repodir = $pset->directory_noslash . "/";
-            }
-        }
-
-        $hasha = $commita->hash;
-        if ($truncpfx
-            && $commita->is_handout($pset)
-            && !$commitb->is_handout($pset)) {
-            $hasha = $this->truncated_hash($pset, $hasha);
-        }
-        $hashb = $commitb->hash;
-        if ($truncpfx
-            && $commitb->is_handout($pset)
-            && !$commita->is_handout($pset)) {
-            $hashb = $this->truncated_hash($pset, $hashb);
-        }
-
-        $ignore_diffconfig = $commita->is_handout($pset) && $commitb->is_handout($pset);
-        $no_full = $options["no_full"] ?? false;
-        $no_user_collapse = $options["no_user_collapse"] ?? false;
-        $needfiles = self::fix_diff_files($options["needfiles"] ?? null);
-        $onlyfiles = self::fix_diff_files($options["onlyfiles"] ?? null);
-        $wdiff = !!($options["wdiff"] ?? false);
-
         // read "full" files
-        if (!$ignore_diffconfig && !$no_full) {
+        if (!$ignore_diffconfig && !$dctx->no_full) {
             foreach ($pset->potential_diffconfig_full() as $fname) {
                 if (!str_starts_with($fname, $pset->directory_slash)) {
                     $fname = $pset->directory_slash . $fname;
                 }
-                if ((!$onlyfiles || ($onlyfiles[$fname] ?? false))
+                if ($dctx->file_allowed($fname)
                     && ($diffconfig = $pset->find_diffconfig($fname))
                     && $diffconfig->full) {
-                    $command = ["git", "show", "{$hashb}:{$repodir}" . substr($fname, strlen($pset->directory_slash))];
+                    $command = ["git", "show", "{$dctx->hashb}:{$dctx->repodir}" . substr($fname, strlen($pset->directory_slash))];
                     $result = $this->gitrun($command);
                     $di = new DiffInfo($fname, $diffconfig);
                     $diffs[$di->filename] = $di;
@@ -1189,55 +1161,53 @@ class Repository {
             }
         }
 
-        $command = ["git", "diff", "--name-only", $hasha, $hashb];
-        if ($pset && !$truncpfx && $pset->directory_noslash) {
+        $command = ["git", "diff", "--name-only", $dctx->hasha, $dctx->hashb];
+        if ($pset && !$dctx->truncpfx && $pset->directory_noslash) {
             array_push($command, "--", $pset->directory_noslash);
         }
         $result = $this->gitrun($command);
 
         $xdiffs = [];
         foreach (explode("\n", $result) as $line) {
-            if ($line != "") {
-                $file = $truncpfx . $line;
-                $diffconfig = $pset->find_diffconfig($file);
-                // skip files presented in their entirety
-                if ($diffconfig
-                    && !$ignore_diffconfig
-                    && !$no_full
-                    && $diffconfig->full
-                    && ($diffs[$file] ?? null)) {
-                    continue;
+            if ($line == "") {
+                continue;
+            }
+            $file = $dctx->truncpfx . $line;
+            $diffconfig = $pset->find_diffconfig($file);
+            // skip files presented in their entirety
+            if ($diffconfig
+                && !$ignore_diffconfig
+                && !$dctx->no_full
+                && $diffconfig->full
+                && ($diffs[$file] ?? null)) {
+                continue;
+            }
+            // skip files that aren't allowed
+            if (!$dctx->file_allowed($dctx->truncpfx . $line)) {
+                continue;
+            }
+            // create diff record
+            $di = new DiffInfo($file, $diffconfig, $dctx);
+            // decide whether file is collapsed
+            if ($dctx->no_user_collapse
+                && $diffconfig
+                && !$diffconfig->collapse_default) {
+                $di->set_collapse($diffconfig->collapse_default);
+            } else if ($di->collapse
+                       && $dctx->file_required($file)) {
+                $di->set_collapse(null);
+            }
+            // store diff if collapsed, skip if ignored
+            if ($diffconfig
+                && !$ignore_diffconfig
+                && ($diffconfig->ignore || $di->collapse)
+                && !$dctx->file_required($file)) {
+                if (!$diffconfig->ignore) {
+                    $di->finish_unloaded();
+                    $diffs[$file] = $di;
                 }
-                // skip files that aren't allowed
-                if ($onlyfiles && !($onlyfiles[$truncpfx . $line] ?? false)) {
-                    continue;
-                }
-                // create diff record
-                $di = new DiffInfo($file, $diffconfig);
-                $di->set_repoa($this, $pset, $hasha, $line, $commita->is_handout($pset));
-                $di->set_wdiff($wdiff);
-                // decide whether file is collapsed
-                if ($no_user_collapse
-                    && $diffconfig
-                    && !$diffconfig->collapse_default) {
-                    $di->set_collapse($diffconfig->collapse_default);
-                } else if ($di->collapse
-                           && $needfiles
-                           && ($needfiles[$file] ?? false)) {
-                    $di->set_collapse(null);
-                }
-                // store diff if collapsed, skip if ignored
-                if ($diffconfig
-                    && !$ignore_diffconfig
-                    && ($diffconfig->ignore || $di->collapse)
-                    && (!$needfiles || !($needfiles[$file] ?? false))) {
-                    if (!$diffconfig->ignore) {
-                        $di->finish_unloaded();
-                        $diffs[$file] = $di;
-                    }
-                } else {
-                    $xdiffs[] = $di;
-                }
+            } else {
+                $xdiffs[] = $di;
             }
         }
 
@@ -1256,9 +1226,9 @@ class Repository {
             $nd = count($xdiffs);
             $darg = [];
             for ($i = 0; $i < $nd; ++$i) {
-                $darg[substr($xdiffs[$i]->filename, strlen($truncpfx))] = $xdiffs[$i];
+                $darg[substr($xdiffs[$i]->filename, strlen($dctx->truncpfx))] = $xdiffs[$i];
                 if (count($darg) >= 200 || $i == $nd - 1) {
-                    $this->parse_diff($darg, $pset, $hasha, $hashb, $wdiff ? ["-w"] : []);
+                    $this->parse_diff($darg, $pset, $dctx->hasha, $dctx->hashb, $dctx->wdiff ? ["-w"] : []);
                     $darg = [];
                 }
             }
@@ -1273,9 +1243,7 @@ class Repository {
             foreach ($pset->grades() as $g) {
                 $file = $g->landmark_file;
                 if ($file && !isset($diffs[$file])) {
-                    $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file));
-                    $di->set_repoa($this, $pset, $hasha, substr($file, strlen($truncpfx)), $commitb->is_handout($pset));
-                    $di->set_wdiff($wdiff);
+                    $diffs[$file] = $di = new DiffInfo($file, $pset->find_diffconfig($file), $dctx);
                     $di->finish();
                 }
             }
