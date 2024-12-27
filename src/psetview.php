@@ -2328,7 +2328,7 @@ class PsetView {
     /** @param array<string,DiffInfo> $diff
      * @return array<string,DiffInfo> */
     private function _complete_diff($diff, DiffContext $dctx) {
-        // expand diff to include all grade landmarks
+        // expand diff to include grade landmarks
         if ($this->pset->has_grade_landmark
             && $this->pc_view) {
             foreach ($this->pset->grades() as $g) {

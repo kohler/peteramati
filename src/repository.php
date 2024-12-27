@@ -58,8 +58,8 @@ class Repository {
     /** @var ?string */
     private $_original_cacheid;
 
-    /** @var list<array{string,string,list<string>,int}> */
-    static private $_file_contents = [];
+    /** @var list<RepositoryFileContent> */
+    static private $_contents = [];
     /** @var bool */
     static public $verbose = false;
     /** @var ?resource */
@@ -1152,15 +1152,14 @@ class Repository {
                     $command = ["git", "show", "{$dctx->hashb}:{$dctx->repodir}" . substr($fname, strlen($pset->directory_slash))];
                     $result = $this->gitrun($command);
                     $di = new DiffInfo($fname, $diffconfig);
+                    $di->set_contentb(new RepositoryFileContent($dctx->hashb, $fname, $result));
                     $diffs[$di->filename] = $di;
-                    foreach (explode("\n", $result) as $idx => $line) {
-                        $di->add("+", 0, $idx + 1, $line);
-                    }
                     $di->finish();
                 }
             }
         }
 
+        // fetch names of changed files
         $command = ["git", "diff", "--name-only", $dctx->hasha, $dctx->hashb];
         if ($pset && !$dctx->truncpfx && $pset->directory_noslash) {
             array_push($command, "--", $pset->directory_noslash);
@@ -1254,27 +1253,23 @@ class Repository {
     }
 
 
-    /** @return list<string> */
-    function content_lines($hash, $filename) {
-        foreach (self::$_file_contents as $x) {
-            if ($x[0] === $hash && $x[1] === $filename) {
-                ++$x[3];
-                return $x[2];
-            }
-        }
-
-        $n = count(self::$_file_contents);
-        if ($n === 8) {
-            $n = 0;
-            for ($i = 1; $i < 8; ++$i) {
-                if (self::$_file_contents[$i][3] < self::$_file_contents[$n][3])
-                    $n = $i;
+    /** @return RepositoryFileContent */
+    function file_content($hash, $filename) {
+        $l = -1;
+        foreach (self::$_contents as $i => $rfc) {
+            if ($rfc->hash === $hash && $rfc->file === $filename) {
+                $rfc->mark_use();
+                return $rfc;
+            } else if ($l < 0 || self::$_contents[$l]->use_time > $rfc->use_time) {
+                $l = $i;
             }
         }
 
         $result = $this->gitrun(["git", "show", "{$hash}:{$filename}"]);
-        self::$_file_contents[$n] = [$hash, $filename, explode("\n", $result), 1];
-        return self::$_file_contents[$n][2];
+        $rfc = new RepositoryFileContent($hash, $filename, $result);
+        $n = count(self::$_contents);
+        self::$_contents[$n < 8 ? $n : $l] = $rfc;
+        return $rfc;
     }
 
 
@@ -1302,4 +1297,44 @@ class GitTreeListInfo {
     const MODE_RW = 0100644;
     const MODE_RWX = 0100755;
     const MODE_LINK = 0120000;
+}
+
+class RepositoryFileContent {
+    /** @var string */
+    public $hash;
+    /** @var string */
+    public $file;
+    /** @var list<string> */
+    public $lines;
+    /** @var int */
+    public $flags = 0;
+    /** @var int */
+    public $use_time;
+    /** @var int */
+    static private $use_clock = 0;
+
+    /** @param string $hash
+     * @param string $file
+     * @param string $content */
+    function __construct($hash, $file, $content) {
+        $this->hash = $hash;
+        $this->file = $file;
+        if ($content === null || $content === "") {
+            $this->lines = [];
+        } else {
+            $this->lines = explode("\n", $content);
+            $n = count($this->lines);
+            if ($this->lines[$n - 1] === "") {
+                array_pop($this->lines);
+            } else {
+                $this->flags |= DiffInfo::LINE_NONL;
+            }
+        }
+        $this->mark_use();
+    }
+
+    function mark_use() {
+        ++self::$use_clock;
+        $this->use_time = self::$use_clock;
+    }
 }

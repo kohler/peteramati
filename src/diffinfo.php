@@ -100,15 +100,6 @@ class DiffInfo implements Iterator {
         }
     }
 
-    function set_repoa(Repository $repoa, ?Pset $pset, $hasha, $filenamea,
-                       $hasha_hrepo = null) {
-        $this->_repoa = $repoa;
-        $this->_pset = $pset;
-        $this->_hasha = $hasha;
-        $this->_filenamea = $filenamea;
-        $this->_hasha_hrepo = $hasha_hrepo;
-    }
-
     /** @param bool $wdiff */
     function set_wdiff($wdiff) {
         $this->wdiff = $wdiff;
@@ -118,6 +109,21 @@ class DiffInfo implements Iterator {
     function set_collapse($collapse) {
         $this->collapse = !!$collapse;
         $this->_collapse_set = isset($collapse);
+    }
+
+    function set_contentb(RepositoryFileContent $rfc) {
+        assert(empty($this->_diff));
+        foreach ($rfc->lines as $i => $line) {
+            $this->add("+", 0, $i + 1, $line);
+        }
+        if (($rfc->flags & self::LINE_NONL) !== 0) {
+            $this->set_ends_without_newline();
+        }
+    }
+
+    /** @return list<null|string|int> $diff */
+    function __diff() {
+        return $this->_diff;
     }
 
     /** @param string $ch
@@ -376,6 +382,9 @@ class DiffInfo implements Iterator {
         $deltab = 0;
         if ($lx >= 0 && $lx < $this->_diffsz) {
             $deltab = $this->_diff[$lx + 2] - $this->_diff[$lx + 1];
+        } else if ($lx === $this->_diffsz && $this->_diffsz > 0) {
+            assert($this->_diff[$lx - 3] !== null);
+            $deltab = $this->_diff[$lx - 2] - $this->_diff[$lx - 3];
         }
         if ($off === 2) {
             $line_lx -= $deltab;
@@ -383,11 +392,11 @@ class DiffInfo implements Iterator {
         }
 
         // load old content
-        $lines = $this->_repoa->content_lines($this->_hasha, $this->_filenamea);
-        if ($line_lx > count($lines)) {
+        $rfc = $this->_repoa->file_content($this->_hasha, $this->_filenamea);
+        if ($line_lx > count($rfc->lines)) {
             return true;
         }
-        $line_rx = min(count($lines), $line_rx);
+        $line_rx = min(count($rfc->lines), $line_rx);
 
         $splice = [];
         if ($lx >= 0 && $lx < $this->_diffsz
@@ -395,21 +404,21 @@ class DiffInfo implements Iterator {
             && $rx < $this->_diffsz && $this->_diff[$rx + 1] <= $line_rx) {
             $line_rx = $this->_diff[$rx + 1];
             for ($i = $this->_diff[$lx + 1] + 1; $i < $line_rx; ++$i) {
-                array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+                array_push($splice, " ", $i, $i + $deltab, $rfc->lines[$i - 1]);
             }
             array_splice($this->_diff, $lx + 4, $rx - $lx - 4, $splice);
             $this->fix_context($lx);
         } else if ($lx >= 0 && $lx < $this->_diffsz
                    && $this->_diff[$lx + 1] >= $line_lx - 1) {
             for ($i = $this->_diff[$lx + 1] + 1; $i < $line_rx; ++$i) {
-                array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+                array_push($splice, " ", $i, $i + $deltab, $rfc->lines[$i - 1]);
             }
             array_splice($this->_diff, $lx + 4, 0, $splice);
             $this->fix_context($lx);
         } else if ($rx < $this->_diffsz && $this->_diff[$rx + 1] <= $line_rx) {
             $line_rx = $this->_diff[$rx + 1];
             for ($i = $line_lx; $i < $line_rx; ++$i) {
-                array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+                array_push($splice, " ", $i, $i + $deltab, $rfc->lines[$i - 1]);
             }
             array_splice($this->_diff, $rx, 0, $splice);
             $this->fix_context($rx);
@@ -417,18 +426,21 @@ class DiffInfo implements Iterator {
             $linecount = $line_rx - $line_lx;
             array_push($splice, "@", null, null, "@@ -{$line_lx},{$linecount} +" . ($line_lx + $deltab) . ",{$linecount} @@");
             for ($i = $line_lx; $i < $line_rx; ++$i) {
-                array_push($splice, " ", $i, $i + $deltab, $lines[$i - 1]);
+                array_push($splice, " ", $i, $i + $deltab, $rfc->lines[$i - 1]);
             }
             array_splice($this->_diff, $l, 0, $splice);
         }
         $this->_diffsz = count($this->_diff);
 
         // add or remove last context line if appropriate
-        if ($line_rx === count($lines)) {
+        if ($line_rx === count($rfc->lines)) {
             if ($this->_diffsz > 0
                 && $this->_diff[$this->_diffsz - 4] === "@") {
                 $this->_diffsz -= 4;
                 array_splice($this->_diff, $this->_diffsz, 4);
+            }
+            if (($rfc->flags & self::LINE_NONL) !== 0) {
+                $this->set_ends_without_newline();
             }
         } else {
             if ($this->_diffsz === 0
