@@ -1216,8 +1216,9 @@ class Pset {
     }
 
     private static function reorder_config($what, $a, $order) {
-        if (!is_array($order))
+        if (!is_array($order)) {
             throw new PsetConfigException("`$what` format error", $what);
+        }
         $b = array();
         foreach ($order as $name) {
             if (is_string($name)) {
@@ -1239,7 +1240,7 @@ class Pset {
         $i = 0;
         $xp = [];
         foreach ($x as $k => $v) {
-            $xp[$k] = [$v->order, $i];
+            $xp[$k] = [$v->order ?? 0.0, $i];
             ++$i;
         }
         uasort($xp, function ($a, $b) {

@@ -175,10 +175,11 @@ class GradeEntry {
                 $this->disabled_if = Pset::cstr($loc, $g, "disabled_if");
             }
         }
-        $this->order = Pset::cnum($loc, $g, "order", "position");
-        if ($this->order === null && isset($g->priority)) {
-            $this->order = -Pset::cnum($loc, $g, "priority");
+        $o = Pset::cnum($loc, $g, "order", "position");
+        if ($o === null && isset($g->priority)) {
+            $o = -Pset::cnum($loc, $g, "priority");
         }
+        $this->order = (float) ($o ?? 0.0);
 
         $allow_total = false;
         $type = null;
