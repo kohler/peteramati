@@ -337,6 +337,12 @@ class MinMax_GradeFormula extends Function_GradeFormula {
     function __construct($op) {
         parent::__construct($op);
     }
+    function complete(GradeFormulaCompiler $gfc, $p1, $p2) {
+        if (!empty($this->_a)) {
+            $this->vtype = $this->_a[0]->vtype;
+        }
+        return true;
+    }
     function evaluate(Contact $student, ?PsetView $info) {
         $cur = null;
         $ismax = $this->_op === "max";

@@ -268,7 +268,7 @@ class GradeFormulaCompiler {
         } else if (preg_match('/\G(?:\d+\.?\d*|\.\d+)(?!\w)/s', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Constant_GradeFormula((float) $m[0]);
-        } else if (preg_match('/\G(?:[A-D](?!\w)|[A-D][-+]|[A-D]–|F(?!\w))/s', $s, $m, 0, $p)) {
+        } else if (preg_match('/\G(?:[A-D](?![-+\w])|[A-D][-+]|[A-D]–|F(?!\w))/s', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Constant_GradeFormula(GradeEntry::parse_letter_value($m[0]), GradeEntry::VTLETTER);
         } else if (preg_match('/\G(?:pi|π|m_pi)\b/si', $s, $m, 0, $p)) {
