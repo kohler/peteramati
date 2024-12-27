@@ -8,6 +8,14 @@ class Rank_GradeFormula extends Function_GradeFormula {
         parent::__construct("rank");
         $this->cacheable = false;
     }
+    /** @return bool */
+    function complete(GradeFormulaCompiler $gfc, $p1, $p2) {
+        if ($this->nargs() !== 1) {
+            $gfc->error_at($p1, $p2, "<0>Exactly one argument required");
+            return false;
+        }
+        return true;
+    }
     function evaluate(Contact $user, ?PsetView $info) {
         $allv = $this->_allv ?? $this->compute_all($user->conf);
         return $allv[$user->contactId];

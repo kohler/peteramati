@@ -192,10 +192,8 @@ class GradeFormulaCompiler {
     }
 
     /** @param int $p
-     * @param ?int $min
-     * @param ?int $max
      * @return array{?GradeFormula,int} */
-    private function parse_arguments(Function_GradeFormula $fe, $p, $min = null, $max = null) {
+    private function parse_arguments(Function_GradeFormula $fe, $p) {
         $s = $this->state->str;
         $p0 = $p = $this->skip_space($p);
 
@@ -231,14 +229,10 @@ class GradeFormulaCompiler {
             $fe->add_arg($e);
         }
 
-        if ($min !== null && $fe->nargs() < $min) {
-            $this->error_at($p0, $p, "<0>Too few arguments");
-            return [null, $p];
-        } else if ($max !== null && $fe->nargs() > $max) {
-            $this->error_at($p0, $p, "<0>Too many arguments");
-            return [null, $p];
-        } else {
+        if ($fe->complete($this, $p0, $p)) {
             return [$fe, $p];
+        } else {
+            return [null, $p];
         }
     }
 
@@ -274,12 +268,15 @@ class GradeFormulaCompiler {
         } else if (preg_match('/\G(?:\d+\.?\d*|\.\d+)(?!\w)/s', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Constant_GradeFormula((float) $m[0]);
+        } else if (preg_match('/\G(?:[A-D](?!\w)|[A-D][-+]|[A-D]–|F(?!\w))/s', $s, $m, 0, $p)) {
+            $p += strlen($m[0]);
+            $e = new Constant_GradeFormula(GradeEntry::parse_letter_value($m[0]), GradeEntry::VTLETTER);
         } else if (preg_match('/\G(?:pi|π|m_pi)\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Constant_GradeFormula((float) M_PI);
         } else if (preg_match('/\Gnull\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
-            $e = new Null_GradeFormula;
+            $e = new Constant_GradeFormula(null);
         } else if (preg_match('/\G(?:false|true)\b/si', $s, $m, 0, $p)) {
             $p += strlen($m[0]);
             $e = new Constant_GradeFormula($m[0] === "true");
@@ -293,8 +290,10 @@ class GradeFormulaCompiler {
             }
         } else if (preg_match('/\G(?:min|max)\b/s', $s, $m, 0, $p)) {
             list($e, $p) = $this->parse_arguments(new MinMax_GradeFormula($m[0]), $p + strlen($m[0]));
+        } else if (preg_match('/\Grlookup\b/s', $s, $m, 0, $p)) {
+            list($e, $p) = $this->parse_arguments(new Rlookup_GradeFormula, $p + strlen($m[0]));
         } else if (preg_match('/\Grank\b/s', $s, $m, 0, $p)) {
-            list($e, $p) = $this->parse_arguments(new Rank_GradeFormula, $p + strlen($m[0]), 1, 1);
+            list($e, $p) = $this->parse_arguments(new Rank_GradeFormula, $p + strlen($m[0]));
             $e = $e ? $e->canonicalize($this->conf) : null;
         } else if (preg_match('/\G@[2-9]\d\d\d(?:[-\/]\d\d?[-\/]\d\d?|\d{4})(?:[-T:]\d\d?:?\d\d?(?::\d\d|)[-+:A-Z0-9]*|)\b/s', $s, $m, 0, $p)) {
             if (ctype_digit(substr($m[0], 1)) && strlen($m[0]) >= 10) {
@@ -428,7 +427,7 @@ class GradeFormulaCompiler {
             $chgf = $this->_compile_search($ch, $context);
             $gf = $gf ? new NullableBin_GradeFormula($op, $gf, $chgf) : $chgf;
         }
-        return $gf ?? new Null_GradeFormula;
+        return $gf ?? new Constant_GradeFormula(null);
     }
 
     /** @param SearchExpr $sex
@@ -468,7 +467,7 @@ class GradeFormulaCompiler {
         if (preg_match('/\A(?:[-+]?)(?:\d+\.?\d*|\.\d+)\z/', $v)) {
             return new Relation_GradeFormula($op, $gf, new Constant_GradeFormula(floatval($v)));
         }
-        return new Null_GradeFormula;
+        return new Constant_GradeFormula(null);
     }
 
     /** @param string $text

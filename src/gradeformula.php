@@ -32,6 +32,11 @@ abstract class GradeFormula implements JsonSerializable {
 
     abstract function evaluate(Contact $student, ?PsetView $info);
 
+    /** @return ?Constant_GradeFormula */
+    function const_evaluate() {
+        return null;
+    }
+
     /** @param list<string> &$v */
     function export_grade_names(&$v) {
         foreach ($this->_a as $a) {
@@ -86,23 +91,31 @@ class Unary_GradeFormula extends GradeFormula {
     function __construct($op, $e) {
         parent::__construct($op, [$e]);
     }
-    function evaluate(Contact $student, ?PsetView $info) {
-        if (($v0 = $this->_a[0]->evaluate($student, $info)) === null) {
+    private function vevaluate($v) {
+        if ($v === null) {
             return null;
         }
         switch ($this->_op) {
         case "neg":
-            return -$v0;
+            return -$v;
         case "log":
         case "log10":
-            return $v0 > 0 ? log10($v0) : null;
+            return $v > 0 ? log10($v) : null;
         case "ln":
-            return $v0 > 0 ? log($v0) : null;
+            return $v > 0 ? log($v) : null;
         case "lg":
-            return $v0 > 0 ? log($v0) / log(2) : null;
+            return $v > 0 ? log($v) / M_LN2 : null;
         case "exp":
-            return exp($v0);
+            return exp($v);
         }
+    }
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
+        return $this->vevaluate($v0);
+    }
+    function constant_evaluate() {
+        $cv = $this->_a[0]->constant_evaluate();
+        return $cv !== null ? new Constant_GradeFormula($this->vevaluate($cv->v)) : null;
     }
 }
 
@@ -115,6 +128,10 @@ class Not_GradeFormula extends GradeFormula {
     function evaluate(Contact $student, ?PsetView $info) {
         $v0 = $this->_a[0]->evaluate($student, $info);
         return !$v0;
+    }
+    function constant_evaluate() {
+        $cv = $this->_a[0]->constant_evaluate();
+        return $cv !== null ? new Constant_GradeFormula(!$cv->v) : null;
     }
 }
 
@@ -134,9 +151,8 @@ class Bin_GradeFormula extends GradeFormula {
             $this->vtype = GradeEntry::VTDURATION;
         }
     }
-    function evaluate(Contact $student, ?PsetView $info) {
-        if (($v0 = $this->_a[0]->evaluate($student, $info)) === null
-            || ($v1 = $this->_a[1]->evaluate($student, $info)) === null) {
+    function vevaluate($v0, $v1) {
+        if ($v0 === null || $v1 === null) {
             return null;
         }
         switch ($this->_op) {
@@ -153,6 +169,21 @@ class Bin_GradeFormula extends GradeFormula {
         case "**":
             return $v0 ** $v1;
         }
+    }
+    function evaluate(Contact $student, ?PsetView $info) {
+        if (($v0 = $this->_a[0]->evaluate($student, $info)) === null) {
+            return null;
+        }
+        $v1 = $this->_a[1]->evaluate($student, $info);
+        return $this->vevaluate($v0, $v1);
+    }
+    function constant_evaluate() {
+        $cv0 = $this->_a[0]->constant_evaluate();
+        $cv1 = $this->_a[1]->constant_evaluate();
+        if ($cv0 === null || $cv1 === null) {
+            return null;
+        }
+        return new Constant_GradeFormula($cv0->v, $cv1->v);
     }
 }
 
@@ -182,9 +213,7 @@ class Relation_GradeFormula extends GradeFormula {
         parent::__construct(self::canonical_relation($op), [$e1, $e2]);
         $this->vtype = GradeEntry::VTBOOL;
     }
-    function evaluate(Contact $student, ?PsetView $info) {
-        $v0 = $this->_a[0]->evaluate($student, $info);
-        $v1 = $this->_a[1]->evaluate($student, $info);
+    function vevaluate($v0, $v1) {
         switch ($this->_op) {
         case "==":
             return $v0 == $v1;
@@ -200,6 +229,19 @@ class Relation_GradeFormula extends GradeFormula {
             return $v0 >= $v1;
         }
     }
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
+        $v1 = $this->_a[1]->evaluate($student, $info);
+        return $this->vevaluate($v0, $v1);
+    }
+    function constant_evaluate() {
+        $cv0 = $this->_a[0]->constant_evaluate();
+        $cv1 = $this->_a[1]->constant_evaluate();
+        if ($cv0 === null || $cv1 === null) {
+            return null;
+        }
+        return new Constant_GradeFormula($this->vevaluate($cv0->v, $cv1->v));
+    }
 }
 
 class NullableBin_GradeFormula extends GradeFormula {
@@ -214,9 +256,7 @@ class NullableBin_GradeFormula extends GradeFormula {
             $this->vtype = $e2->vtype;
         }
     }
-    function evaluate(Contact $student, ?PsetView $info) {
-        $v0 = $this->_a[0]->evaluate($student, $info);
-        $v1 = $this->_a[1]->evaluate($student, $info);
+    function vevaluate($v0, $v1) {
         switch ($this->_op) {
         case "+?":
             if ($v0 === null && $v1 === null) {
@@ -237,6 +277,19 @@ class NullableBin_GradeFormula extends GradeFormula {
             return !$v0 !== !$v1;
         }
     }
+    function evaluate(Contact $student, ?PsetView $info) {
+        $v0 = $this->_a[0]->evaluate($student, $info);
+        $v1 = $this->_a[1]->evaluate($student, $info);
+        return $this->vevaluate($v0, $v1);
+    }
+    function constant_evaluate() {
+        $cv0 = $this->_a[0]->constant_evaluate();
+        $cv1 = $this->_a[1]->constant_evaluate();
+        if ($cv0 === null || $cv1 === null) {
+            return null;
+        }
+        return new Constant_GradeFormula($this->vevaluate($cv0->v, $cv1->v));
+    }
 }
 
 class Ternary_GradeFormula extends GradeFormula {
@@ -253,6 +306,13 @@ class Ternary_GradeFormula extends GradeFormula {
         $v0 = $this->_a[0]->evaluate($student, $info);
         return $this->_a[$v0 ? 1 : 2]->evaluate($student, $info);
     }
+    function constant_evaluate() {
+        $cv0 = $this->_a[0]->constant_evaluate();
+        if ($cv0 === null) {
+            return null;
+        }
+        return $this->_a[$cv0->v ? 1 : 2]->constant_evaluate();
+    }
 }
 
 abstract class Function_GradeFormula extends GradeFormula {
@@ -266,6 +326,10 @@ abstract class Function_GradeFormula extends GradeFormula {
     /** @return int */
     function nargs() {
         return count($this->_a);
+    }
+    /** @return bool */
+    function complete(GradeFormulaCompiler $gfc, $p1, $p2) {
+        return true;
     }
 }
 
@@ -289,18 +353,20 @@ class MinMax_GradeFormula extends Function_GradeFormula {
 }
 
 class Constant_GradeFormula extends GradeFormula {
-    /** @var float|bool */
-    private $v;
+    /** @var null|int|float|bool
+     * @readonly */
+    public $v;
 
-    function __construct($v)  {
-        parent::__construct("n", []);
+    function __construct($v, $format = null)  {
+        parent::__construct("constant", []);
         $this->v = $v;
-        if (is_bool($v)) {
-            $this->vtype = GradeEntry::VTBOOL;
-        }
+        $this->vtype = $format ?? (is_bool($v) ? GradeEntry::VTBOOL : GradeEntry::VTNUMBER);
     }
     function evaluate(Contact $student, ?PsetView $info) {
         return $this->v;
+    }
+    function constant_evaluate() {
+        return $this;
     }
     function jsonSerialize() {
         return $this->v;
