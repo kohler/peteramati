@@ -377,6 +377,64 @@ class UpdateSchema {
             && $this->conf->ql_ok("alter table Repository add unique key `repogid` (`repogid`)");
     }
 
+    private function v177_readme_md_out_of_range() {
+        $result = $this->conf->qe("select pset, repoid, bhash, notes, notesOverflow from CommitNotes where haslinenotes order by repoid");
+        $qstager = Dbl::make_multi_ql_stager($this->conf->dblink);
+        $repo = null;
+        //$f = fopen("/tmp/xt.txt", "w");
+        while (($row = $result->fetch_object())) {
+            $pset = (int) $row->pset;
+            $repoid = (int) $row->repoid;
+            $notesj = json_decode($row->notes ?? $row->notesOverflow);
+            if (!isset($notesj->linenotes)) {
+                continue;
+            }
+            $newlinenotes = null;
+            foreach ($notesj->linenotes as $fname => $notesobj) {
+                if (!str_ends_with($fname, "/README.md")) {
+                    continue;
+                }
+                if ((!$repo || $repo->repoid !== $repoid)
+                    && !($repo = Repository::by_id($repoid, $this->conf))) {
+                    continue;
+                }
+                $hash = bin2hex($row->bhash);
+                $rfc = $repo->file_content($hash, $fname);
+                $newnotesobj = null;
+                foreach ($notesobj as $lineid => $note) {
+                    if (!str_starts_with($lineid, "b")) {
+                        continue;
+                    }
+                    $line = intval(substr($lineid, 1));
+                    if ($line !== count($rfc->lines) + 1) {
+                        continue;
+                    }
+                    //fwrite($f, "{$pset},{$repoid},{$repo->repogid},{$repo->url},{$hash},{$fname},{$lineid}\n");
+                    $newnotesobj = $newnotesobj ?? clone $notesobj;
+                    unset($newnotesobj->$lineid);
+                    $newnotesobj->{"b" . ($line - 1)} = $note;
+                }
+                if ($newnotesobj !== null) {
+                    $newlinenotes = $newlinenotes ?? clone $notesj->linenotes;
+                    $newlinenotes->$fname = $newnotesobj;
+                }
+            }
+            if ($newlinenotes !== null) {
+                $notesj->linenotes = $newlinenotes;
+                $notestr = json_encode_db($notesj);
+                $notestra = strlen($notestr) > 32700 ? null : $notestr;
+                $notestrb = strlen($notestr) > 32700 ? $notestr : null;
+                $qstager("update CommitNotes set notes=?, notesOverflow=? where pset=? and bhash=?",
+                    $notestra, $notestrb, $pset, $row->bhash);
+                //fwrite($f, "+{$pset},{$repoid},{$repo->repogid},{$notestra}\n");
+            }
+        }
+        Dbl::free($result);
+        //fclose($f);
+        $qstager(null);
+        return true;
+    }
+
     function run() {
         $conf = $this->conf;
         // avoid error message about timezone, set to $Opt
@@ -1028,6 +1086,10 @@ class UpdateSchema {
             || ($conf->sversion === 176
                 && $conf->ql_ok("alter table RepositoryGrade drop `userbhash`"))) {
             $conf->update_schema_version(177);
+        }
+        if ($conf->sversion === 177
+            && $this->v177_readme_md_out_of_range()) {
+            $conf->update_schema_version(178);
         }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
