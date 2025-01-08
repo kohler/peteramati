@@ -164,7 +164,7 @@ class Multiconference {
             echo join("", $errors);
             $qreq->conf()->footer();
         }
-        exit;
+        exit(0);
     }
 
     /** @return string */

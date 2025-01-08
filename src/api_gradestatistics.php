@@ -252,7 +252,7 @@ class GradeStatistics_API {
             && $_SERVER["HTTP_IF_NONE_MATCH"] === self::etag($pset, $user, $gradets)) {
             header("HTTP/1.0 304 Not Modified");
             header("Cache-Control: max-age=30,must-revalidate,private");
-            exit;
+            exit(0);
         }
 
         if ($gradets

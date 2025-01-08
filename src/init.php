@@ -24,6 +24,18 @@ const VF_STUDENT_ALLOWED = 2;
 const VF_STUDENT_ANY = 3;
 const VF_TF = 4;
 
+const NAME_E = 1;   // include email
+const NAME_B = 2;   // always put email in angle brackets
+const NAME_EB = 3;  // NAME_E + NAME_B
+const NAME_P = 4;   // return email or "[No name]" instead of empty string
+const NAME_L = 8;   // "last, first"
+const NAME_I = 16;  // first initials instead of first name
+const NAME_S = 32;  // "last, first" according to conference preference
+const NAME_U = 64;  // unaccented
+const NAME_MAILQUOTE = 128; // quote name by RFC822
+const NAME_A = 256; // affiliation
+const NAME_PARSABLE = 512; // `last, first` if `first last` would be ambiguous
+
 global $OK, $Conf, $Opt;
 $OK = 1;
 

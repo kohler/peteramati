@@ -33,7 +33,7 @@ abstract class GradeFormula implements JsonSerializable {
     abstract function evaluate(Contact $student, ?PsetView $info);
 
     /** @return ?Constant_GradeFormula */
-    function const_evaluate() {
+    function constant_evaluate() {
         return null;
     }
 

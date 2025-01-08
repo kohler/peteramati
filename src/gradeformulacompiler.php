@@ -70,7 +70,7 @@ class GradeFormulaCompiler {
     /** @param int $pos1
      * @param int $pos2
      * @param string $msg */
-    private function error_at($pos1, $pos2, $msg) {
+    function error_at($pos1, $pos2, $msg) {
         $mi = $this->ms->error_at(null, "{$msg} in formula");
         $mi->landmark = $this->state->ident;
         $mi->pos1 = $pos1;

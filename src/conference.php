@@ -91,6 +91,8 @@ class Conf {
     public $opt;
     /** @var array<string,mixed> */
     public $opt_override;
+    /** @var string */
+    public $lang = "en";
 
     /** @var object */
     public $config;
@@ -234,7 +236,7 @@ class Conf {
     // Initialization functions
     //
 
-    function load_settings() {
+    function __load_settings() {
         // load settings from database
         $this->settings = [];
         $this->settingTexts = [];
@@ -253,7 +255,7 @@ class Conf {
             if ($row[2] !== null) {
                 $this->settingTexts[$row[0]] = $row[2];
             }
-            if (substr($row[0], 0, 4) == "opt.") {
+            if (str_starts_with($row[0], "opt.")) {
                 $okey = substr($row[0], 4);
                 $this->opt_override[$okey] = $this->opt[$okey] ?? null;
                 $this->opt[$okey] = ($row[2] === null ? (int) $row[1] : $row[2]);
@@ -261,8 +263,11 @@ class Conf {
         }
         Dbl::free($result);
 
-        // update schema
-        $this->sversion = $this->settings["allowPaperOption"];
+        $this->sversion = $this->settings["allowPaperOption"] ?? 0;
+    }
+
+    function load_settings() {
+        $this->__load_settings();
         if ($this->sversion < 178) {
             $old_nerrors = Dbl::$nerrors;
             (new UpdateSchema($this))->run();
@@ -890,9 +895,24 @@ class Conf {
 
     // users
 
+    /** @return null|'ldap'|'htauth'|'none'|'oauth' */
+    function login_type() {
+        if (!array_key_exists("loginType", $this->opt)) {
+            if ($this->opt["ldapLogin"] ?? false) {
+                $this->opt["loginType"] = "ldap";
+            } else if ($this->opt["httpAuthLogin"] ?? false) {
+                $this->opt["loginType"] = "htauth";
+            } else {
+                $this->opt["loginType"] = null;
+            }
+        }
+        return $this->opt["loginType"];
+    }
+
     /** @return bool */
     function external_login() {
-        return isset($this->opt["ldapLogin"]) || isset($this->opt["httpAuthLogin"]);
+        $lt = $this->login_type();
+        return $lt === "ldap" || $lt === "htauth";
     }
 
     /** @return object */
@@ -1653,8 +1673,9 @@ class Conf {
             }
             $param = $p;
         }
-        if (Conf::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
-            foreach (Conf::$hoturl_defaults as $k => $v) {
+        $param = $param ?? [];
+        if (self::$hoturl_defaults && !($flags & self::HOTURL_NO_DEFAULTS)) {
+            foreach (self::$hoturl_defaults as $k => $v) {
                 if (!array_key_exists($k, $param)) {
                     $param[$k] = $v;
                 }

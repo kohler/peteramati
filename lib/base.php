@@ -1,6 +1,6 @@
 <?php
 // base.php -- HotCRP base helper functions
-// Copyright (c) 2006-2022 Eddie Kohler; see LICENSE.
+// Copyright (c) 2006-2024 Eddie Kohler; see LICENSE.
 /** @phan-file-suppress PhanRedefineFunction */
 
 // type helpers
@@ -55,6 +55,13 @@ function is_string_list($x) {
 
 // string helpers
 
+if (PHP_VERSION_ID < 80000) {
+    /** @suppress PhanRedefineFunctionInternal */
+    function str_contains($haystack, $needle) {
+        return strpos($haystack, $needle) !== false;
+    }
+}
+
 /** @param string $haystack
  * @param string $needle
  * @return bool */
@@ -87,15 +94,12 @@ function preg_matchpos($pattern, $subject) {
 /** @param string $text
  * @return string */
 function cleannl($text) {
-    if (substr($text, 0, 3) === "\xEF\xBB\xBF") {
+    if (str_starts_with($text, "\xEF\xBB\xBF")) {
         $text = substr($text, 3);
     }
     if (strpos($text, "\r") !== false) {
         $text = str_replace("\r\n", "\n", $text);
         $text = str_replace("\r", "\n", $text);
-    }
-    if ($text !== "" && $text[strlen($text) - 1] !== "\n") {
-        $text .= "\n";
     }
     return $text;
 }
@@ -119,6 +123,7 @@ function space_join(/* $str_or_array, ... */) {
  * @return bool */
 function is_usascii($str) {
     return !preg_match('/[\x80-\xFF]/', $str);
+    // 2023: this is faster than iconv, iconv_strlen, or mb_check_encoding
 }
 
 /** @param string $str
@@ -153,18 +158,17 @@ if (!function_exists("mac_os_roman_to_utf8")) {
 /** @param string $str
  * @return string */
 function convert_to_utf8($str) {
-    if (substr($str, 0, 3) === "\xEF\xBB\xBF") {
+    if (str_starts_with($str, "\xEF\xBB\xBF")) {
         $str = substr($str, 3);
     }
     if (is_valid_utf8($str)) {
         return $str;
+    }
+    $pfx = substr($str, 0, 5000);
+    if (substr_count($pfx, "\r") > 1.5 * substr_count($pfx, "\n")) {
+        return mac_os_roman_to_utf8($str);
     } else {
-        $pfx = substr($str, 0, 5000);
-        if (substr_count($pfx, "\r") > 1.5 * substr_count($pfx, "\n")) {
-            return mac_os_roman_to_utf8($str);
-        } else {
-            return windows_1252_to_utf8($str);
-        }
+        return windows_1252_to_utf8($str);
     }
 }
 
@@ -539,10 +543,12 @@ if (defined("JSON_UNESCAPED_LINE_TERMINATORS")) {
         return json_encode($x, $flags);
     }
 }
+
 /** @return string */
 function json_encode_db($x, $flags = 0) {
-    return json_encode($x, $flags | JSON_UNESCAPED_UNICODE);
+    return json_encode($x, $flags | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
+
 /** @return string */
 function json_escape_browser_sqattr($x, $flags = 0) {
     $s = json_encode($x, $flags);
@@ -611,19 +617,28 @@ function object_replace($a, $b) {
     }
 }
 
+const OBJECT_REPLACE_NO_RECURSE = "norecurse\000";
+
 /** @param object $a
  * @param array|object $b
  * @return void */
 function object_replace_recursive($a, $b) {
-    foreach (is_object($b) ? get_object_vars($b) : $b as $k => $v) {
-        if ($v === null) {
-            unset($a->$k);
-        } else if (!property_exists($a, $k)
-                   || !is_object($a->$k)
-                   || !is_object($v)) {
+    $ba = is_object($b) ? get_object_vars($b) : $b;
+    if ($ba[OBJECT_REPLACE_NO_RECURSE] ?? null) {
+        foreach (array_keys(get_object_vars($a)) as $ak) {
+            unset($a->$ak);
+        }
+    }
+    foreach ($ba as $k => $v) {
+        if (is_object($v) || is_associative_array($v)) {
+            if (!is_object($a->$k ?? null)) {
+                $a->$k = (object) [];
+            }
+            object_replace_recursive($a->$k, $v);
+        } else if ($v !== null && $k !== OBJECT_REPLACE_NO_RECURSE) {
             $a->$k = $v;
         } else {
-            object_replace_recursive($a->$k, $v);
+            unset($a->$k);
         }
     }
 }

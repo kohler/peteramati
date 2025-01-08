@@ -2414,21 +2414,23 @@ class PsetView {
                 continue;
             }
             $diffc = $this->pset->find_diffconfig($fn);
-            if ($diffc === null
-                || $diffc->base === null
-                || $diffc->base === $this->pset->diff_base) {
+            $base = $diffc ? $diffc->base : null;
+            if ($base === null
+                || $base === $this->pset->diff_base) {
                 continue;
             }
-            if (!array_key_exists($diffc->base, $bases)) {
-                $c = $this->commit_in_base($diffc->base);
+            if (array_key_exists($base, $bases)) {
+                $c = $bases[$base];
+            } else {
+                $c = $this->commit_in_base($base);
                 if ($c !== null && $c !== $dctx->commita) {
-                    $bases[$diffc->base] = $c;
                     $cbyhash[$c->hash] = $c;
                 } else {
-                    $bases[$diffc->base] = null;
+                    $c = null;
                 }
+                $bases[$base] = $c;
             }
-            if (($c = $bases[$diffc->base]) !== null) {
+            if ($c !== null) {
                 $fbyhash[$c->hash][] = $fn;
             }
         }
