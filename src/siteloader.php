@@ -8,6 +8,7 @@ class SiteLoader {
         "CommandLineException" => "lib/getopt.php",
         "CsvGenerator" => "lib/csv.php",
         "CsvParser" => "lib/csv.php",
+        "FmtArg" => "lib/fmt.php",
         "Function_GradeFormula" => "src/gradeformula.php",
         "GitHubResponse" => "src/github_repositorysite.php",
         "LoginHelper" => "lib/login.php",

@@ -75,8 +75,9 @@ class RepositorySite {
         return ["git"];
     }
 
+    /** @return list<FmtArg> */
     function message_defs(Contact $user) {
-        return ["REPOGITURL" => null, "REPOBASE" => null];
+        return [new FmtArg("repourl", $this->url, 0), new FmtArg("repobase", $this->friendly_url(), 0)];
     }
 
     /** @param Repository $repo

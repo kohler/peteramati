@@ -300,16 +300,15 @@ class GitHub_RepositorySite extends RepositorySite {
     function message_defs(Contact $user) {
         $base = $user->is_anonymous ? "[anonymous]" : $this->base;
         return [
-            "REPOURL" => "https://github.com/{$base}",
-            "REPOGITURL" => "git@github.com:{$base}",
-            "REPOBASE" => $base,
-            "GITHUB" => 1
+            new FmtArg("repourl", "https://github.com/{$base}", 0),
+            new FmtArg("repobase", $base, 0),
+            new FmtArg("repotype", "github", 0)
         ];
     }
     /** @param string $name
      * @return ?string */
     function expand_message($name, Contact $user) {
-        return Messages::$main->expand_html($name, $this->message_defs($user));
+        return $this->conf->_($name, ...$this->message_defs($user));
     }
 
     function gitfetch($repo, $cacheid, $foreground) {

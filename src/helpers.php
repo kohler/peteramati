@@ -405,27 +405,19 @@ function mk_site_subdir($dir, $mode) {
 
 
 // text helpers
-function commajoin($what, $joinword = "and") {
-    $what = array_values($what);
-    $c = count($what);
-    if ($c == 0) {
-        return "";
-    } else if ($c == 1) {
-        return $what[0];
-    } else if ($c == 2) {
-        return $what[0] . " " . $joinword . " " . $what[1];
-    } else {
-        return join(", ", array_slice($what, 0, -1)) . ", " . $joinword . " " . $what[count($what) - 1];
-    }
-}
-
+/** @param array $what
+ * @param string $prefix
+ * @param string $joinword
+ * @return string */
 function prefix_commajoin($what, $prefix, $joinword = "and") {
     return commajoin(array_map(function ($x) use ($prefix) {
         return $prefix . $x;
     }, $what), $joinword);
 }
 
-function numrangejoin($range) {
+/** @param iterable $range
+ * @return list<string> */
+function unparse_numrange_list($range) {
     $a = [];
     $format = $first = $last = null;
     $intval = $plen = 0;
@@ -438,10 +430,11 @@ function numrangejoin($range) {
             } else if ($first === $last) {
                 $a[] = $first;
             } else {
+                /** @phan-suppress-next-line PhanTypeMismatchArgumentInternalReal */
                 $a[] = $first . "–" . substr($last, $plen);
             }
         }
-        if ($current !== "" && ctype_digit($current)) {
+        if ($current !== "" && (is_int($current) || ctype_digit($current))) {
             $format = "%0" . strlen((string) $current) . "d";
             $plen = 0;
             $first = $last = $current;
@@ -461,39 +454,81 @@ function numrangejoin($range) {
     } else if ($format !== null) {
         $a[] = $first . "–" . substr($last, $plen);
     }
-    return commajoin($a);
+    return $a;
 }
 
-function pluralx($n, $what) {
-    if (is_array($n)) {
-        $n = count($n);
-    }
-    return $n === 1 ? $what : pluralize($what);
+/** @param iterable $range
+ * @return string */
+function numrangejoin($range) {
+    return commajoin(unparse_numrange_list($range));
 }
 
-function pluralize($what) {
-    if ($what === "this") {
-        return "these";
-    } else if ($what === "has") {
-        return "have";
-    } else if ($what === "is") {
-        return "are";
-    } else if (str_ends_with($what, ")")
-               && preg_match('/\A(.*?)(\s*\([^)]*\))\z/', $what, $m)) {
-        return pluralize($m[1]) . $m[2];
-    } else if (preg_match('/\A.*?(?:s|sh|ch|[bcdfgjklmnpqrstvxz]y)\z/', $what)) {
-        if (substr($what, -1) === "y") {
-            return substr($what, 0, -1) . "ies";
-        } else {
-            return $what . "es";
-        }
+/** @param int|float|array $n
+ * @param string $singular
+ * @param ?string $plural
+ * @return string */
+function plural_word($n, $singular, $plural = null) {
+    $z = is_array($n) ? count($n) : $n;
+    if ($z == 1) {
+        return $singular;
+    } else if (($plural ?? "") !== "") {
+        return $plural;
     } else {
-        return $what . "s";
+        return pluralize($singular);
     }
 }
 
-function plural($n, $what) {
-    return (is_array($n) ? count($n) : $n) . ' ' . pluralx($n, $what);
+/** @param string $s
+ * @return string
+ * @suppress PhanParamSuspiciousOrder */
+function pluralize($s) {
+    if ($s[0] === "t"
+        && (str_starts_with($s, "this ") || str_starts_with($s, "that "))) {
+        return ($s[2] === "i" ? "these " : "those ") . pluralize(substr($s, 5));
+    }
+    $len = strlen($s);
+    $last = $s[$len - 1];
+    if ($last === "s") {
+        if ($s === "this") {
+            return "these";
+        } else if ($s === "has") {
+            return "have";
+        } else if ($s === "is") {
+            return "are";
+        } else {
+            return "{$s}es";
+        }
+    } else if ($last === "h"
+               && $len > 1
+               && ($s[$len - 2] === "s" || $s[$len - 2] === "c")) {
+        return "{$s}es";
+    } else if ($last === "y"
+               && $len > 1
+               && strpos("bcdfgjklmnpqrstvxz", $s[$len - 2]) !== false) {
+        return substr($s, 0, $len - 1) . "ies";
+    } else if ($last === "t") {
+        if ($s === "that") {
+            return "those";
+        } else if ($s === "it") {
+            return "them";
+        } else {
+            return "{$s}s";
+        }
+    } else if ($last === ")"
+               && preg_match('/\A(.*?)(\s*\([^)]*\))\z/', $s, $m)) {
+        return pluralize($m[1]) . $m[2];
+    } else {
+        return "{$s}s";
+    }
+}
+
+/** @param int|float|array $n
+ * @param string $singular
+ * @param ?string $plural
+ * @return string */
+function plural($n, $singular, $plural = null) {
+    $z = is_array($n) ? count($n) : $n;
+    return "{$z} " . plural_word($z, $singular, $plural);
 }
 
 function ordinal($n) {

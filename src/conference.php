@@ -160,6 +160,10 @@ class Conf {
     private $_root_user;
     /** @var ?Contact */
     private $_site_contact;
+    /** @var ?Fmt */
+    private $_fmt;
+    /** @var ?list<string> */
+    private $_fmt_override_names;
     /** @var array<string,Repository> */
     private $_handout_repos = [];
     /** @var array<int,CommitList> */
@@ -227,6 +231,11 @@ class Conf {
     }
 
     /** @return ?\mysqli */
+    function contactdb() {
+        return null;
+    }
+
+    /** @return ?\mysqli */
     static function main_contactdb() {
         return null;
     }
@@ -248,6 +257,10 @@ class Conf {
             }
         }
         $this->opt_override = [];
+        if ($this->_fmt) {
+            $this->_fmt->remove_overrides();
+        }
+        $this->_fmt_override_names = null;
 
         $result = $this->q_raw("select name, value, data from Settings");
         while ($result && ($row = $result->fetch_row())) {
@@ -259,6 +272,8 @@ class Conf {
                 $okey = substr($row[0], 4);
                 $this->opt_override[$okey] = $this->opt[$okey] ?? null;
                 $this->opt[$okey] = ($row[2] === null ? (int) $row[1] : $row[2]);
+            } else if (str_starts_with($row[0], "msg.")) {
+                $this->_fmt_override_names[] = $row[0];
             }
         }
         Dbl::free($result);
@@ -311,7 +326,7 @@ class Conf {
 
         // GC old capabilities
         if (($this->settings["__capability_gc"] ?? 0) < Conf::$now - 86400) {
-            foreach (array($this->dblink, Contact::contactdb()) as $db) {
+            foreach ([$this->dblink, $this->contactdb()] as $db) {
                 if ($db)
                     Dbl::ql($db, "delete from Capability where timeExpires>0 and timeExpires<" . Conf::$now);
             }
@@ -527,12 +542,6 @@ class Conf {
         // extract defaults
         if ($config->_defaults->main_branch ?? null) {
             $this->set_default_main_branch($config->_defaults->main_branch);
-        }
-        if (!($config->_messagedefs ?? null)) {
-            $config->_messagedefs = (object) array();
-        }
-        if (!($config->_messagedefs->SYSTEAM ?? null)) {
-            $config->_messagedefs->SYSTEAM = "cs61-staff";
         }
     }
 
@@ -1465,10 +1474,6 @@ class Conf {
             return $timestamp < ($now ? : Conf::$now) ? $d . " ago" : "in " . $d;
         }
     }
-    /** @param int $timestamp */
-    function unparse_usertime_span($timestamp) {
-        return '<span class="usertime hidden need-usertime" data-time="' . $timestamp . '"></span>';
-    }
     /** @param string $name */
     function unparse_setting_time($name) {
         $t = $this->settings[$name] ?? 0;
@@ -2322,13 +2327,110 @@ class Conf {
     }
 
 
+    // messages
+
+    /** @return Fmt */
+    function fmt() {
+        if (!$this->_fmt) {
+            $this->_fmt = new Fmt($this);
+            $this->_fmt->add_requirement_resolver([$this, "resolve_fmt_requirement"]);
+            $m = ["?etc/msgs.json"];
+            if ($this->lang !== "en") {
+                $m[] = "?etc/msgs.{$this->lang}.json";
+            }
+            $this->_fmt->set_default_priority(-1.0);
+            expand_json_includes_callback($m, [$this->_fmt, "addj"]);
+            $this->_fmt->set_default_priority(0.0);
+            if (($mlist = $this->opt("messageOverrides"))) {
+                expand_json_includes_callback($mlist, [$this->_fmt, "addj"]);
+            }
+            $this->_fmt->define("site", FmtItem::make_template("<0>" . $this->opt["paperSite"], FmtItem::EXPAND_NONE));
+            if (($n = $this->opt["messageRecordSources"] ?? null)) {
+                $this->_fmt->record_sources($n);
+            }
+        }
+        if ($this->_fmt_override_names !== null) {
+            foreach ($this->_fmt_override_names as $id) {
+                $this->_fmt->define_override(substr($id, 4), $this->settingTexts[$id]);
+            }
+            $this->_fmt_override_names = null;
+        }
+        return $this->_fmt;
+    }
+
+    /** @param string $out
+     * @return string */
+    function _x($out, ...$args) {
+        return $this->fmt()->_x($out, ...$args);
+    }
+
+    /** @param string $in
+     * @return string */
+    function _($in, ...$args) {
+        return $this->fmt()->_($in, ...$args);
+    }
+
+    /** @param string $context
+     * @param string $in
+     * @return string */
+    function _c($context, $in, ...$args) {
+        return $this->fmt()->_c($context, $in, ...$args);
+    }
+
+    /** @param string $id
+     * @return ?string */
+    function _i($id, ...$args) {
+        return $this->fmt()->_i($id, ...$args);
+    }
+
+    /** @param string $context
+     * @param string $id
+     * @return ?string */
+    function _ci($context, $id, ...$args) {
+        return $this->fmt()->_ci($context, $id, ...$args);
+    }
+
+    /** @param string $in
+     * @return string */
+    function _5($in, ...$args) {
+        return Ftext::as(5, $this->fmt()->_($in, ...$args));
+    }
+
+    /** @param string $context
+     * @param string $in
+     * @return string */
+    function _c5($context, $in, ...$args) {
+        return Ftext::as(5, $this->fmt()->_c($context, $in, ...$args));
+    }
+
+    /** @param string $id
+     * @return ?string */
+    function _i5($id, ...$args) {
+        return Ftext::as(5, $this->fmt()->_i($id, ...$args));
+    }
+
+    /** @param string $s
+     * @return false|array{true,mixed} */
+    function resolve_fmt_requirement($s) {
+        if (str_starts_with($s, "setting.")) {
+            return [true, $this->setting(substr($s, 8))];
+        } else if (str_starts_with($s, "opt.")) {
+            return [true, $this->opt(substr($s, 4))];
+        } else if ($s === "lang") {
+            return [true, $this->lang];
+        } else {
+            return false;
+        }
+    }
+
+
     //
     // Miscellaneous
     //
 
-    public function capability_manager($for = null) {
+    function capability_manager($for = null) {
         if ($for && substr($for, 0, 1) === "U") {
-            if (($cdb = Contact::contactdb()))
+            if (($cdb = $this->contactdb()))
                 return new CapabilityManager($cdb, "U");
             else
                 return null;

@@ -104,6 +104,31 @@ function cleannl($text) {
     return $text;
 }
 
+/** @param array $what
+ * @param string $joinword
+ * @return string */
+function commajoin($what, $joinword = "and") {
+    $what = array_values($what);
+    $c = count($what);
+    if ($c === 0) {
+        return "";
+    } else if ($c === 1) {
+        return $what[0];
+    } else if ($c === 2) {
+        return "{$what[0]} {$joinword} {$what[1]}";
+    } else {
+        $last = array_pop($what);
+        foreach ($what as &$w) {
+            if (str_ends_with($w, "</span>")) {
+                $w = substr($w, 0, -7) . ",</span>";
+            } else {
+                $w .= ",";
+            }
+        }
+        return join(" ", $what) . " {$joinword} {$last}";
+    }
+}
+
 function space_join(/* $str_or_array, ... */) {
     $t = "";
     foreach (func_get_args() as $arg) {

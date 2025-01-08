@@ -1,0 +1,40 @@
+[
+    {
+        "in": "repo_nonexistent",
+        "out": "<0>No such repository {repourl}. Check the repository name and try again."
+    },
+    {
+        "in": "repo_unreadable",
+        "out": "<0>We can’t access the repository at {repourl}. Check the repository name and try again."
+    },
+    {
+        "in": "repo_nomain",
+        "out": "<0>The {repobase} repository does not appear to have a “main” branch. That branch is required for grading."
+    },
+    {
+        "in": "repo_toopublic",
+        "out": "<0>The {repobase} repository is too public."
+    },
+    {
+        "in": "repo_toopublic",
+        "out": "<5>The {repobase} repository is too public. Use <a href=\"{repourl}/settings\">“Settings”</a> to make the repository private.",
+        "require": ["{repotype}=github"]
+    },
+    {
+        "in": "repo_toopublic_timeout",
+        "out": "<0>I can’t verify whether {repobase} is too public."
+    },
+    {
+        "in": "repo_working_timeout",
+        "html": "<0>I can’t verify whether {repobase} is working."
+    },
+    {
+        "in": "repo_notowner",
+        "out": "<0>Your account isn’t a collaborator on this repository."
+    },
+    {
+        "in": "repo_notowner",
+        "out": "<5>Your GitHub account isn’t a collaborator on this repository. This can be changed on <a href=\"{repourl}/settings\">“Settings”</a>.",
+        "require": "{repotype}=github"
+    }
+]

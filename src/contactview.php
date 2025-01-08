@@ -340,7 +340,7 @@ class ContactView {
                 if ($info->viewer->isPC) {
                     $your_partner = '<a href="' . $info->conf->hoturl("pset", array("pset" => $pset->urlkey, "u" => $info->viewer->user_linkpart($partner))) . '">' . $your_partner . '</a>';
                 }
-                $ms->error_at("partner", "This repository differs from $your_partner$prepo_url.");
+                $ms->error_at("partner", "<5>This repository differs from {$your_partner}{$prepo_url}.");
             }
         }
         if ($repo) {
@@ -348,7 +348,7 @@ class ContactView {
         }
         $prefixes = ["", "WARNING: ", "ERROR: "];
         $notes = array_map(function ($m) use ($prefixes) {
-            return [$m->status > 0, $prefixes[max($m->status, 0)] . $m->message];
+            return [$m->status > 0, $prefixes[max($m->status, 0)] . $m->message_as(5)];
         }, $ms->message_list());
         if ($repo
             && $pset->handout_warn_merge !== false
@@ -359,7 +359,7 @@ class ContactView {
             $repoclasses = RepositorySite::site_classes($info->conf);
             $x = commajoin(array_map(function ($k) { return Ht::link($k::global_friendly_siteclass(), $k::global_friendly_siteurl()); }, $repoclasses), "or");
             if ($editable) {
-                $notes[] = array(false, "Enter your $x repository URL here.");
+                $notes[] = array(false, "Enter your {$x} repository URL here.");
             }
         }
 

@@ -198,13 +198,6 @@ function initialize_psets() {
         Multiconference::fail_bad_database();
     }
 
-    // read initial messages
-    Messages::$main = new Messages;
-    $x = json_decode(file_get_contents(SiteLoader::$root . "/src/messages.json"));
-    foreach ($x as $j) {
-        Messages::$main->add($j);
-    }
-
     // read psets
     try {
         Conf::$main->set_config(load_psets_json(false));
@@ -247,10 +240,6 @@ function initialize_psets() {
             $locp = "";
         }
         Multiconference::fail_message($locp . "Configuration error: " . $exception->getMessage());
-    }
-
-    foreach (Conf::$main->config->_messagedefs as $k => $v) {
-        Messages::$main->define($k, $v);
     }
 
     // if any anonymous problem sets, create anonymous usernames

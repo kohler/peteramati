@@ -220,7 +220,7 @@ class Repository {
     /** @param string $name
      * @return ?string */
     function expand_message($name, Contact $user) {
-        return Messages::$main->expand_html($name, $this->reposite->message_defs($user));
+        return $this->conf->_($name, ...$this->reposite->message_defs($user));
     }
 
     /** @param ?string $cacheid */

@@ -520,10 +520,6 @@ class Contact {
         }
     }
 
-    static function contactdb() {
-        return null;
-    }
-
     function contactdb_user() {
         return null;
     }
@@ -713,7 +709,7 @@ class Contact {
         }
 
         // add to contact database
-        if ($this->conf->opt("contactdb_dsn") && ($cdb = self::contactdb())) {
+        if ($this->conf->opt("contactdb_dsn") && ($cdb = $this->conf->contactdb())) {
             Dbl::ql($cdb, "insert into ContactInfo set firstName=?, lastName=?, email=?, affiliation=? on duplicate key update firstName=values(firstName), lastName=values(lastName), affiliation=values(affiliation)",
                     $this->firstName, $this->lastName, $this->email, $this->affiliation);
             if ($this->password_plaintext
@@ -1320,11 +1316,11 @@ class Contact {
             && ($cdbok = $this->check_hashed_password($input, $hash))) {
             if ($this->password_needs_rehash($hash)) {
                 $hash = $this->hash_password($input);
-                Dbl::ql(self::contactdb(), "update ContactInfo set password=? where contactDbId=?", $hash, $cdbu->contactDbId);
+                Dbl::ql($this->conf->contactdb(), "update ContactInfo set password=? where contactDbId=?", $hash, $cdbu->contactDbId);
                 $cdbu->password = $hash;
             }
             if ($cdbu->passwordUseTime <= $update_use_time) {
-                Dbl::ql(self::contactdb(), "update ContactInfo set passwordUseTime=? where contactDbId=?", Conf::$now, $cdbu->contactDbId);
+                Dbl::ql($this->conf->contactdb(), "update ContactInfo set passwordUseTime=? where contactDbId=?", Conf::$now, $cdbu->contactDbId);
                 $cdbu->passwordUseTime = Conf::$now;
             }
         }
@@ -1372,7 +1368,7 @@ class Contact {
             $cdbu->password = $hash;
             if (!$old || $old !== $new)
                 $cdbu->passwordTime = Conf::$now;
-            Dbl::ql(self::contactdb(), "update ContactInfo set password=?, passwordTime=? where contactDbId=?", $cdbu->password, $cdbu->passwordTime, $cdbu->contactDbId);
+            Dbl::ql($this->conf->contactdb(), "update ContactInfo set password=?, passwordTime=? where contactDbId=?", $cdbu->password, $cdbu->passwordTime, $cdbu->contactDbId);
             if ($this->contactId && $this->password) {
                 $this->password = "";
                 $this->passwordTime = $cdbu->passwordTime;
@@ -1443,7 +1439,7 @@ class Contact {
                 $this->conf->ql("update ContactInfo set lastLogin=" . Conf::$now . " where contactId=$this->contactId");
             }
             if ($this->contactDbId) {
-                Dbl::ql(self::contactdb(), "update ContactInfo set activity_at=" . Conf::$now . " where contactDbId=$this->contactDbId");
+                Dbl::ql($this->conf->contactdb(), "update ContactInfo set activity_at=" . Conf::$now . " where contactDbId=$this->contactDbId");
             }
         }
     }
