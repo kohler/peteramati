@@ -175,7 +175,7 @@ class Diff_Page {
             $t = "Diff";
         }
         $this->conf->header("<span class=\"pset-title\">{$t}</span>", "home");
-        $this->conf->errorMsg($msg);
+        $this->conf->error_msg($msg);
         $this->conf->footer();
         exit(0);
     }

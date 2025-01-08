@@ -46,7 +46,7 @@ function admin_home_messages($conf) {
     }
 
     if (count($m)) {
-        $conf->warnMsg("<div>" . join('</div><div style="margin-top:0.5em">', $m) . "</div>");
+        $conf->warning_msg("<div>" . join('</div><div style="margin-top:0.5em">', $m) . "</div>");
     }
 }
 

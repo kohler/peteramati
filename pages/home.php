@@ -132,7 +132,7 @@ if ($Me->privChair
         $users = Dbl::fetch_first_columns("select contactId from ContactInfo where email like ?", $who);
     }
     if (empty($users)) {
-        $Conf->warnMsg("No users match “" . htmlspecialchars($who) . "”.");
+        $Conf->warning_msg("No users match “" . htmlspecialchars($who) . "”");
     } else {
         if (isset($Qreq->enable_user)) {
             UserActions::enable($users, $Me);
@@ -221,13 +221,13 @@ if ($Me->isPC && !$User) {
 
 // Home message
 if (($v = $Conf->setting_data("homemsg"))) {
-    $Conf->infoMsg($v);
+    $Conf->feedback_msg(MessageItem::plain($v));
 }
 if ($Me->privChair) {
     $gc = new GradeFormulaCompiler($Conf);
     $gc->check_all();
     if ($gc->ms->has_problem()) {
-        $Conf->errorMsg($gc->ms->full_feedback_html());
+        $Conf->feedback_msg($gc->ms);
     }
 }
 

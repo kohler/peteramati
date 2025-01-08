@@ -48,11 +48,11 @@ class PsetRequest {
         }
         if (($qreq->newcommit ?? $qreq->commit) && !$this->info->hash()) {
             if ($this->info->repo) {
-                $this->conf->errorMsg("Commit " . htmlspecialchars($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
+                $this->conf->error_msg("Commit " . htmlspecialchars($qreq->newcommit ?? $qreq->commit) . " isn’t connected to this repository.");
                 $this->info->set_grading_or_latest_nontrivial_commit(); // XXX
                 unset($qreq->newcommit, $qreq->commit);
             } else {
-                $this->conf->errorMsg("No repository has been configured for this pset.");
+                $this->conf->error_msg("No repository has been configured for this pset.");
                 ContactView::error_exit("404 Not Found", htmlspecialchars($this->pset->title));
             }
         }
@@ -255,7 +255,7 @@ class PsetRequest {
         if (empty($errors)) {
             return true;
         } else {
-            $this->conf->errorMsg(join("<br />\n", $errors));
+            $this->conf->error_msg(join("<br />\n", $errors));
             return false;
         }
     }
@@ -266,7 +266,7 @@ class PsetRequest {
             && file_uploaded($_FILES["file"])) {
             $text = file_get_contents($_FILES["file"]["tmp_name"]);
             if ($text === false) {
-                $this->conf->errorMsg("Internal error: cannot read uploaded file.");
+                $this->conf->error_msg("Internal error: cannot read uploaded file.");
             } else if ($this->handle_upload_file($text, $_FILES["file"]["name"])) {
                 $this->conf->redirect_self($this->qreq);
             }

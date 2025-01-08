@@ -27,7 +27,7 @@ class LoginHelper {
         // check HTTP auth
         if (!isset($_SERVER["REMOTE_USER"]) || !$_SERVER["REMOTE_USER"]) {
             $conf->header("Error", "home");
-            Conf::msg_error("This site is using HTTP authentication to manage its users, but you have not provided authentication data. This usually indicates a server configuration error.");
+            $conf->error_msg("This site is using HTTP authentication to manage its users, but you have not provided authentication data. This usually indicates a server configuration error.");
             $conf->footer();
             exit(0);
         }
@@ -41,7 +41,7 @@ class LoginHelper {
         self::login_redirect($conf, $qreq); // redirect on success
 
         $conf->header("Error", "home");
-        Conf::msg_error("This site is using HTTP authentication to manage its users, and you have provided incorrect authentication data.");
+        $conf->error_msg("This site is using HTTP authentication to manage its users, and you have provided incorrect authentication data.");
         $conf->footer();
         exit(0);
     }
@@ -93,7 +93,7 @@ class LoginHelper {
             $reg = Contact::safe_registration($_REQUEST);
             $reg->no_validate_email = true;
             if (!($user = Contact::create($conf, $reg))) {
-                return Conf::msg_error($conf->db_error_html(true));
+                return $conf->error_msg($conf->db_error_html(true));
             }
             if ($conf->setting("setupPhase")) {
                 return self::first_user($user, "", false);
@@ -116,11 +116,11 @@ class LoginHelper {
         // maybe reset password
         $xuser = $user ? : $cdb_user;
         if ($qreq->action === "forgot" && $qreq->valid_post()) {
-            $worked = $xuser->sendAccountInfo("forgot", true);
+            $worked = $xuser->sendAccountInfo("forgot", true, true);
             if ($worked === "@resetpassword") {
-                $conf->confirmMsg("A password reset link has been emailed to " . htmlspecialchars($qreq->email) . ". When you receive that email, follow its instructions to create a new password.");
+                $conf->success_msg("A password reset link has been emailed to " . htmlspecialchars($qreq->email) . ". When you receive that email, follow its instructions to create a new password.");
             } else if ($worked) {
-                $conf->confirmMsg("Your password has been emailed to " . htmlspecialchars($qreq->email) . ".  When you receive that email, return here to sign in.");
+                $conf->success_msg("Your password has been emailed to " . htmlspecialchars($qreq->email) . ".  When you receive that email, return here to sign in.");
                 $conf->log("Password sent", $xuser);
             }
             return null;
@@ -177,7 +177,7 @@ class LoginHelper {
     static function check_postlogin(Contact $user, Qrequest $qreq) {
         // Check for the cookie
         if (!$qreq->has_gsession("v")) {
-            return Conf::msg_error("You appear to have disabled cookies in your browser. This site requires cookies to function.");
+            return $user->conf->error_msg("You appear to have disabled cookies in your browser. This site requires cookies to function.");
         }
 
         // Go places
@@ -223,10 +223,10 @@ class LoginHelper {
         // create database account
         if (!$user || !$user->has_account_here()) {
             if (!($user = Contact::create($conf, Contact::safe_registration($_REQUEST))))
-                return Conf::msg_error($conf->db_error_html(true));
+                return $conf->error_msg($conf->db_error_html(true));
         }
 
-        $user->sendAccountInfo("create", true);
+        $user->sendAccountInfo("create", true, true);
         $msg = "Successfully created an account for " . htmlspecialchars($qreq->email) . ".";
 
         // handle setup phase
@@ -235,7 +235,7 @@ class LoginHelper {
             return $user;
         }
 
-        if (Mailer::allow_send($user->email)) {
+        if (Contact::is_real_email($user->email)) {
             $msg .= " Login information has been emailed to you. Return here when you receive it to complete the registration process. If you don’t receive the email, check your spam folders and verify that you entered the correct address.";
         } else {
             if ($conf->opt("sendEmail"))
@@ -247,7 +247,7 @@ class LoginHelper {
         if (isset($qreq->password) && trim($qreq->password) !== "") {
             $msg .= " The password you supplied on the login screen was ignored.";
         }
-        $conf->confirmMsg($msg);
+        $conf->success_msg($msg);
         return null;
     }
 
@@ -260,7 +260,7 @@ class LoginHelper {
         }
         $user->save_roles(Contact::ROLE_ADMIN, null);
         $user->conf->save_setting("setupPhase", null);
-        $user->conf->confirmMsg(ltrim($msg));
+        $user->conf->success_msg(ltrim($msg));
     }
 
     /** @param bool $explicit

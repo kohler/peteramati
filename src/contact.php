@@ -524,15 +524,18 @@ class Contact {
         return null;
     }
 
-
+    /** @return bool */
     function is_empty() {
-        return $this->contactId <= 0 && !$this->capabilities && !$this->email;
+        return $this->contactId <= 0 && !$this->email && !$this->capabilities;
     }
 
+    /** @param string $email
+     * @return bool */
     function owns_email($email) {
         return (string) $email !== "" && strcasecmp($email, $this->email) === 0;
     }
 
+    /** @return bool */
     function is_disabled() {
         if ($this->_disabled === null) {
             $this->_disabled = $this->disabled
@@ -545,6 +548,23 @@ class Contact {
         return $this->_disabled;
     }
 
+    /** @return bool */
+    function is_dormant() {
+        return $this->is_disabled();
+    }
+
+    /** @return bool */
+    function is_unconfirmed() {
+        // XXX
+        return false;
+    }
+
+    /** @param bool $self_requested
+     * @return bool */
+    function can_receive_mail($self_requested = false) {
+        return !$this->is_disabled() && self::is_real_email($this->email);
+    }
+
     function can_enable() {
         if (!$this->isPC && $this->conf->opt("disableNonPC")) {
             return false;
@@ -553,24 +573,47 @@ class Contact {
         }
     }
 
+    /** @return bool */
     function has_email() {
         return !!$this->email;
     }
 
+    /** @return bool */
     static function is_anonymous_email($email) {
         // see also PaperSearch, Mailer
-        return substr($email, 0, 9) === "anonymous"
+        return substr_compare($email, "anonymous", 0, 9, true) === 0
             && (strlen($email) === 9 || ctype_digit(substr($email, 9)));
     }
 
+    /** @param string $email
+     * @return bool */
+    static function is_example_email($email) {
+        $len = strlen($email);
+        return ($at = strpos($email, "@")) !== false
+            && $at + 1 < $len
+            && ($email[$at + 1] === "_"
+                || ($at + 12 <= $len
+                    && (ord($email[$len - 11]) | 0x20) === 0x65 /* 'e' */
+                    && preg_match('/\G[@.]example\.(?:com|net|org|edu)\z/i', $email, $m, 0, $len - 12)));
+    }
+
+    /** @param string $email
+     * @return bool */
+    static function is_real_email($email) {
+        return validate_email($email) && !self::is_example_email($email);
+    }
+
+    /** @return bool */
     function is_anonymous_user() {
         return $this->email && self::is_anonymous_email($this->email);
     }
 
+    /** @return bool */
     function has_account_here() {
         return $this->contactId > 0;
     }
 
+    /** @return bool */
     function is_admin() {
         return $this->privChair;
     }
@@ -663,16 +706,16 @@ class Contact {
             $url = $this->conf->selfurl($Qreq, [], Conf::HOTURL_RAW | Conf::HOTURL_SITE_RELATIVE);
             $Qreq->set_gsession("login_bounce", [$this->conf->session_key, $url, $Qreq->page(), $_POST, Conf::$now + 120]);
             if ($Qreq->valid_post()) {
-                $this->conf->msg("You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.", 2);
+                $this->conf->error_msg("You’ve been logged out due to inactivity, so your changes have not been saved. After logging in, you may submit them again.");
             } else {
-                $this->conf->msg("You must sign in to access that page.", 2);
+                $this->conf->error_msg("You must sign in to access that page.");
             }
             $this->conf->redirect();
         }
 
         http_response_code(401);
         $this->conf->header("Permission error");
-        $this->conf->msg("You don’t have permission to access this page.", 2);
+        $this->conf->error_msg("You don’t have permission to access this page.");
         $this->conf->footer();
         exit(0);
     }
@@ -1132,7 +1175,7 @@ class Contact {
         if ($acct->save_json($cj, null, $send)) {
             if ($Me && $Me->privChair) {
                 $type = $acct->disabled ? "disabled " : "";
-                $conf->infoMsg("Created {$type}account for <a href=\"" . $conf->hoturl("profile", ["u" => $acct->email]) . "\">" . Text::user_html_nolink($acct) . "</a>.");
+                $conf->success_msg("Created {$type}account for <a href=\"" . $conf->hoturl("profile", ["u" => $acct->email]) . "\">" . Text::user_html_nolink($acct) . "</a>.");
             }
             return $acct;
         } else {
@@ -1143,14 +1186,17 @@ class Contact {
 
     function mark_create($send_email, $message_chair) {
         global $Me;
-        if ($Me && $Me->privChair && $message_chair)
-            $this->conf->infoMsg("Created account for <a href=\"" . $this->conf->hoturl("profile", ["u" => $this->email]) . "\">" . Text::user_html_nolink($this) . "</a>.");
-        if ($send_email)
+        if ($Me && $Me->privChair && $message_chair) {
+            $this->conf->success_msg("Created account for <a href=\"" . $this->conf->hoturl("profile", ["u" => $this->email]) . "\">" . Text::user_html_nolink($this) . "</a>.");
+        }
+        if ($send_email) {
             $this->sendAccountInfo("create", false);
-        if ($Me && $Me->has_email() && $Me->email !== $this->email)
+        }
+        if ($Me && $Me->has_email() && $Me->email !== $this->email) {
             $this->conf->log("Created account ($Me->email)", $this);
-        else
+        } else {
             $this->conf->log("Created account", $this);
+        }
     }
 
 
@@ -1193,9 +1239,21 @@ class Contact {
     // } else
     //     change local password and update time;
 
+    /** @param string $input
+     * @return bool */
     static function valid_password($input) {
-        return $input !== "" && $input !== "0" && $input !== "*"
-            && trim($input) === $input;
+        return strlen($input) > 5 && trim($input) === $input;
+    }
+
+    /** return bool */
+    function password_unset() {
+        $cdbu = $this->cdb_user();
+        return (!$cdbu
+                || (string) $cdbu->password === ""
+                || str_starts_with($cdbu->password, " unset"))
+            && ((string) $this->password === ""
+                || str_starts_with($this->password, " unset")
+                || ($cdbu && (string) $cdbu->password !== "" && $cdbu->passwordTime >= $this->passwordTime));
     }
 
     static function random_password($length = 14) {
@@ -1212,7 +1270,7 @@ class Contact {
         return $cdbu && $cdbu->password;
     }
 
-    private function prefer_contactdb_password() {
+    function prefer_contactdb_password() {
         $cdbu = $this->contactdb_user();
         return $cdbu && $cdbu->password
             && (!$this->has_account_here() || $this->password === "");
@@ -1388,37 +1446,32 @@ class Contact {
     }
 
 
-    function sendAccountInfo($sendtype, $sensitive) {
+    function sendAccountInfo($sendtype, $sensitive, $self_requested = false) {
         assert(!$this->disabled);
-        $rest = array();
+        $rest = ["sensitive" => $sensitive];
         if ($sendtype == "create" && $this->prefer_contactdb_password()) {
             $template = "@activateaccount";
         } else if ($sendtype == "create") {
             $template = "@createaccount";
         } else if ($this->plaintext_password()
-                   && ($this->conf->opt("safePasswords") <= 1 || $sendtype != "forgot")) {
+                   && ($this->conf->opt("safePasswords") <= 1 || $sendtype !== "forgot")) {
             $template = "@accountinfo";
         } else {
-            if ($this->contactDbId && $this->prefer_contactdb_password()) {
-                $capmgr = $this->conf->capability_manager("U");
-            } else {
-                $capmgr = $this->conf->capability_manager();
-            }
-            $rest["capability"] = $capmgr->create(CAPTYPE_RESETPASSWORD, array("user" => $this, "timeExpires" => time() + 259200));
-            $this->conf->log("Created password reset " . substr($rest["capability"], 0, 8) . "...", $this);
             $template = "@resetpassword";
         }
 
-        $mailer = new CS61Mailer($this, null, $rest);
-        $prep = $mailer->make_preparation($template, $rest);
-        if ($prep->sendable
-            || !$sensitive
-            || $this->conf->opt("debugShowSensitiveEmail")) {
-            Mailer::send_preparation($prep);
-            return $template;
-        } else {
-            Conf::msg_error("Mail cannot be sent to " . htmlspecialchars($this->email) . " at this time.");
+        $mailer = new Mailer($this->conf, $this, $rest);
+        $prep = $mailer->prepare($template, $rest);
+        $prep->set_self_requested($self_requested);
+        if (!$prep->send()) {
+            if ($this->conf->opt("sendEmail")) {
+                $this->conf->feedback_msg(...$prep->message_list());
+            } else {
+                $this->conf->error_msg("<0>The system cannot send email at this time. You’ll need help from the site administrator to sign in.");
+            }
             return false;
+        } else {
+            return $template;
         }
     }
 
@@ -1513,7 +1566,7 @@ class Contact {
         if (!$pc && ($partner == "" || strcasecmp($partner, "none") == 0)) {
             $pc = $this;
         } else if (!$pc || !$pc->contactId) {
-            return Conf::msg_error("I can’t find someone with email/username " . htmlspecialchars($partner) . ". Check your spelling.");
+            return $this->conf->error_msg("<0>I can’t find someone with email/username {$partner}. Check your spelling.");
         }
 
         foreach ($this->links(LINK_PARTNER, $pset) as $link) {

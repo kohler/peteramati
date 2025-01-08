@@ -19,7 +19,7 @@ class ResetPassword_Page {
 
     function request() {
         if ($this->conf->external_login()) {
-            $this->conf->msg("Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.", 2);
+            $this->conf->error_msg("Password reset links aren’t used for this conference. Contact your system administrator if you’ve forgotten your password.");
             $this->conf->redirect();
         }
 
@@ -29,7 +29,7 @@ class ResetPassword_Page {
             $resetcap = $m[1];
         }
         if (!$resetcap) {
-            $this->conf->msg("You didn’t enter the full password reset link into your browser. Make sure you include the reset code (the string of letters, numbers, and other characters at the end).", 2);
+            $this->conf->error_msg("You didn’t enter the full password reset link into your browser. Make sure you include the reset code (the string of letters, numbers, and other characters at the end).");
             $this->conf->redirect();
         }
 
@@ -37,7 +37,7 @@ class ResetPassword_Page {
         $capmgr = $this->conf->capability_manager($resetcap);
         $capdata = $capmgr->check($resetcap);
         if (!$capdata || $capdata->capabilityType != CAPTYPE_RESETPASSWORD) {
-            $this->conf->msg("That password reset code has expired, or you didn’t enter it correctly.", 2);
+            $this->conf->error_msg("That password reset code has expired, or you didn’t enter it correctly.");
             $this->conf->redirect();
         }
 
@@ -47,7 +47,7 @@ class ResetPassword_Page {
             $Acct = $this->conf->user_by_id($capdata->contactId);
         }
         if (!$Acct) {
-            $this->conf->msg("That password reset code refers to a user who no longer exists. Either create a new account or contact the conference administrator.", 2);
+            $this->conf->error_msg("That password reset code refers to a user who no longer exists. Either create a new account or contact the conference administrator.");
             $this->conf->redirect();
         }
 
@@ -60,11 +60,11 @@ class ResetPassword_Page {
             $_POST["password"] = trim($_POST["password"] ?? "");
             $_POST["password2"] = trim($_POST["password2"] ?? "");
             if ($_POST["password"] == "") {
-                Conf::msg_error("You must enter a password.");
+                $this->conf->error_msg("You must enter a password.");
             } else if ($_POST["password"] !== $_POST["password2"]) {
-                Conf::msg_error("The two passwords you entered did not match.");
+                $this->conf->error_msg("The two passwords you entered did not match.");
             } else if (!Contact::valid_password($_POST["password"])) {
-                Conf::msg_error("Invalid password.");
+                $this->conf->error_msg("Invalid password.");
             } else {
                 $flags = 0;
                 if ($_POST["password"] === ($_POST["autopassword"] ?? null)) {
@@ -76,7 +76,7 @@ class ResetPassword_Page {
                     $log_acct = $Acct;
                 }
                 $log_acct->log_activity("Password reset via " . substr($resetcap, 0, 8) . "...");
-                $this->conf->confirmMsg("Your password has been changed. You may now sign in to the conference site.");
+                $this->conf->success_msg("Your password has been changed. You may now sign in to the conference site.");
                 $capmgr->delete($capdata);
                 $this->qreq->set_gsession("password_reset", (object) ["time" => Conf::$now, "email" => $Acct->email, "password" => $_POST["password"]]);
                 $this->conf->redirect();

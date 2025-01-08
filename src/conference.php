@@ -107,7 +107,7 @@ class Conf {
     public $multiuser_page = false;
     /** @var bool */
     private $_header_printed = false;
-    /** @var ?list<array{string,string}> */
+    /** @var ?list<array{string,int}> */
     private $_save_msgs;
     /** @var false|null|array<string,mixed> */
     private $_session_list = false;
@@ -180,6 +180,8 @@ class Conf {
     const USERNAME_USERNAME = 8;
     /** @var int */
     private $_username_classes = 0;
+    /** @var DKIMSigner|null|false */
+    private $_dkim_signer = false;
 
     /** @var false|null|SessionList */
     private $_active_list = false;
@@ -384,6 +386,10 @@ class Conf {
                 }
             }
         }
+        if (($eol = $this->opt["postfixMailer"] ?? $this->opt["postfixEOL"] ?? false)) {
+            $this->opt["postfixEOL"] = is_string($eol) ? $eol : PHP_EOL;
+        }
+        $this->_dkim_signer = false;
 
         // remove final slash from $Opt["paperSite"]
         $nav = Navigation::get();
@@ -488,7 +494,7 @@ class Conf {
 
         if (isset($this->opt["timezone"])) {
             if (!date_default_timezone_set($this->opt["timezone"])) {
-                self::msg_error("Timezone option “" . htmlspecialchars($this->opt["timezone"]) . "” is invalid; falling back to “America/New_York”.");
+                $this->error_msg("Timezone option “" . htmlspecialchars($this->opt["timezone"]) . "” is invalid; falling back to “America/New_York”.");
                 date_default_timezone_set("America/New_York");
             }
         } else if (!ini_get("date.timezone") && !getenv("TZ")) {
@@ -853,7 +859,7 @@ class Conf {
             fwrite(STDERR, "{$landmark}: database error: {$dblink->error} in {$query}\n");
         } else {
             error_log("{$landmark}: database error: {$dblink->error} in {$query}");
-            self::msg_error("<p>" . htmlspecialchars($landmark) . ": database error: " . htmlspecialchars($this->dblink->error) . " in " . Ht::pre_text_wrap($query) . "</p>");
+            $this->error_msg("<p>" . htmlspecialchars($landmark) . ": database error: " . htmlspecialchars($this->dblink->error) . " in " . Ht::pre_text_wrap($query) . "</p>");
         }
     }
 
@@ -1512,6 +1518,18 @@ class Conf {
         }
     }
 
+    /** @return ?DKIMSigner */
+    function dkim_signer() {
+        if ($this->_dkim_signer === false) {
+            if (($dkim = $this->opt("dkimConfig"))) {
+                $this->_dkim_signer = DKIMSigner::make($dkim);
+            } else {
+                $this->_dkim_signer = null;
+            }
+        }
+        return $this->_dkim_signer;
+    }
+
 
     /** @suppress PhanAccessReadOnlyProperty */
     function set_multiuser_page() {
@@ -1534,6 +1552,26 @@ class Conf {
     //
     // Message routines
     //
+
+    /** @param string $text
+     * @param int $type */
+    static function msg_on(?Conf $conf, $text, $type) {
+        assert(is_int($type) && is_string($text ?? ""));
+        if (($text ?? "") === "") {
+            // do nothing
+        } else if (PHP_SAPI === "cli") {
+            if ($type >= 2) {
+                fwrite(STDERR, "{$text}\n");
+            } else if ($type === 1 || !defined("HOTCRP_TESTHARNESS")) {
+                fwrite(STDOUT, "{$text}\n");
+            }
+        } else if ($conf && !$conf->_header_printed) {
+            $conf->_save_msgs[] = [$text, $type];
+        } else {
+            $k = Ht::msg_class($type) . ($conf && false /*$conf->_mx_auto*/ ? " mx-auto" : "");
+            echo "<div class=\"{$k}\">{$text}</div>";
+        }
+    }
 
     /** @param string|list<string> $text
      * @param int|string $type */
@@ -1560,51 +1598,41 @@ class Conf {
         }
     }
 
-    function infoMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xinfo" : "info");
+    /** @param MessageItem|iterable<MessageItem>|MessageSet ...$mls */
+    function feedback_msg(...$mls) {
+        $ms = Ht::feedback_msg_content(...$mls);
+        $ms[0] === "" || self::msg_on($this, $ms[0], $ms[1]);
     }
 
-    static public function msg_info($text, $minimal = false) {
-        self::$main->msg($text, $minimal ? "xinfo" : "info");
+    /** @param string $msg */
+    function error_msg($msg) {
+        $this->feedback_msg(MessageItem::error($msg));
     }
 
-    function warnMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xwarning" : "warning");
+    /** @param string $msg */
+    function warning_msg($msg) {
+        $this->feedback_msg(MessageItem::warning($msg));
     }
 
-    static public function msg_warning($text, $minimal = false) {
-        self::$main->msg($text, $minimal ? "xwarning" : "warning");
+    /** @param string $msg */
+    function success_msg($msg) {
+        $this->feedback_msg(MessageItem::success($msg));
     }
 
-    function confirmMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xconfirm" : "confirm");
-    }
-
-    static public function msg_confirm($text, $minimal = false) {
-        self::$main->msg($text, $minimal ? "xconfirm" : "confirm");
-    }
-
-    /** @return false */
-    function errorMsg($text, $minimal = false) {
-        $this->msg($text, $minimal ? "xmerror" : "merror");
-        return false;
-    }
-
-    /** @return false */
-    static public function msg_error($text, $minimal = false) {
-        self::$main->msg($text, $minimal ? "xmerror" : "merror");
-        return false;
-    }
-
-    static public function msg_debugt($text) {
-        if (is_object($text) || is_array($text) || $text === null || $text === false || $text === true)
+    /** @param mixed $text */
+    static function msg_debugt($text) {
+        if (is_object($text) || is_array($text) || $text === null || $text === false || $text === true) {
             $text = json_encode_browser($text);
-        self::$main->msg(Ht::pre_text_wrap($text), "merror");
+        }
+        self::msg_on(self::$main, Ht::pre_text_wrap($text), 2);
         return false;
     }
 
     function post_missing_msg() {
-        $this->msg("Your uploaded data wasn’t received. This can happen on unusually slow connections, or if you tried to upload a file larger than I can accept.", "merror");
+        $this->feedback_msg(
+            MessageItem::error("<0>Uploaded data was not received"),
+            MessageItem::inform("<0>This can happen on unusually slow connections, or if you tried to upload a file larger than I can accept.")
+        );
     }
 
 
@@ -1804,13 +1832,23 @@ class Conf {
         return $t;
     }
 
-    /** @param ?array<string,mixed> $param
+    /** @param string $page
+     * @param null|string|array $param
+     * @param int $flags
+     * @return string */
+    function hoturl_raw($page, $param = null, $flags = 0) {
+        return $this->hoturl($page, $param, self::HOTURL_RAW | $flags);
+    }
+
+    /** @param string $page
+     * @param ?array<string,mixed> $param
      * @return string */
     function hoturl_absolute($page, $param = null, $flags = 0) {
         return $this->hoturl($page, $param, self::HOTURL_ABSOLUTE | $flags);
     }
 
-    /** @param ?array<string,mixed> $param
+    /** @param string $page
+     * @param ?array<string,mixed> $param
      * @return string */
     function hoturl_site_relative_raw($page, $param = null) {
         return $this->hoturl($page, $param, self::HOTURL_SITE_RELATIVE | self::HOTURL_RAW);
@@ -2210,13 +2248,13 @@ class Conf {
         if ($qreq && ($msgs = $qreq->csession("msgs")) && !empty($msgs)) {
             $qreq->unset_csession("msgs");
             foreach ($msgs as $m) {
-                $this->msg($m[0], $m[1]);
+                self::msg_on($this, $m[0], $m[1]);
             }
             echo "<div id=\"initialmsgspacer\"></div>";
         }
         if ($this->_save_msgs) {
             foreach ($this->_save_msgs as $m) {
-                $this->msg($m[0], $m[1]);
+                self::msg_on($this, $m[0], $m[1]);
             }
             $this->_save_msgs = null;
         }

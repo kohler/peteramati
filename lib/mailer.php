@@ -1,269 +1,286 @@
 <?php
 // mailer.php -- HotCRP mail template manager
-// Copyright (c) 2006-2019 Eddie Kohler; see LICENSE.
-
-class MailPreparation {
-    public $subject = "";
-    public $body = "";
-    public $preparation_owner = "";
-    public $to = array();
-    public $sendable = false;
-    public $headers = array();
-    public $errors = array();
-}
+// Copyright (c) 2006-2025 Eddie Kohler; see LICENSE.
 
 class Mailer {
-    const EXPAND_BODY = 0;
-    const EXPAND_HEADER = 1;
-    const EXPAND_EMAIL = 2;
+    const CONTEXT_BODY = 0;
+    const CONTEXT_HEADER = 1;
+    const CONTEXT_EMAIL = 2;
 
-    const EXPANDVAR_CONTINUE = -9999;
+    const CENSOR_NONE = 0;
+    const CENSOR_DISPLAY = 1;
+    const CENSOR_ALL = 2;
 
-    public static $email_fields = array("to" => "To", "cc" => "Cc", "bcc" => "Bcc",
-                                        "reply-to" => "Reply-To");
+    public static $email_fields = ["to" => "To", "cc" => "Cc", "bcc" => "Bcc", "reply-to" => "Reply-To"];
+    public static $template_fields = ["to", "cc", "bcc", "reply-to", "subject", "body"];
 
-    protected $recipient = null;
+    /** @var Conf */
+    public $conf;
+    /** @var ?Contact */
+    protected $recipient;
+    /** @var string */
+    protected $eol;
 
     /** @var int */
     protected $width;
-    /** @var bool|'display'|'high' */
-    protected $sensitive;
+    /** @var bool */
+    protected $flowed = false;
+    /** @var int */
+    protected $censor;
     /** @var ?string */
     protected $reason;
     /** @var bool */
     protected $adminupdate = false;
     /** @var ?string */
     protected $notes;
+    /** @var ?string */
+    public $capability_token;
+    /** @var bool */
+    protected $sensitive;
+
+    /** @var ?MailPreparation */
     protected $preparation;
-    public $capability;
+    /** @var int */
+    protected $context = 0;
+    /** @var ?string */
+    protected $line_prefix;
 
-    protected $expansionType = null;
+    /** @var array<string,true> */
+    private $_unexpanded = [];
+    /** @var list<string> */
+    protected $_errors_reported = [];
+    /** @var ?MessageSet */
+    private $_ms;
 
-    protected $_unexpanded = array();
-
-    static private $eol = null;
-
-    function __construct() {
-        $this->reset(null, []);
+    /** @param ?Contact $recipient
+     * @param array{width?:int,censor?:0|1|2,capability_token?:string,sensitive?:bool} $settings */
+    function __construct(Conf $conf, $recipient = null, $settings = []) {
+        $this->conf = $conf;
+        $this->eol = $conf->opt("postfixEOL") ?? "\r\n";
+        $this->flowed = !!$this->conf->opt("mailFormatFlowed");
+        $this->reset($recipient, $settings);
     }
 
     /** @param ?Contact $recipient
-     * @param array<string,mixed> $settings */
+     * @param array{width?:int,censor?:0|1|2,capability_token?:string,sensitive?:bool} $settings */
     function reset($recipient = null, $settings = []) {
         $this->recipient = $recipient;
         $this->width = $settings["width"] ?? 72;
         if ($this->width <= 0) {
             $this->width = 10000000;
         }
-        //$this->flowed = !!$this->conf->opt("mailFormatFlowed");
-        //$this->censor = $settings["censor"] ?? self::CENSOR_NONE;
+        $this->censor = $settings["censor"] ?? self::CENSOR_NONE;
         $this->reason = $settings["reason"] ?? null;
         $this->adminupdate = $settings["adminupdate"] ?? false;
         $this->notes = $settings["notes"] ?? null;
-        $this->capability = $settings["capability"] ?? null;
+        $this->capability_token = $settings["capability_token"] ?? null;
         $this->sensitive = $settings["sensitive"] ?? false;
     }
 
-    static function eol() {
-        global $Conf;
-        if (self::$eol === null) {
-            if (($x = $Conf->opt("postfixMailer")) === null)
-                $x = $Conf->opt("postfixEOL");
-            if (!$x)
-                self::$eol = "\r\n";
-            else if ($x === true || !is_string($x))
-                self::$eol = PHP_EOL;
-            else
-                self::$eol = $x;
-        }
-        return self::$eol;
-    }
 
-
+    /** @param Contact $contact
+     * @param string $out
+     * @return string */
     function expand_user($contact, $out) {
         $r = Text::analyze_name($contact);
-        if (is_object($contact) && ($contact->preferredEmail ?? "") != "")
+        if (is_object($contact)
+            && ($contact->preferredEmail ?? "") != "") {
             $r->email = $contact->preferredEmail;
+        }
 
         // maybe infer username
-        if ($r->firstName == "" && $r->lastName == "" && is_object($contact)
-            && (($contact->email ?? "") !== "" || ($contact->preferredEmail ?? "") !== ""))
+        if ($r->firstName === ""
+            && $r->lastName === ""
+            && $r->email !== "") {
             $this->infer_user_name($r, $contact);
+        }
 
-        if ($out == "NAME" || $out == "CONTACT")
-            $t = $r->name;
-        else if ($out == "FIRST")
-            $t = $r->firstName;
-        else if ($out == "LAST")
-            $t = $r->lastName;
-        else
-            $t = "";
-        if ($t == "" && $out == "NAME" && $r->email
-            && $this->expansionType != self::EXPAND_EMAIL)
-            $t = $r->email;
-        if ($t != "" && $this->expansionType == self::EXPAND_EMAIL
-            && preg_match('#[\000-\037()[\]<>@,;:\\".]#', $t))
-            $t = "\"" . addcslashes($t, '"\\') . "\"";
+        $flags = $this->context === self::CONTEXT_EMAIL ? NAME_MAILQUOTE : 0;
+        if ($r->email !== "") {
+            $email = $r->email;
+        } else {
+            $email = "none";
+            $flags |= NAME_B;
+        }
 
-        $email = $r->email;
-        if ($email == "" && $this->expansionType == self::EXPAND_EMAIL)
-            $email = "<none>";
-        if ($out == "EMAIL")
-            $t = $email;
-        else if ($out == "CONTACT" && $this->expansionType == self::EXPAND_EMAIL) {
-            if ($t == "")
-                $t = $email;
-            else if ($email[0] == "<")
-                $t .= " $email";
-            else
-                $t .= " <$email>";
-        } else if ($out == "CONTACT" && $email != "")
-            $t = ($t == "" ? $email : "$t <$email>");
-
-        return $t;
+        if ($out === "EMAIL") {
+            return $flags & NAME_B ? "<{$email}>" : $email;
+        } else if ($out === "CONTACT") {
+            return Text::name($r->firstName, $r->lastName, $email, $flags | NAME_E);
+        } else if ($out === "NAME") {
+            if ($this->context !== self::CONTEXT_EMAIL) {
+                $flags |= NAME_P;
+            }
+            return Text::name($r->firstName, $r->lastName, $email, $flags);
+        } else if ($out === "FIRST") {
+            return Text::name($r->firstName, "", "", $flags);
+        } else if ($out === "LAST") {
+            return Text::name("", $r->lastName, "", $flags);
+        } else {
+            return "";
+        }
     }
 
     function infer_user_name($r, $contact) {
     }
 
-    function expandvar($what, $isbool = false) {
-        global $Conf;
-        $len = strlen($what);
+
+    function kw_opt($args, $isbool) {
+        $yes = $this->expandvar($args, true);
+        if ($yes && !$isbool) {
+            return $this->expandvar($args, false);
+        }
+        return $yes;
+    }
+
+    function kw_urlenc($args, $isbool) {
+        $hasinner = $this->expandvar($args, true);
+        if ($hasinner && !$isbool) {
+            return urlencode($this->expandvar($args, false));
+        }
+        return $hasinner;
+    }
+
+    function kw_recipient($args, $isbool, $reciptype) {
+        if ($this->preparation) {
+            $this->preparation->preparation_owner = $this->recipient->email;
+        }
+        return $this->expand_user($this->recipient, $reciptype);
+    }
+
+    function kw_capability($args, $isbool) {
+        if ($this->capability_token) {
+            $this->sensitive = true;
+        }
+        return $isbool || $this->capability_token ? $this->capability_token : "";
+    }
+
+    function kw_login($args, $isbool, $name) {
+        if (!$this->recipient) {
+            return $this->conf->login_type() ? false : null;
+        }
+
+        $loginparts = "";
+        if (($lt = $this->conf->login_type()) === null || $lt === "ldap") {
+            $loginparts = "email=" . urlencode($this->recipient->email);
+        }
+        if ($name === "LOGINURL") {
+            return $this->conf->opt("paperSite") . "/signin/" . ($loginparts ? "?{$loginparts}" : "");
+        } else if ($name === "LOGINURLPARTS") {
+            return $loginparts;
+        }
+        $pwd = $lt === null ? $this->recipient->plaintext_password() : null;
+        if (!$pwd) {
+            return $pwd;
+        }
+        $this->sensitive = true;
+        return $this->censor ? "HIDDEN" : $pwd;
+    }
+
+    function kw_needpassword($args, $isbool) {
+        if ($this->conf->login_type() || $this->censor) {
+            return false;
+        } else if ($this->recipient) {
+            return $this->recipient->password_unset();
+        } else {
+            return null;
+        }
+    }
+
+    function kw_passwordlink($args, $isbool) {
+        if (!$this->recipient) {
+            return $this->conf->login_type() ? false : null;
+        } else if ($this->censor === self::CENSOR_ALL) {
+            return null;
+        }
+        $this->sensitive = true;
+        if (!$this->censor && !$this->preparation->reset_capability) {
+            if ($this->recipient->contactDbId && $this->recipient->prefer_contactdb_password()) {
+                $capmgr = $this->conf->capability_manager("U");
+            } else {
+                $capmgr = $this->conf->capability_manager();
+            }
+            $this->preparation->reset_capability = $capmgr->create(CAPTYPE_RESETPASSWORD, ["user" => $this->recipient, "timeExpires" => time() + 259200]);
+        }
+        $token = $this->censor ? "HIDDEN" : $this->preparation->reset_capability;
+        return $this->conf->hoturl_raw("resetpassword", null, Conf::HOTURL_ABSOLUTE | Conf::HOTURL_NO_DEFAULTS) . "/" . urlencode($token);
+    }
+
+    /** @param string $what
+     * @param bool $isbool
+     * @return null|bool|string */
+    function expandvar($what, $isbool) {
+        if (str_ends_with($what, ")") && ($paren = strpos($what, "("))) {
+            $name = substr($what, 0, $paren);
+            $args = substr($what, $paren + 1, strlen($what) - $paren - 2);
+        } else {
+            $name = $what;
+            $args = "";
+        }
 
         // generic expansions: OPT, URLENC
-        if ($len > 7 && substr($what, 0, 5) == "%OPT(" && substr($what, $len - 2) == ")%") {
-            $inner = "%" . substr($what, 5, $len - 7) . "%";
-            $yes = $this->expandvar($inner, true);
-            if ($isbool)
-                return $yes;
-            else if ($yes)
-                return $this->expandvar($inner, false);
-            else
-                return ($yes === null ? $what : "");
-        }
-
-        if ($len > 10 && substr($what, 0, 8) == "%URLENC(" && substr($what, $len - 2) == ")%") {
-            $inner = "%" . substr($what, 8, $len - 10) . "%";
-            $yes = $this->expandvar($inner, true);
-            if ($isbool)
-                return $yes;
-            else if ($yes)
-                return urlencode($this->expandvar($inner, false));
-            else
-                return ($yes === null ? $what : "");
-        }
-
-        // expansions that do not require a recipient
-        if ($what == "%CONFNAME%")
-            return $Conf->full_name();
-        if ($what == "%CONFSHORTNAME%")
-            return $Conf->short_name;
-        if ($what == "%CONFLONGNAME%")
-            return $Conf->long_name;
-        if ($what == "%SIGNATURE%")
-            return $Conf->opt("emailSignature") ? : "- " . $Conf->short_name . " Submissions";
-        if ($what == "%ADMIN%" || $what == "%SITECONTACT%")
-            return $this->expand_user($Conf->site_contact(), "CONTACT");
-        if ($what == "%ADMINNAME%")
-            return $this->expand_user($Conf->site_contact(), "NAME");
-        if ($what == "%ADMINEMAIL%" || $what == "%SITEEMAIL%")
-            return $this->expand_user($Conf->site_contact(), "EMAIL");
-        if ($what == "%URL%")
-            return $Conf->opt("paperSite");
-        else if ($len > 7 && substr($what, 0, 5) == "%URL(" && substr($what, $len - 2) == ")%") {
+        $len = strlen($name);
+        if ($name === "OPT" && $args) {
+            return $this->kw_opt($args, $isbool);
+        } else if ($name === "URLENC" && $args) {
+            return $this->kw_urlenc($args, $isbool);
+        } else if ($name === "CONFNAME") {
+            return $this->conf->full_name();
+        } else if ($name === "CONFSHORTNAME") {
+            return $this->conf->short_name;
+        } else if ($name === "CONFLONGNAME") {
+            return $this->conf->long_name;
+        } else if ($name === "SIGNATURE") {
+            return $this->conf->opt("emailSignature") ? : "- " . $this->conf->short_name . " Submissions";
+        } else if ($name === "ADMIN" || $name === "SITECONTACT") {
+            return $this->expand_user($this->conf->site_contact(), "CONTACT");
+        } else if ($name === "ADMINNAME") {
+            return $this->expand_user($this->conf->site_contact(), "NAME");
+        } else if ($name === "ADMINEMAIL" || $name === "SITEEMAIL") {
+            return $this->expand_user($this->conf->site_contact(), "EMAIL");
+        } else if ($name === "URL") {
+            if ($args === "") {
+                return $this->conf->opt("paperSite");
+            }
             $a = preg_split('/\s*,\s*/', substr($what, 5, $len - 7));
             for ($i = 0; $i < count($a); ++$i) {
                 $a[$i] = $this->expand($a[$i], "urlpart");
                 $a[$i] = preg_replace('/\&(?=\&|\z)/', "", $a[$i]);
             }
-            return $Conf->hoturl_absolute($a[0], isset($a[1]) ? $a[1] : "", Conf::HOTURL_NO_DEFAULTS);
-        }
-        if ($what == "%PHP%")
+            return $this->conf->hoturl_absolute($a[0], isset($a[1]) ? $a[1] : "", Conf::HOTURL_NO_DEFAULTS);
+        } else if ($name === "PHP") {
             return Navigation::get()->php_suffix;
-        if (preg_match('/\A%(CONTACT|NAME|EMAIL|FIRST|LAST)%\z/', $what, $m)) {
-            if ($this->recipient) {
-                if ($this->preparation)
-                    $this->preparation->preparation_owner = $this->recipient->email;
-                return $this->expand_user($this->recipient, $m[1]);
-            } else if ($isbool)
-                return false;
-        }
-
-        if ($what == "%LOGINNOTICE%") {
-            if ($Conf->opt("disableCapabilities"))
-                return $this->expand($Conf->opt("mailtool_loginNotice") ?? " To sign in, either click the link below or paste it into your web browser's location field.\n\n%LOGINURL%", $isbool);
-            else
-                return "";
-        }
-        if ($what == "%REASON%" || $what == "%ADMINUPDATE%" || $what == "%NOTES%") {
-            $which = strtolower(substr($what, 1, strlen($what) - 2));
+        } else if (in_array($name, ["CONTACT", "NAME", "EMAIL", "FIRST", "LAST"])) {
+            if (!$this->recipient) {
+                return null;
+            }
+            return $this->kw_recipient($args, $isbool, $name);
+        } else if ($name === "REASON" || $name === "ADMINUPDATE" || $name === "NOTES") {
+            $which = strtolower($name);
             $value = $this->$which;
-            if ($value === null && !$this->recipient)
-                return ($isbool ? null : $what);
-            else if ($what == "%ADMINUPDATE%")
+            if ($value === null && !$this->recipient) {
+                return $isbool ? null : $what;
+            } else if ($name === "ADMINUPDATE") {
                 return $value ? "An administrator performed this update. " : "";
-            else
+            } else {
                 return $value === null ? "" : $value;
-        }
-
-        $result = $this->expandvar_generic($what, $isbool);
-        if ($result !== self::EXPANDVAR_CONTINUE)
-            return $result;
-
-        // exit if no recipient
-        $external_password = $Conf->external_login();
-        if (!$this->recipient) {
-            if ($isbool && $what == "%PASSWORD%" && $external_password)
-                return false;
-            else
-                return ($isbool ? null : $what);
-        }
-
-        // expansions that require a recipient
-        if ($what == "%LOGINURL%" || $what == "%LOGINURLPARTS%" || $what == "%PASSWORD%") {
-            $password = false;
-            if (!$external_password) {
-                $pwd_plaintext = $this->recipient->plaintext_password();
-                if ($pwd_plaintext && !$this->sensitive)
-                    $password = $pwd_plaintext;
-                else if ($pwd_plaintext && $this->sensitive === "display")
-                    $password = "HIDDEN";
             }
-            $loginparts = "";
-            if (!$Conf->opt("httpAuthLogin")) {
-                $loginparts = "email=" . urlencode($this->recipient->email);
-                if ($password)
-                    $loginparts .= "&password=" . urlencode($password);
-            }
-            if ($what == "%LOGINURL%")
-                return $Conf->opt("paperSite") . ($loginparts ? "/?" . $loginparts : "/");
-            else if ($what == "%LOGINURLPARTS%")
-                return $loginparts;
-            else
-                return ($isbool || $password ? $password : "");
+        } else if ($name === "LOGINURL" || $name === "LOGINURLPARTS" || $name === "PASSWORD") {
+            return $this->kw_login($args, $isbool, $name);
+        } else if ($name === "PASSWORDLINK") {
+            return $this->kw_passwordlink($args, $isbool);
+        } else if ($name === "CAPABILITY") {
+            return $this->kw_capability($args, $isbool);
         }
-        if ($what == "%CAPABILITY%")
-            return ($isbool || $this->capability ? $this->capability : "");
-
-        $result = $this->expandvar_recipient($what, $isbool);
-        if ($result !== self::EXPANDVAR_CONTINUE)
-            return $result;
 
         // fallback
-        if ($isbool)
+        if ($isbool) {
             return false;
-        else {
-            $this->_unexpanded[$what] = true;
-            return $what;
         }
-    }
-
-    function expandvar_generic($what, $isbool) {
-        return self::EXPANDVAR_CONTINUE;
-    }
-
-    function expandvar_recipient($what, $isbool) {
-        return self::EXPANDVAR_CONTINUE;
+        if (!isset($this->_unexpanded[$what])) {
+            $this->_unexpanded[$what] = true;
+        }
+        return null;
     }
 
 
@@ -296,7 +313,7 @@ class Mailer {
         } else
             $yes = true;
         if ($yes && $cond)
-            $yes = $this->expandvar("%" . substr($cond, 1, strlen($cond) - 2) . "%", true);
+            $yes = $this->expandvar(substr($cond, 1, strlen($cond) - 2), true);
         $this->_pushIf($ifstack, $text, $yes);
         return $yes;
     }
@@ -327,121 +344,160 @@ class Mailer {
         return $text . $rest;
     }
 
-    private function _lineexpand($line, $info, $indent, $width) {
+    /** @param string $line
+     * @return string */
+    private function _lineexpand($line, $indent) {
         $text = "";
-        while (preg_match('/^(.*?)(%#?[-a-zA-Z0-9!@_:.\/]+(?:|\([^\)]*\))%)(.*)$/s', $line, $m)) {
-            $text .= $m[1] . $this->expandvar($m[2], false);
-            $line = $m[3];
+        $pos = 0;
+        while (preg_match('/\G(.*?)(%(#?[-a-zA-Z0-9!@_:.\/]+(?:|\([^\)]*\)))%)/s', $line, $m, 0, $pos)) {
+            $text .= $m[1];
+            // Don't expand keywords that look like they are coming from URLs
+            if (strlen($m[3]) >= 2
+                && ctype_xdigit(substr($m[3], 0, 2))
+                && strlen($line) >= $pos + strlen($m[0]) + 2
+                && ctype_xdigit(substr($line, $pos + strlen($m[0]), 2))
+                && preg_match('/\/\/\S+\z/', $text)) {
+                $s = null;
+            } else {
+                $s = $this->expandvar($m[3], false);
+            }
+            $text .= $s ?? $m[2];
+            $pos += strlen($m[0]);
         }
-        $text .= $line;
-        return prefix_word_wrap($info, $text, $indent, $width);
+        $text .= substr($line, $pos);
+        return prefix_word_wrap($this->line_prefix ?? "", $text, $indent,
+                                $this->width, $this->flowed);
     }
 
+    /** @param string $text
+     * @param ?string $field
+     * @return string */
     function expand($text, $field = null) {
-        if (is_array($text)) {
-            $a = array();
-            foreach ($text as $k => $t)
-                $a[$k] = $this->expand($t, $k);
-            return $a;
-        }
-
         // leave early on empty string
-        if ($text == "")
+        if ($text === "") {
             return "";
+        }
 
         // width, expansion type based on field
-        $oldExpansionType = $this->expansionType;
-        $width = 100000;
-        if ($field == "to" || $field == "cc" || $field == "bcc"
-            || $field == "reply-to")
-            $this->expansionType = self::EXPAND_EMAIL;
-        else if ($field != "body" && $field != "")
-            $this->expansionType = self::EXPAND_HEADER;
-        else {
-            $this->expansionType = self::EXPAND_BODY;
-            $width = $this->width;
+        $old_context = $this->context;
+        $old_width = $this->width;
+        $old_line_prefix = $this->line_prefix;
+        if (isset(self::$email_fields[$field])) {
+            $this->context = self::CONTEXT_EMAIL;
+            $this->width = 10000000;
+        } else if ($field !== "body" && $field != "") {
+            $this->context = self::CONTEXT_HEADER;
+            $this->width = 10000000;
+        } else {
+            $this->context = self::CONTEXT_BODY;
         }
 
-        // expand out %IF% and %ELSE% and %ENDIF%.  Need to do this first,
-        // or we get confused with wordwrapping.
+        // expand out conditionals first to avoid confusion with wordwrapping
         $text = $this->_expandConditionals(cleannl($text));
 
         // separate text into lines
         $lines = explode("\n", $text);
-        if (count($lines) && $lines[count($lines) - 1] === "")
+        if (!empty($lines) && $lines[count($lines) - 1] === "") {
             array_pop($lines);
+        }
 
         $text = "";
-        $textstart = 0;
         for ($i = 0; $i < count($lines); ++$i) {
             $line = rtrim($lines[$i]);
-            if ($line == "")
+            if ($line == "") {
                 $text .= "\n";
-            else if (preg_match('/^%(?:REVIEWS|COMMENTS)(?:[(].*[)])?%$/', $line)) {
-                if (($m = $this->expandvar($line, false)) != "")
+            } else if (preg_match('/\A%((?:REVIEWS|COMMENTS)(?:|\(.*\)))%\z/s', $line, $m)) {
+                if (($m = $this->expandvar($m[1], false)) != "") {
                     $text .= $m . "\n";
-            } else if (preg_match('/^([ \t][ \t]*.*?: )(%OPT\([\w()]+\)%)$/', $line, $m)) {
-
-                if (($yes = $this->expandvar($m[2], true)))
-                    $text .= prefix_word_wrap($m[1], $this->expandvar($m[2]), tabLength($m[1], true), $width);
-                else if ($yes === null)
-                    $text .= $line . "\n";
-            } else if (preg_match('/^([ \t][ \t]*.*?: )(%\w+(?:|\([^\)]*\))%|\S+)\s*$/', $line, $m))
-                $text .= $this->_lineexpand($m[2], $m[1], tabLength($m[1], true), $width);
-            else if (strpos($line, '%') !== false)
-                $text .= $this->_lineexpand($line, "", 0, $width);
-            else
-                $text .= prefix_word_wrap("", $line, 0, $width);
+                }
+            } else if (strpos($line, "%") === false) {
+                $text .= prefix_word_wrap("", $line, 0, $this->width, $this->flowed);
+            } else {
+                if (($line[0] === " " || $line[0] === "\t" || $line[0] === "*")
+                    && preg_match('/\A([ *\t]*)%(\w+(?:|\([^\)]*\)))%(: .*)\z/s', $line, $m)
+                    && $this->expandvar($m[2], true)) {
+                    $line = $m[1] . $this->expandvar($m[2], false) . $m[3];
+                }
+                if (($line[0] === " " || $line[0] === "\t" || $line[0] === "*")
+                    && preg_match('/\A([ \t]*\*[ \t]+|[ \t]*.*?: (?=%))(.*?: |)(%(\w+(?:|\([^\)]*\)))%)\s*\z/s', $line, $m)
+                    && ($tl = tab_width($m[1], true)) <= 20) {
+                    $this->line_prefix = $m[1] . $m[2];
+                    if (str_starts_with($m[4] ?? "", "OPT(")) {
+                        if (($yes = $this->expandvar($m[4], true))) {
+                            $text .= prefix_word_wrap($this->line_prefix, $this->expandvar($m[4], false), $tl, $this->width, $this->flowed);
+                        } else if ($yes === null) {
+                            $text .= $line . "\n";
+                        }
+                    } else {
+                        $text .= $this->_lineexpand($m[3], $tl);
+                    }
+                    continue;
+                }
+                $this->line_prefix = "";
+                $text .= $this->_lineexpand($line, 0);
+            }
         }
 
         // lose newlines on header expansion
-        if ($this->expansionType != self::EXPAND_BODY)
+        if ($this->context !== self::CONTEXT_BODY) {
             $text = rtrim(preg_replace('/[\r\n\f\x0B]+/', ' ', $text));
+        }
 
-        $this->expansionType = $oldExpansionType;
+        $this->context = $old_context;
+        $this->width = $old_width;
+        $this->line_prefix = $old_line_prefix;
         return $text;
     }
 
+    /** @param array|object $x
+     * @return array<string,string> */
+    function expand_all($x) {
+        $r = [];
+        foreach ((array) $x as $k => $t) {
+            if (in_array($k, self::$template_fields))
+                $r[$k] = $this->expand($t, $k);
+        }
+        return $r;
+    }
+
     /** @return array<string,string> */
-    static function get_template($templateName, $default = false) {
-        global $Conf, $mailTemplates;
+    function get_template($templateName, $default = false) {
+        global $mailTemplates;
         $m = $mailTemplates[$templateName];
-        if (!$default && $Conf) {
-            if (($t = $Conf->setting_data("mailsubj_" . $templateName)) !== null) {
+        if (!$default && $this->conf) {
+            if (($t = $this->conf->setting_data("mailsubj_" . $templateName)) !== null) {
                 $m["subject"] = $t;
             }
-            if (($t = $Conf->setting_data("mailbody_" . $templateName)) !== null) {
+            if (($t = $this->conf->setting_data("mailbody_" . $templateName)) !== null) {
                 $m["body"] = $t;
             }
         }
         return $m;
     }
 
-    function expand_template($templateName, $default = false) {
-        return $this->expand(self::get_template($templateName, $default));
+    /** @param string $name
+     * @param bool $use_default
+     * @return array{body:string,subject:string} */
+    function expand_template($name, $use_default = false) {
+        return $this->expand_all($this->get_template($name, $use_default));
     }
 
-
-    static function allow_send($email) {
-        global $Conf;
-        return $Conf->opt("sendEmail")
-            && ($at = strpos($email, "@")) !== false
-            && ((($ch = $email[$at + 1]) !== "_" && $ch !== "e" && $ch !== "E")
-                || !preg_match(';\A(?:_.*|example\.(?:com|net|org))\z;i', substr($email, $at + 1)));
-    }
 
     /** @return MailPreparation */
-    function create_preparation() {
-        return new MailPreparation;
+    function prepare($template, $rest = []) {
+        assert($this->recipient && $this->recipient->email);
+        $prep = new MailPreparation($this->conf, $this->recipient);
+        $this->populate_preparation($prep, $template, $rest);
+        return $prep;
     }
 
-    /** @param array<string,mixed> $rest */
-    function make_preparation($template, $rest = []) {
-        global $Conf;
-
+    function populate_preparation(MailPreparation $prep, $template, $rest = []) {
         // look up template
-        if (is_string($template) && $template[0] == "@") {
-            $template = self::get_template(substr($template, 1));
+        if (is_string($template) && $template[0] === "@") {
+            $template = (array) $this->get_template(substr($template, 1));
+        }
+        if (is_object($template)) {
+            $template = (array) $template;
         }
         // add rest fields to template for expansion
         foreach (self::$email_fields as $lcfield => $field) {
@@ -449,324 +505,141 @@ class Mailer {
                 $template[$lcfield] = $rest[$lcfield];
         }
 
+        // look up recipient; use preferredEmail if set
+        if (!$this->recipient || !$this->recipient->email) {
+            throw new Exception("No email in Mailer::send");
+        }
+        if (!isset($this->recipient->contactId)) {
+            error_log("no contactId in recipient\n" . debug_string_backtrace());
+        }
+        $mimetext = new MimeText($this->eol);
+
         // expand the template
-        $prep = $this->preparation = $this->create_preparation();
-        $m = $this->expand($template);
+        $this->preparation = $prep;
+        $mail = $this->expand_all($template);
         $this->preparation = null;
 
-        $subject = MimeText::encode_header("Subject: ", $m["subject"]);
+        $mail["to"] = MailPreparation::recipient_address(($prep->recipients())[0]);
+        $subject = $mimetext->encode_header("Subject: ", $mail["subject"]);
         $prep->subject = substr($subject, 9);
-
-        $prep->body = $m["body"];
-
-        // look up recipient; use preferredEmail if set
-        $recipient = $this->recipient;
-        if (!$recipient || !$recipient->email)
-            return Conf::msg_error("no email in Mailer::send");
-        if ($recipient->preferredEmail ?? false) {
-            $recipient = (object) array("email" => $recipient->preferredEmail);
-            foreach (["firstName", "lastName", "name", "fullName"] as $k)
-                if (($this->recipient->$k ?? "") !== "")
-                    $recipient->$k = $this->recipient->$k;
-        }
-        $prep->to = array(Text::user_email_to($recipient));
-        $m["to"] = $prep->to[0];
-        $prep->sendable = self::allow_send($recipient->email);
+        $prep->body = $mail["body"];
 
         // parse headers
-        if (!$Conf->opt("emailFromHeader"))
-            $Conf->set_opt("emailFromHeader", MimeText::encode_email_header("From: ", $Conf->opt("emailFrom")));
-        $eol = self::eol();
-        $prep->headers = array("from" => $Conf->opt("emailFromHeader") . $eol, "subject" => $subject . $eol, "to" => "");
-        foreach (self::$email_fields as $lcfield => $field)
-            if (($text = ($m[$lcfield] ?? "")) !== ""
-                && $text !== "<none>") {
-                if (($hdr = MimeText::encode_email_header($field . ": ", $text)))
-                    $prep->headers[$lcfield] = $hdr . $eol;
-                else {
-                    $prep->errors[$lcfield] = $text;
-                    if (!($rest["no_error_quit"] ?? false))
-                        Conf::msg_error("$field destination “<samp>" . htmlspecialchars($text) . "</samp>” isn't a valid email list.");
+        $fromHeader = $this->conf->opt("emailFromHeader");
+        if ($fromHeader === null) {
+            $fromHeader = $mimetext->encode_email_header("From: ", $this->conf->opt("emailFrom"));
+            $this->conf->set_opt("emailFromHeader", $fromHeader);
+        }
+        $prep->headers = [];
+        if ($fromHeader) {
+            $prep->headers["from"] = $fromHeader . $this->eol;
+        }
+        $prep->headers["subject"] = $subject . $this->eol;
+        $prep->headers["to"] = "";
+        foreach (self::$email_fields as $lcfield => $field) {
+            if (($text = $mail[$lcfield] ?? "") === "" || $text === "<none>") {
+                continue;
+            }
+            if (($hdr = $mimetext->encode_email_header($field . ": ", $text))) {
+                $prep->headers[$lcfield] = $hdr . $this->eol;
+            } else {
+                $mimetext->mi->field = $lcfield;
+                $mimetext->mi->landmark = "{$field} field";
+                $prep->append_item($mimetext->mi);
+                $logmsg = "{$lcfield}: {$text}";
+                if (!in_array($logmsg, $this->_errors_reported)) {
+                    error_log("mailer error on {$logmsg}");
+                    $this->_errors_reported[] = $logmsg;
                 }
             }
-        $prep->headers["mime-version"] = "MIME-Version: 1.0" . $eol;
-        $prep->headers["content-type"] = "Content-Type: text/plain; charset=utf-8" . $eol;
-
-        if ($prep->errors && !($rest["no_error_quit"] ?? false))
-            return false;
-        else
-            return $prep;
-    }
-
-    static function preparation_differs($prep1, $prep2) {
-        return $prep1->subject != $prep2->subject
-            || $prep1->body != $prep2->body
-            || ($prep1->headers["cc"] ?? null) !== ($prep2->headers["cc"] ?? null)
-            || ($prep1->headers["reply-to"] ?? null) != ($prep2->headers["reply-to"] ?? null)
-            || $prep1->preparation_owner != $prep2->preparation_owner;
-    }
-
-    /** @param list<string> $to */
-    static function merge_preparation_to($prep, $to) {
-        if (count($to) !== 1
-            || count($prep->to) === 0
-            || $prep->to[count($prep->to) - 1] !== $to[0])
-            $prep->to = array_merge($prep->to, $to);
-    }
-
-    static function send_preparation($prep) {
-        global $Conf;
-        if ($Conf->opt("internalMailer") === null)
-            $Conf->set_opt("internalMailer", strncasecmp(PHP_OS, "WIN", 3) != 0);
-        $headers = $prep->headers;
-        $eol = self::eol();
-
-        // create valid To: header
-        $to = $prep->to;
-        if (is_array($to))
-            $to = join(", ", $to);
-        $to = MimeText::encode_email_header("To: ", $to);
-        $headers["to"] = $to . $eol;
-
-        // set sendmail parameters
-        $extra = $Conf->opt("sendmailParam");
-        if (($sender = $Conf->opt("emailSender")) !== null) {
-            @ini_set("sendmail_from", $sender);
-            if ($extra === null)
-                $extra = "-f" . escapeshellarg($sender);
         }
+        $prep->headers["mime-version"] = "MIME-Version: 1.0" . $this->eol;
+        $prep->headers["content-type"] = "Content-Type: text/plain; charset=utf-8"
+            . ($this->flowed ? "; format=flowed" : "") . $this->eol;
+        $prep->sensitive = $this->sensitive;
+        if ($prep->has_error() && !($rest["no_error_quit"] ?? false)) {
+            $this->conf->feedback_msg($prep->message_list());
+        }
+    }
 
-        if ($prep->sendable && $Conf->opt("internalMailer")
-            && ($sendmail = ini_get("sendmail_path"))) {
-            $htext = join("", $headers);
-            $f = popen($extra ? "$sendmail $extra" : $sendmail, "wb");
-            fwrite($f, $htext . $eol . $prep->body);
-            $status = pclose($f);
-            if (pcntl_wifexitedwith($status))
-                return true;
-            else {
-                $Conf->set_opt("internalMailer", false);
-                error_log("Mail " . $headers["to"] . " failed to send, falling back (status $status)");
+    /** @param list<MailPreparation> $preps */
+    static function send_combined_preparations($preps) {
+        $n = count($preps);
+        for ($i = 0; $i !== $n; ++$i) {
+            $p = $preps[$i];
+            if (!$p) {
+                continue;
+            }
+            if (!$p->unique_preparation) {
+                for ($j = $i + 1; $j !== $n; ++$j) {
+                    if ($preps[$j]
+                        && $p->can_merge($preps[$j])) {
+                        $p->merge($preps[$j]);
+                        $preps[$j] = null;
+                    }
+                }
+            }
+            $p->send();
+        }
+    }
+
+
+    /** @return int */
+    function message_count() {
+        return $this->_ms ? $this->_ms->message_count() : 0;
+    }
+
+    /** @return iterable<MessageItem> */
+    function message_list() {
+        return $this->_ms ? $this->_ms->message_list() : [];
+    }
+
+    /** @return string */
+    function full_feedback_text() {
+        return $this->_ms ? $this->_ms->full_feedback_text() : "";
+    }
+
+    /** @param ?string $field
+     * @param string $message
+     * @return MessageItem */
+    function warning_at($field, $message) {
+        $this->_ms = $this->_ms ?? (new MessageSet)->set_ignore_duplicates(true)->set_want_ftext(true, 5);
+        return $this->_ms->warning_at($field, $message);
+    }
+
+    /** @param string $ref */
+    final function unexpanded_warning_at($ref) {
+        if (preg_match('/\A%(\w+)/', $ref, $m)) {
+            $kw = $m[1];
+            $xref = $ref;
+        } else {
+            $kw = $ref;
+            $xref = "%{$kw}%";
+        }
+        $text = $this->handle_unexpanded_keyword($kw, $xref);
+        if ($text !== "") {
+            $this->warning_at($xref, $text);
+        }
+    }
+
+    /** @param string $kw
+     * @param string $xref
+     * @return string */
+    function handle_unexpanded_keyword($kw, $xref) {
+        if (preg_match('/\A(?:RESET|)PASSWORDLINK/', $kw)) {
+            if ($this->conf->login_type()) {
+                return "<0>This site does not use password links";
+            } else if ($this->censor === self::CENSOR_ALL) {
+                return "<0>Password links cannot appear in mails with Cc or Bcc";
             }
         }
-
-        if ($prep->sendable) {
-            if (strpos($to, $eol) === false) {
-                unset($headers["to"]);
-                $to = substr($to, 4); // skip "To: "
-            } else
-                $to = "";
-            unset($headers["subject"]);
-            $htext = substr(join("", $headers), 0, -2);
-            return mail($to, $prep->subject, $prep->body, $htext, $extra);
-
-        } else if (!$Conf->opt("sendEmail")
-                   && !preg_match('/\Aanonymous\d*\z/', $to)) {
-            unset($headers["mime-version"], $headers["content-type"]);
-            $text = join("", $headers) . $eol . $prep->body;
-            if (PHP_SAPI != "cli")
-                $Conf->infoMsg("<pre>" . htmlspecialchars($text) . "</pre>");
-            else if (!$Conf->opt("disablePrintEmail"))
-                fwrite(STDERR, "========================================\n" . str_replace("\r\n", "\n", $text) .  "========================================\n");
-            return null;
-        }
+        return "<0>Keyword not found";
     }
-
-
-    protected function unexpanded_warning() {
-        $a = array_keys($this->_unexpanded);
-        natcasesort($a);
-        for ($i = 0; $i < count($a); ++$i)
-            $a[$i] = "<code>" . htmlspecialchars($a[$i]) . "</code>";
-        if (count($a) == 1)
-            return "Keyword-like string " . commajoin($a) . " was not recognized.";
-        else
-            return "Keyword-like strings " . commajoin($a) . " were not recognized.";
-    }
-
-    function nwarnings() {
-        return count($this->_unexpanded);
-    }
-
-    function warnings() {
-        $e = array();
-        if (count($this->_unexpanded))
-            $e[] = $this->unexpanded_warning();
-        return $e;
-    }
-
 }
 
-class MimeText {
-    /// Quote potentially non-ASCII header text a la RFC2047 and/or RFC822.
-    static function append(&$result, &$linelen, $str, $utf8) {
-        if ($utf8) {
-            // replace all special characters used by the encoder
-            $str = str_replace(array('=',   '_',   '?',   ' '),
-                               array('=3D', '=5F', '=3F', '_'), $str);
-            // define nonsafe characters
-            if ($utf8 > 1)
-                $matcher = ',[^-0-9a-zA-Z!*+/=_],';
-            else
-                $matcher = ',[\x80-\xFF],';
-            preg_match_all($matcher, $str, $m, PREG_OFFSET_CAPTURE);
-            $xstr = "";
-            $last = 0;
-            foreach ($m[0] as $mx) {
-                $xstr .= substr($str, $last, $mx[1] - $last)
-                    . "=" . strtoupper(dechex(ord($mx[0])));
-                $last = $mx[1] + 1;
-            }
-            $xstr .= substr($str, $last);
-        } else
-            $xstr = $str;
-
-        // append words to the line
-        while ($xstr != "") {
-            $z = strlen($xstr);
-            assert($z > 0);
-
-            // add a line break
-            $maxlinelen = ($utf8 ? 76 - 12 : 78);
-            if (($linelen + $z > $maxlinelen && $linelen > 30)
-                || ($utf8 && substr($result, strlen($result) - 2) == "?=")) {
-                $result .= Mailer::eol() . " ";
-                $linelen = 1;
-                while (!$utf8 && $xstr !== "" && ctype_space($xstr[0])) {
-                    $xstr = substr($xstr, 1);
-                    --$z;
-                }
-            }
-
-            // if encoding, skip intact UTF-8 characters;
-            // otherwise, try to break at a space
-            if ($utf8 && $linelen + $z > $maxlinelen) {
-                $z = $maxlinelen - $linelen;
-                if ($xstr[$z - 1] == "=")
-                    $z -= 1;
-                else if ($xstr[$z - 2] == "=")
-                    $z -= 2;
-                while ($z > 3
-                       && $xstr[$z] == "="
-                       && ($chr = hexdec(substr($xstr, $z + 1, 2))) >= 128
-                       && $chr < 192)
-                    $z -= 3;
-            } else if ($linelen + $z > $maxlinelen) {
-                $y = strrpos(substr($xstr, 0, $maxlinelen - $linelen), " ");
-                if ($y > 0)
-                    $z = $y;
-            }
-
-            // append
-            if ($utf8)
-                $astr = "=?utf-8?q?" . substr($xstr, 0, $z) . "?=";
-            else
-                $astr = substr($xstr, 0, $z);
-
-            $result .= $astr;
-            $linelen += strlen($astr);
-
-            $xstr = substr($xstr, $z);
-        }
-    }
-
-    static function encode_email_header($header, $str) {
-        if (preg_match('/[\r\n]/', $str))
-            $str = simplify_whitespace($str);
-
-        $text = $header;
-        $linelen = strlen($text);
-
-        // separate $str into emails, quote each separately
-        while (true) {
-
-            // try three types of match in turn:
-            // 1. name <email> [RFC 822]
-            $match = preg_match("/\\A[,\\s]*((?:(?:\"(?:[^\"\\\\]|\\\\.)*\"|[^\\s\\000-\\037()[\\]<>@,;:\\\\\".]+)\\s*?)*)\\s*<\\s*(.*?)\\s*>\\s*(.*)\\z/s", $str, $m);
-            // 2. name including periods but no quotes <email> (canonicalize)
-            if (!$match) {
-                $match = preg_match("/\\A[,\\s]*((?:[^\\s\\000-\\037()[\\]<>@,;:\\\\\"]+\\s*?)*)\\s*<\\s*(.*?)\\s*>\\s*(.*)\\z/s", $str, $m);
-                if ($match)
-                    $m[1] = "\"$m[1]\"";
-            }
-            // 3. bare email
-            if (!$match)
-                $match = preg_match("/\\A[,\\s]*()<?\\s*([^\\s\\000-\\037()[\\]<>,;:\\\\\"]+)\\s*>?\\s*(.*)\\z/s", $str, $m);
-            // otherwise, fail
-            if (!$match)
-                break;
-
-            list($name, $email, $str) = array($m[1], $m[2], $m[3]);
-            if (strpos($email, "@") !== false && !validate_email($email))
-                return false;
-            if ($str != "" && $str[0] != ",")
-                return false;
-            if ($email == "none" || $email == "hidden")
-                continue;
-
-            if ($text !== $header) {
-                $text .= ", ";
-                $linelen += 2;
-            }
-
-            // unquote any existing UTF-8 encoding
-            if ($name != "" && $name[0] == "="
-                && strcasecmp(substr($name, 0, 10), "=?utf-8?q?") == 0)
-                $name = self::decode_header($name);
-
-            $utf8 = preg_match('/[\x80-\xFF]/', $name) ? 2 : 0;
-            if ($name != "" && $name[0] == "\""
-                && preg_match("/\\A\"([^\\\\\"]|\\\\.)*\"\\z/s", $name)) {
-                if ($utf8)
-                    self::append($text, $linelen, substr($name, 1, -1), $utf8);
-                else
-                    self::append($text, $linelen, $name, false);
-            } else if ($utf8)
-                self::append($text, $linelen, $name, $utf8);
-            else
-                self::append($text, $linelen, rfc2822_words_quote($name), false);
-
-            if ($name == "")
-                self::append($text, $linelen, $email, false);
-            else
-                self::append($text, $linelen, " <$email>", false);
-        }
-
-        if (!preg_match('/\A[\s,]*\z/', $str))
-            return false;
-        return $text;
-    }
-
-    static function encode_header($header, $str) {
-        if (preg_match('/[\r\n]/', $str))
-            $str = simplify_whitespace($str);
-
-        $text = $header;
-        $linelen = strlen($text);
-        if (preg_match('/[\x80-\xFF]/', $str))
-            self::append($text, $linelen, $str, true);
-        else
-            self::append($text, $linelen, $str, false);
-        return $text;
-    }
-
-    static function chr_hexdec_callback($m) {
-        return chr(hexdec($m[1]));
-    }
-
-    static function decode_header($text) {
-        if (strlen($text) > 2 && $text[0] == '=' && $text[1] == '?') {
-            $out = '';
-            while (preg_match('/\A=\?utf-8\?q\?(.*?)\?=(\r?\n )?/i', $text, $m)) {
-                $f = str_replace('_', ' ', $m[1]);
-                $out .= preg_replace_callback('/=([0-9A-F][0-9A-F])/',
-                                              "MimeText::chr_hexdec_callback",
-                                              $f);
-                $text = substr($text, strlen($m[0]));
-            }
-            return $out . $text;
-        } else
-            return $text;
-    }
-
+// load mail templates, including local ones if any
+global $Opt;
+require_once(SiteLoader::$root . "/src/mailtemplate.php");
+if ((@include (SiteLoader::$root . "/conf/mailtemplate-local.php")) !== false) {
+    /* do nothing */;
 }

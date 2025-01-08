@@ -109,7 +109,7 @@ class RepositorySite {
     static private function chair_error($error) {
         global $Me;
         if ($Me && $Me->privChair) {
-            $Me->conf->errorMsg($error);
+            $Me->conf->error_msg($error);
         }
         return -1;
     }
@@ -120,7 +120,7 @@ class RepositorySite {
             return 0;
         }
         if (is_string($dr)) {
-            self::chair_error(htmlspecialchars($dr));
+            self::chair_error("<0>{$dr}");
         }
         return -1;
     }

@@ -174,21 +174,21 @@ class GitHub_RepositorySite extends RepositorySite {
             if ($Me->privChair) {
                 return $user->change_username("github", null);
             } else {
-                Conf::msg_error("Empty username.");
+                $user->conf->error_msg("Empty username.");
                 return false;
             }
         }
 
         // weird?
         if (preg_match('_[@,;:~/\[\](){}\\<>&#=\\000-\\027]_', $username)) {
-            Conf::msg_error("The username “" . htmlspecialchars($username) . "” contains funny characters. Remove them.");
+            $user->conf->error_msg("<0>The username “{$username}” contains funny characters. Remove them.");
             return false;
         }
 
         // in use?
         $x = $user->conf->fetch_value("select contactId from ContactInfo where github_username=?", $username);
         if ($x && $x != $user->contactId) {
-            Conf::msg_error("That username is already in use.");
+            $user->conf->error_msg("<0>That username is already in use.");
             return false;
         }
 
@@ -208,14 +208,14 @@ class GitHub_RepositorySite extends RepositorySite {
         $gql = self::graphql($user->conf, $gq);
         if (!$gql->rdata) {
             error_log(json_encode($gql));
-            Conf::msg_error("Error contacting the GitHub API. Maybe try again?");
+            $user->conf->error_msg("<0>Error contacting the GitHub API. Maybe try again?");
             return false;
         } else if (!isset($gql->rdata->user)) {
-            Conf::msg_error("That user doesn’t exist. Check your spelling and try again.");
+            $user->conf->error_msg("<0>That user doesn’t exist. Check your spelling and try again.");
             return false;
         } else if (!isset($gql->rdata->user->organization)) {
             if ($user->conf->opt("githubRequireOrganizationMembership")) {
-                Conf::msg_error("That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
+                $user->conf->error_msg("<5>That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
                 return false;
             }
         } else if ($staff_team
@@ -226,7 +226,7 @@ class GitHub_RepositorySite extends RepositorySite {
                                 function ($node) use ($username) {
                                     return strcasecmp($username, $node->login) === 0;
                                 })) {
-            Conf::msg_error("That user is a member of the course staff.");
+            $user->conf->error_msg("<0>That user is a member of the course staff.");
             return false;
         }
 

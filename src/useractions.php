@@ -45,13 +45,13 @@ class UserActions {
     static function reset_password($ids, $contact, $ifempty) {
         global $Conf;
         $result = self::modify_password_mail("contactId!=" . $contact->contactId . ($ifempty ? " and password=''" : ""), true, false, $ids);
-        $Conf->confirmMsg("Passwords reset.");
+        $Conf->success_msg("Passwords reset.");
         return $result;
     }
 
     static function send_account_info($ids, $contact) {
         global $Conf;
         return self::modify_password_mail("true", false, "send", $ids);
-        $Conf->confirmMsg("Account information sent.");
+        $Conf->success_msg("Account information sent.");
     }
 }

@@ -193,11 +193,6 @@ class CS61Mailer extends Mailer {
         $e = array();
         if (count($this->_unexpanded))
             $e[] = $this->unexpanded_warning();
-        if (count($this->_tagless)) {
-            $a = array_keys($this->_tagless);
-            sort($a, SORT_NUMERIC);
-            $e[] = pluralx(count($this->_tagless), "Paper") . " " . commajoin($a) . " did not have some requested tag values.";
-        }
         return $e;
     }
 

@@ -273,7 +273,7 @@ class RunRequest {
         if (($chain = QueueItem::parse_chain($this->qreq->chain)) !== false) {
             Ht::stash_script("\$pa.runmany({$chain})");
         } else {
-            $this->conf->errorMsg("Invalid chain");
+            $this->conf->error_msg("Invalid chain");
         }
 
         echo "<hr class=\"c\">\n";

@@ -84,9 +84,9 @@ class ContactView {
         if (isset($qreq->u) && $qreq->u) {
             $user = self::find_user($qreq->u, $viewer, $pset && $pset->anonymous);
             if (!$user) {
-                $viewer->conf->errorMsg("No such user “" . htmlspecialchars($qreq->u) . "”.");
+                $viewer->conf->error_msg("No such user “" . htmlspecialchars($qreq->u) . "”.");
             } else if ($user->contactId !== $viewer->contactId && !$viewer->isPC) {
-                $viewer->conf->errorMsg("You can’t see that user’s information.");
+                $viewer->conf->error_msg("You can’t see that user’s information.");
                 $user = null;
             }
         }
@@ -106,7 +106,7 @@ class ContactView {
         $pset = $viewer->conf->pset_by_key($psetkey);
         if ((!$pset || $pset->disabled)
             && ($psetkey !== null && $psetkey !== "" && $psetkey !== false)) {
-            $viewer->conf->errorMsg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
+            $viewer->conf->error_msg("No such problem set “" . htmlspecialchars($psetkey) . "”.");
         }
         if (!$pset || !$viewer->can_view_pset($pset)) {
             foreach ($viewer->conf->psets() as $p) {
@@ -270,7 +270,7 @@ class ContactView {
             return;
         }
         if (!$viewer->can_set_repo($pset, $user)) {
-            return $viewer->conf->errorMsg("You can’t edit repository information for that problem set now.");
+            return $viewer->conf->error_msg("You can’t edit repository information for that problem set now.");
         }
         if ($user->set_partner($pset, $_REQUEST["partner"])) {
             $viewer->conf->redirect_self($qreq);

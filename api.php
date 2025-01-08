@@ -110,11 +110,11 @@ class APIRequest {
                 $j = $j->content;
             }
             if (!($j->ok ?? false) && !($j->error ?? false)) {
-                Conf::msg_error("Internal error");
+                $this->conf->error_msg("Internal error");
             } else if (($x = $j->error ?? false)) {
-                Conf::msg_error(htmlspecialchars($x));
+                $this->conf->error_msg("<0>{$x}");
             } else if (($x = $j->error_html ?? false)) {
-                Conf::msg_error($x);
+                $this->conf->error_msg("<5>{$x}");
             }
             $this->conf->redirect($this->conf->make_absolute_site($this->qreq->redirect));
         } else {

@@ -197,13 +197,13 @@ function file_uploaded(&$var) {
         return false;
     case UPLOAD_ERR_INI_SIZE:
     case UPLOAD_ERR_FORM_SIZE:
-        $Conf->errorMsg("You tried to upload a file that’s too big for our system to accept.  The maximum size is " . ini_get("upload_max_filesize") . "B.");
+        $Conf->error_msg("You tried to upload a file that’s too big for our system to accept.  The maximum size is " . ini_get("upload_max_filesize") . "B.");
         return false;
     case UPLOAD_ERR_PARTIAL:
-        $Conf->errorMsg("You appear to have interrupted the upload process; I am not storing that file.");
+        $Conf->error_msg("You appear to have interrupted the upload process; I am not storing that file.");
         return false;
     default:
-        $Conf->errorMsg("Internal upload error " . $var['error'] . "!");
+        $Conf->error_msg("Internal upload error " . $var['error'] . "!");
         return false;
     }
 }
@@ -254,7 +254,7 @@ class JsonResult {
     }
     function export_errors() {
         if (isset($this->content["error"])) {
-            Conf::msg_error($this->content["error"]);
+            Conf::msg_on(Conf::$main, $this->content["error"], 2);
         }
         if (isset($this->content["errf"])) {
             foreach ($this->content["errf"] as $f => $x)

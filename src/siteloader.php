@@ -13,7 +13,6 @@ class SiteLoader {
         "GitHubResponse" => "src/github_repositorysite.php",
         "LoginHelper" => "lib/login.php",
         "MessageItem" => "lib/messageset.php",
-        "MimeText" => "lib/mailer.php",
         "Pset" => "src/psetconfig.php",
         "ZipDocument" => "lib/documenthelper.php",
         "Collator" => "lib/collatorshim.php"
