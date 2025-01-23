@@ -195,7 +195,7 @@ export class GradeEntry {
         }
         if (typeof t === "string") {
             pde.innerHTML = t;
-        } else if (t instanceof Node) {
+        } else if (t) {
             pde.replaceChildren(t);
         }
         if (edit) {
