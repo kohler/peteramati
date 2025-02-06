@@ -349,26 +349,27 @@ class GitHub_RepositorySite extends RepositorySite {
 
     /** @return -1|0|1 */
     function validate_working(Contact $user, ?MessageSet $ms = null) {
-        $status = RepositorySite::run_remote_oauth($this->conf,
-            $this->conf->opt("githubOAuthClientId"),
-            $this->conf->opt("githubOAuthToken"),
-            "ls-remote " . escapeshellarg($this->https_url()) . " 2>&1",
-            $output);
-        $answer = join("\n", $output);
-        if ($status >= 124) { // timeout
+        if ($this->conf->opt("disableRemote")) {
+            RepositorySite::disabled_remote_error($this->conf);
             return -1;
-        } else if (!preg_match('/\A[0-9a-f]{40,}\s+/', $answer)) {
+        }
+        $lscommand = $this->credentialed_git_command();
+        array_push($lscommand, "ls-remote", $this->https_url());
+        $subp = Repository::gitrun_at($this->conf, $lscommand, "/tmp");
+        if ($subp->status >= 124) { // timeout
+            return -1;
+        }
+        if (!preg_match('/\A[0-9a-f]{40,}\s+/', $subp->stdout)) {
             if ($ms) {
                 $ms->error_at("repo", $this->expand_message("repo_unreadable", $user));
                 $ms->error_at("working");
             }
             return 0;
-        } else {
-            if ($ms && !preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/(?:' . $this->conf->default_main_branch . '|master|main)/m', $answer)) {
-                $ms->warning_at("repo", $this->expand_message("repo_nomain", $user));
-            }
-            return 1;
         }
+        if ($ms && !preg_match('/^[0-9a-f]{40,}\s+refs\/heads\/(?:' . $this->conf->default_main_branch . '|master|main)/m', $subp->stdout)) {
+            $ms->warning_at("repo", $this->expand_message("repo_nomain", $user));
+        }
+        return 1;
     }
 
     function validate_ownership_always() {

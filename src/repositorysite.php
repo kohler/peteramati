@@ -124,29 +124,6 @@ class RepositorySite {
         }
         return -1;
     }
-    /** @param string $clientid
-     * @param string $token
-     * @param string $gitcommand
-     * @param list<string> &$output
-     * @return int */
-    static function run_remote_oauth(Conf $conf, $clientid, $token,
-                                     $gitcommand, &$output) {
-        $output = [];
-        if (self::disabled_remote_error($conf) < 0) {
-            return -1;
-        } else if (!$clientid || !$token || $token === Conf::INVALID_TOKEN) {
-            return self::chair_error("Missing OAuth client ID and/or token.");
-        }
-        putenv("GIT_USERNAME={$clientid}");
-        putenv("GIT_PASSWORD={$token}");
-        $command = SiteLoader::$root . "/jail/pa-timeout " . $conf->validate_timeout
-            . " git -c credential.helper= -c " . escapeshellarg("credential.helper=!f() { echo username=\$GIT_USERNAME; echo password=\$GIT_PASSWORD; }; f")
-            . " " . $gitcommand;
-        exec($command, $output, $status);
-        putenv("GIT_USERNAME");
-        putenv("GIT_PASSWORD");
-        return $status;
-    }
 }
 
 class Bad_RepositorySite extends RepositorySite {
