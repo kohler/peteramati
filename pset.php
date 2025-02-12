@@ -611,7 +611,7 @@ class PsetRequest {
         $value .= '<div class="pa-viewoptions">'
             . '<button type="button" class="q ui js-pset-viewoptions">'
             . foldarrow(!$fold_viewoptions)
-            . ' options</button><span style="padding-left:1em"'
+            . 'options</button><span style="padding-left:1em"'
             . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
             $value .= '&nbsp;<a href="' . $this->conf->selfurl($this->qreq, ["tab" => $i]) . '"'
