@@ -157,7 +157,7 @@ class Multiconference {
         } else {
             Contact::set_main_user(null);
             header("HTTP/1.1 404 Not Found");
-            $qreq->conf()->header("HotCRP Error", "", ["action_bar" => false]);
+            $qreq->conf()->header("System error", "", ["action_bar" => false]);
             foreach ($errors as $i => &$e) {
                 $e = ($i ? "<div class=\"hint\">" : "<p>") . htmlspecialchars($e) . ($i ? "</div>" : "</p>");
             }
