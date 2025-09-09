@@ -638,9 +638,8 @@ class Pset {
     function default_student_vf() {
         if ($this->visible_student()) {
             return $this->scores_visible ? VF_STUDENT_ANY : VF_STUDENT_ALWAYS;
-        } else {
-            return 0;
         }
+        return 0;
     }
 
     /** @param ?PsetView $info

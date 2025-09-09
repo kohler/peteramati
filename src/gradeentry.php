@@ -188,45 +188,20 @@ class GradeEntry {
         } else if (isset($g->formula) && is_string($g->formula)) {
             $type = "formula";
         }
-        if ($type === "number" || $type === "numeric" || $type === null) {
-            $type = null;
-            $this->type_tabular = $this->type_numeric = $allow_total = true;
-        } else if ($type === "checkbox") {
-            $this->type_tabular = $this->type_numeric = $allow_total = true;
-            $this->vtype = self::VTBOOL;
-        } else if ($type === "letter") {
-            $this->type_tabular = $this->type_numeric = true;
-            $allow_total = false;
-            $this->vtype = self::VTLETTER;
-        } else if (in_array($type, ["checkboxes", "stars"], true)) {
-            $this->type_tabular = $this->type_numeric = $allow_total = true;
-        } else if ($type === "timermark") {
-            $this->type_tabular = $this->type_numeric = true;
-            $allow_total = false;
-            $this->vtype = self::VTTIME;
-        } else if ($type === "duration") {
-            $this->type_tabular = $this->type_numeric = $allow_total = true;
-            $this->vtype = self::VTDURATION;
-        } else if (in_array($type, ["text", "shorttext", "markdown", "section", "none"], true)) {
-            $this->type_tabular = $this->type_numeric = $allow_total = false;
-        } else if ($type === "select"
-                   && isset($g->options)
-                   && is_array($g->options)) {
-            // XXX check components are strings all different
-            $this->options = $g->options;
-            $this->type_tabular = true;
-            $this->type_numeric = $allow_total = false;
-        } else if ($type === "formula"
-                   && isset($g->formula)
-                   && is_string($g->formula)) {
-            $this->formula = $g->formula;
-            $this->type_tabular = $this->type_numeric = true;
-            $this->gtype = self::GTYPE_FORMULA;
-            $allow_total = false;
-        } else {
+        $ok = $this->set_type($type, $g);
+        if (!$ok && ($gt = $pset->conf->grade_type($type))) {
+            foreach (get_object_vars($gt) as $k => $v) {
+                if ($k === "type") {
+                    $type = $v;
+                } else if (!property_exists($g, $k)) {
+                    $g->$k = $v;
+                }
+            }
+            $ok = $this->set_type($type, $g);
+        }
+        if (!$ok) {
             throw new PsetConfigException("unknown grade entry type", $loc);
         }
-        $this->type = $type;
 
         if ($this->type === null && isset($g->round)) {
             $round = Pset::cstr($loc, $g, "round");
@@ -240,7 +215,7 @@ class GradeEntry {
             $this->round = $round;
         }
 
-        if (!$allow_total) {
+        if (!$this->allow_total()) {
             if (isset($g->no_total) && !$g->no_total) {
                 throw new PsetConfigException("grade entry type {$this->type} cannot be in total", $loc);
             }
@@ -348,6 +323,51 @@ class GradeEntry {
         $this->account_edit_function = Pset::cstr($loc, $g, "account_edit_function");
 
         $this->config = $g;
+    }
+
+    private function set_type($type, $g) {
+        if ($type === "number" || $type === "numeric" || $type === null) {
+            $type = null;
+            $this->type_tabular = $this->type_numeric = true;
+        } else if ($type === "checkbox") {
+            $this->type_tabular = $this->type_numeric = true;
+            $this->vtype = self::VTBOOL;
+        } else if ($type === "letter") {
+            $this->type_tabular = $this->type_numeric = true;
+            $this->vtype = self::VTLETTER;
+        } else if (in_array($type, ["checkboxes", "stars"], true)) {
+            $this->type_tabular = $this->type_numeric = true;
+        } else if ($type === "timermark") {
+            $this->type_tabular = $this->type_numeric = true;
+            $this->vtype = self::VTTIME;
+        } else if ($type === "duration") {
+            $this->type_tabular = $this->type_numeric = true;
+            $this->vtype = self::VTDURATION;
+        } else if (in_array($type, ["text", "shorttext", "markdown", "section", "none"], true)) {
+            $this->type_tabular = $this->type_numeric = false;
+        } else if ($type === "select"
+                   && isset($g->options)
+                   && is_array($g->options)) {
+            // XXX check components are strings all different
+            $this->options = $g->options;
+            $this->type_tabular = true;
+            $this->type_numeric = false;
+        } else if ($type === "formula"
+                   && isset($g->formula)
+                   && is_string($g->formula)) {
+            $this->formula = $g->formula;
+            $this->type_tabular = $this->type_numeric = true;
+            $this->gtype = self::GTYPE_FORMULA;
+        } else {
+            return false;
+        }
+        $this->type = $type;
+        return true;
+    }
+
+    private function allow_total() {
+        return $this->type_numeric
+            && !in_array($this->type, ["letter", "timermark", "formula"], true);
     }
 
     /** @param string $key
@@ -481,9 +501,8 @@ class GradeEntry {
             return Conf::$now;
         } else if (ctype_digit($v)) {
             return (int) $v;
-        } else {
-            return new GradeError("Invalid timermark");
         }
+        return new GradeError("Invalid timermark");
     }
 
     /** @param string $v
@@ -491,11 +510,25 @@ class GradeEntry {
     function parse_select_value($v) {
         if ($v === "" || strcasecmp($v, "none") === 0) {
             return false;
-        } else if (in_array((string) $v, $this->options)) {
-            return $v;
-        } else {
-            return new GradeError;
         }
+        $vstr = (string) $v;
+        foreach ($this->options as $o) {
+            if (is_string($o)) {
+                if ($vstr === $o) {
+                    return $o;
+                }
+            } else if (is_int($o)) {
+                if ($vstr === (string) $o) {
+                    return $o;
+                }
+            } else {
+                if ($vstr === (string) $o->value
+                    || (isset($o->title) && $vstr === (string) $o->title)) {
+                    return $o->value;
+                }
+            }
+        }
+        return new GradeError;
     }
 
     /** @param string $v

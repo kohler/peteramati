@@ -136,6 +136,8 @@ class Conf {
     private $_categories;
     /** @var array<string,QueueConfig> */
     private $_queues = [];
+    /** @var array<string,object> */
+    private $_grade_types = [];
 
     /** @var ?list<FormulaConfig> */
     private $_global_formulas;
@@ -514,6 +516,11 @@ class Conf {
         assert(isset($config->_defaults));
         assert($this->config === null);
         $this->config = $config;
+
+        // parse grade types
+        if (is_object($config->_grade_types ?? null)) {
+            $this->_grade_types = (array) $config->_grade_types;
+        }
 
         // parse psets
         foreach (get_object_vars($config) as $pk => $p) {
@@ -2628,6 +2635,11 @@ class Conf {
         }
         $this->_canon_formulas[] = $gf;
         return $gf;
+    }
+
+    /** @return ?object */
+    function grade_type($n) {
+        return $this->_grade_types[$n] ?? null;
     }
 
 

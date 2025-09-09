@@ -13,15 +13,20 @@ GradeClass.add("select", {
         sel.name = this.key;
         sel.id = id;
         sel.disabled = this.disabled;
-        const none = document.createElement("option");
-        none.value = "";
-        none.append("None");
-        sel.append(none);
-        for (let i = 0; i !== this.options.length; ++i) {
-            const opt = document.createElement("option");
-            opt.value = this.options[i];
-            opt.append(this.options[i]);
-            sel.append(opt);
+        const nonee = document.createElement("option");
+        nonee.value = "";
+        nonee.append("None");
+        sel.append(nonee);
+        for (const opt of this.options) {
+            const oe = document.createElement("option");
+            if (typeof opt === "object") {
+                oe.value = opt.value;
+                oe.append(opt.title || opt.value);
+            } else {
+                oe.value = opt;
+                oe.append(opt);
+            }
+            sel.append(oe);
         }
         const sp = document.createElement("span");
         sp.className = "select";
@@ -35,13 +40,13 @@ GradeClass.add("select", {
         ve.value = gt;
         if (opts.reset && opts.mixed) {
             if (ve.options[0].value !== "") {
-                const opt = document.createElement("option");
-                opt.value = "";
-                opt.append("Mixed");
-                ve.insertBefore(opt, ve.firstChild);
+                const oe = document.createElement("option");
+                oe.value = "";
+                oe.append("Mixed");
+                ve.insertBefore(oe, ve.firstChild);
             }
             ve.selectedIndex = 0;
-        } else if (gt !== "") {
+        } else if (gt !== "" && ve.options[0].value === "") {
             ve.remove(0);
         }
     },
@@ -52,8 +57,9 @@ GradeClass.add("select", {
     },
     tcell_width: function (col) {
         let w = 0;
-        for (let opt of this.options) {
-            w = Math.max(w, opt.length);
+        for (const opt of this.options) {
+            let ot = typeof opt === "object" ? opt.title || opt.value : opt;
+            w = Math.max(w, opt.toString().length);
         }
         return Math.max(GradeClass.basic_tcell_width.call(this, col),
                         Math.floor(Math.min(w, 10) * 1.25) / 2);
