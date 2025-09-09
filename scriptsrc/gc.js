@@ -114,6 +114,7 @@ export const GradeClass = {
 
     add: (name, x) => {
         x.type = name;
+        x.initialize = x.initialize || (() => null);
         x.type_tabular = x.type_tabular == null ? true : x.type_tabular;
         x.text = x.text || GradeClass.basic_text;
         x.simple_text = x.simple_text || x.text;
@@ -142,10 +143,9 @@ GradeClass.add("formula", {
             return "";
         } else if (v === true) {
             return "✓";
-        } else {
-            const t = v.toFixed(1);
-            return t.endsWith(".0") ? t.substring(0, t.length - 2) : t;
         }
+        const t = v.toFixed(1);
+        return t.endsWith(".0") ? t.substring(0, t.length - 2) : t;
     }
 });
 
@@ -153,9 +153,8 @@ GradeClass.add("time", {
     text: function (v) {
         if (v == null || v === 0) {
             return "";
-        } else {
-            return strftime("%Y-%m-%d %H:%M", v);
         }
+        return strftime("%Y-%m-%d %H:%M", v);
     },
     tcell_width: 10,
     justify: "left",
@@ -166,9 +165,8 @@ GradeClass.add("duration", {
     text: function (v) {
         if (v == null) {
             return "";
-        } else {
-            return sec2text(v, "quarterhour");
         }
+        return sec2text(v, "quarterhour");
     },
     tcell_width: 4,
     justify: "left",

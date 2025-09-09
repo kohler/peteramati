@@ -7,6 +7,28 @@ import { input_set_default_value } from "./ui.js";
 
 
 GradeClass.add("select", {
+    initialize: function () {
+        this.object_options = null;
+        for (const opt of this.options) {
+            if (typeof opt === "object") {
+                this.object_options = this.object_options || [];
+                this.object_options.push(opt);
+            }
+        }
+    },
+    text: function (v) {
+        if (v == null) {
+            return "";
+        }
+        if (this.object_options) {
+            for (const opt of this.options) {
+                if (opt.value == v)
+                    return "" + (opt.title || opt.value);
+            }
+        }
+        return "" + v;
+    },
+    simple_text: GradeClass.basic_text,
     mount_edit: function (elt, id) {
         const sel = document.createElement("select");
         sel.className = "uich pa-gradevalue pa-fresh";

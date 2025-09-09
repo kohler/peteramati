@@ -57,6 +57,7 @@ export class GradeEntry {
         this.normal = true;
         this._abbr = null;
         this._all = null;
+        this.gc.initialize.call(this);
     }
 
     get type_tabular() {
@@ -592,9 +593,8 @@ export class GradeSheet {
             return ge;
         } else if (key === "late_hours") {
             return GradeEntry.late_hours();
-        } else {
-            return null;
         }
+        return null;
     }
 
     *value_entries() {

@@ -14,20 +14,10 @@ function make_multicheckbox(mark) {
                 return "–";
             } else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05) {
                 return mark.repeat(Math.round(v));
-            } else {
-                return "" + v;
             }
+            return "" + v;
         },
         simple_text: GradeClass.basic_text,
-        tcell: function (v) {
-            if (v == null || v === 0) {
-                return "";
-            } else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05) {
-                return mark.repeat(Math.round(v));
-            } else {
-                return "" + v;
-            }
-        },
         mount_edit: function (elt, id) {
             const chhidden = document.createElement("input");
             chhidden.type = "hidden";

@@ -13,9 +13,8 @@ GradeClass.add("checkbox", {
             return "–";
         } else if (v === (this.max || 1) || v === true) {
             return "✓";
-        } else {
-            return "" + v;
         }
+        return "" + v;
     },
     simple_text: GradeClass.basic_text,
     tcell: function (v) {
@@ -23,9 +22,8 @@ GradeClass.add("checkbox", {
             return "";
         } else if (v === (this.max || 1) || v === true) {
             return "✓";
-        } else {
-            return "" + v;
         }
+        return "" + v;
     },
     mount_edit: function (elt, id) {
         return Checkbox_GradeClass.finish_mount_edit(this, $e("span", "pa-gradewidth", $e("input", {
