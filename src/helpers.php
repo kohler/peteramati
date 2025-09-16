@@ -2,6 +2,34 @@
 // helpers.php -- HotCRP non-class helper functions
 // Copyright (c) 2006-2021 Eddie Kohler; see LICENSE.
 
+// string helpers
+
+/** @param null|int|string $s
+ * @return ?int */
+function stoi($s) {
+    if ($s === null || is_int($s)) {
+        return $s;
+    } else if (!is_numeric($s)) {
+        return null;
+    }
+    $iv = intval($s);
+    $fv = floatval($s);
+    return $iv == $fv ? $iv : null;
+}
+
+/** @param null|int|float|string $s
+ * @return null|int|float */
+function stonum($s) {
+    if ($s === null || is_int($s) || is_float($s)) {
+        return $s;
+    } else if (!is_numeric($s)) {
+        return null;
+    }
+    $iv = intval($s);
+    $fv = floatval($s);
+    return $iv == $fv ? $iv : $fv;
+}
+
 function ago($t) {
     if ($t + 60 >= Conf::$now)
         return "less than a minute ago";
@@ -70,18 +98,17 @@ function json_update($j, $updates) {
             $updates = $updates->jsonSerialize();
         }
         if ($is_replacement) {
-            if (is_associative_array($updates)) {
+            if (is_array($updates) && !array_is_list($updates)) {
                 return (object) $updates;
-            } else {
-                return $updates;
             }
+            return $updates;
         }
         if (is_object($updates)) {
             $updates = get_object_vars($updates);
         }
     }
     foreach ($updates as $k => $v) {
-        if (is_object($v) || is_associative_array($v)) {
+        if (is_object($v) || (is_array($v) && !array_is_list($v))) {
             $v = json_update(isset($j[$k]) ? $j[$k] : null, $v);
         }
         if ($v === null) {
@@ -105,7 +132,7 @@ function json_update($j, $updates) {
 /** @param mixed $j
  * @return bool */
 function is_json_null_update($j) {
-    if (is_object($j) || is_associative_array($j)) {
+    if (is_object($j) || (is_array($j) && !array_is_list($j))) {
         if (is_object($j)) {
             $j = get_object_vars($j);
         }
@@ -114,9 +141,8 @@ function is_json_null_update($j) {
                 return false;
         }
         return true;
-    } else {
-        return $j === null;
     }
+    return $j === null;
 }
 
 function json_antiupdate($j, $updates) {
@@ -140,7 +166,7 @@ function json_antiupdate($j, $updates) {
     $aj = [];
     foreach ($updates as $k => $v) {
         if (isset($j[$k])) {
-            if (is_object($v) || is_associative_array($v)) {
+            if (is_object($v) || (is_array($v) && !array_is_list($v))) {
                 $av = json_antiupdate($j[$k], $v);
             } else if ($j[$k] !== $v) {
                 $av = $j[$k];

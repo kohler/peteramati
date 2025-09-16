@@ -200,9 +200,8 @@ class Repository {
     function friendly_url_like(Repository $other) {
         if ($this->reposite->siteclass === $other->reposite->siteclass) {
             return $this->reposite->friendly_url();
-        } else {
-            return $this->url;
         }
+        return $this->url;
     }
 
     /** @param string $branch
@@ -455,9 +454,8 @@ class Repository {
     function reponame() {
         if (($this->rflags & 1) !== 0) {
             return "repo{$this->repogid}";
-        } else {
-            return "repo{$this->repoid}";
         }
+        return "repo{$this->repoid}";
     }
 
     /** @param string $branch
@@ -465,9 +463,8 @@ class Repository {
     function repobranchname($branch) {
         if (($this->rflags & 1) !== 0) {
             return "repo{$this->repogid}/{$branch}";
-        } else {
-            return "repo{$this->repoid}/{$branch}";
         }
+        return "repo{$this->repoid}/{$branch}";
     }
 
 
@@ -562,9 +559,8 @@ class Repository {
         $grr = $this->gitruninfo(["git", "rev-parse", "--verify", "{$arg}^{commit}"]);
         if ($grr->ok && $grr->stdout) {
             return trim($grr->stdout);
-        } else {
-            return null;
         }
+        return null;
     }
 
     static private function set_directory(CommitRecord $cr, $s, $x, $end) {
@@ -1059,7 +1055,7 @@ class Repository {
     static function fix_diff_files($files) {
         if ($files === null || empty($files)) {
             return null;
-        } else if (is_associative_array($files)) {
+        } else if (is_array($files) && !array_is_list($files)) {
             return $files;
         } else if (is_string($files)) {
             return [$files => true];

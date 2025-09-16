@@ -203,41 +203,17 @@ function initialize_psets() {
         Conf::$main->set_config(load_psets_json(false));
     } catch (Exception $exception) {
         // Want to give a good error message, so discover where the error is.
+        $locp = "";
         if ($exception instanceof PsetConfigException
             && $exception->key) {
             // - create pset landmark object
-            $locinfo = (object) [];
+            $landmark = null;
             $mtime = 0;
             foreach (psets_json_data(false, $mtime) as $fname => $data) {
-                $x = Json::decode_landmarks($data, $fname);
-                object_replace_recursive($locinfo, $x);
+                $jp = (new JsonParser($data))->set_filename($fname);
+                $landmark = $jp->path_landmark($exception->full_path()) ?? $landmark;
             }
-            // - read location information
-            $locp = $locinfo->{$exception->key};
-            if ($locp && isset($locp->group) && is_string($locp->group)) {
-                $g = "_defaults_" . $locp->group;
-                if (isset($locinfo->$g)) {
-                    object_merge_recursive($locp, $locinfo->$g);
-                }
-            }
-            if (isset($locinfo->_defaults)) {
-                object_merge_recursive($locp, $locinfo->_defaults);
-            }
-            // - lookup exception path in landmark object
-            foreach ($exception->path as $i => $component) {
-                if ($locp && !is_string($locp)) {
-                    $locp = is_array($locp) ? $locp[$component] : $locp->$component;
-                }
-            }
-            // - report error
-            if (is_object($locp) && ($locp->__LANDMARK__ ?? null)) {
-                $locp = $locp->__LANDMARK__;
-            } else if (!is_string($locp)) {
-                $locp = $locinfo->{$exception->key}->__LANDMARK__;
-            }
-            $locp .= ": ";
-        } else {
-            $locp = "";
+            $locp = $landmark !== null ? "{$landmark}: " : "";
         }
         Multiconference::fail_message($locp . "Configuration error: " . $exception->getMessage());
     }

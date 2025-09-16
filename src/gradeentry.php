@@ -325,6 +325,7 @@ class GradeEntry {
         $this->config = $g;
     }
 
+    /** @suppress PhanAccessReadOnlyProperty */
     private function set_type($type, $g) {
         if ($type === "number" || $type === "numeric" || $type === null) {
             $type = null;
@@ -506,7 +507,7 @@ class GradeEntry {
     }
 
     /** @param string $v
-     * @return false|string|GradeError */
+     * @return false|int|string|GradeError */
     function parse_select_value($v) {
         if ($v === "" || strcasecmp($v, "none") === 0) {
             return false;

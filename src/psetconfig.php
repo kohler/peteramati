@@ -20,6 +20,14 @@ class PsetConfigException extends Exception {
         }
         parent::__construct($msg);
     }
+
+    /** @return list<int|string> */
+    function full_path() {
+        if ($this->key !== null) {
+            return make_array($this->key, ...$this->path);
+        }
+        return $this->path;
+    }
 }
 
 class Pset {
@@ -452,7 +460,7 @@ class Pset {
             foreach ((array) $downloads as $k => $v) {
                 $g = new DownloadEntryConfig(is_int($k) ? $k + 1 : $k, $v);
                 if ($this->downloads[$g->key] ?? null) {
-                    throw new PsetConfigException("download `$g->key` reused", "downloads", $k);
+                    throw new PsetConfigException("download `{$g->key}` reused", "downloads", $k);
                 }
                 $this->downloads[$g->key] = $g;
             }
@@ -472,7 +480,7 @@ class Pset {
             foreach ((array) $runners as $k => $v) {
                 $r = new RunnerConfig(is_int($k) ? $k + 1 : $k, $v, $default_runner, $this);
                 if (isset($this->all_runners[$r->name])) {
-                    throw new PsetConfigException("runner `$r->name` reused", "runners", $k);
+                    throw new PsetConfigException("runner `{$r->name}` reused", "runners", $k);
                 }
                 $this->all_runners[$r->name] = $r;
                 if ($r->transfer_warnings) {
@@ -547,7 +555,7 @@ class Pset {
                 }
                 $name = is_int($k) ? $v->name : $k;
                 if (isset($this->api[$name])) {
-                    throw new PsetConfigException("api `$name` reused", "api", $k);
+                    throw new PsetConfigException("api `{$name}` reused", "api", $k);
                 }
                 $this->api[$name] = $v;
             }
@@ -1124,7 +1132,7 @@ class Pset {
                         return $pv;
                     } else {
                         $errormsg = is_array($v) ? $v[1] : "format error";
-                        throw new PsetConfigException("`$x` $errormsg", $format, $x);
+                        throw new PsetConfigException("`{$x}` {$errormsg}", $format, $x);
                     }
                 }
             }
@@ -1216,7 +1224,7 @@ class Pset {
 
     private static function reorder_config($what, $a, $order) {
         if (!is_array($order)) {
-            throw new PsetConfigException("`$what` format error", $what);
+            throw new PsetConfigException("`{$what}` format error", $what);
         }
         $b = array();
         foreach ($order as $name) {
@@ -1224,12 +1232,12 @@ class Pset {
                 if (isset($a[$name]) && !isset($b[$name])) {
                     $b[$name] = $a[$name];
                 } else if (isset($a[$name])) {
-                    throw new PsetConfigException("`$what` entry `$name` reused", $what);
+                    throw new PsetConfigException("`{$what}` entry `{$name}` reused", $what);
                 } else {
-                    throw new PsetConfigException("`$what` entry `$name` unknown", $what);
+                    throw new PsetConfigException("`{$what}` entry `{$name}` unknown", $what);
                 }
             } else {
-                throw new PsetConfigException("`$what` format error", $what);
+                throw new PsetConfigException("`{$what}` format error", $what);
             }
         }
         return $b;

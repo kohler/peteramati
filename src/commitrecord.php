@@ -46,9 +46,8 @@ class CommitRecord implements JsonSerializable {
             return false;
         } else if (is_string($this->directory)) {
             return $this->directory === $dir;
-        } else {
-            return in_array($dir, $this->directory);
         }
+        return in_array($dir, $this->directory);
     }
     /** @param string $dir_noslash
      * @return bool */
@@ -100,9 +99,8 @@ class CommitRecord implements JsonSerializable {
             return "latest";
         } else if ($s === "grading" || $s === "grade") {
             return "grading";
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param ?string $s
@@ -114,8 +112,7 @@ class CommitRecord implements JsonSerializable {
             return substr($s, 1);
         } else if (!$explicit) {
             return $s;
-        } else {
-            return null;
         }
+        return null;
     }
 }

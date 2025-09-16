@@ -12,48 +12,79 @@ function is_number($x) {
 }
 
 /** @param mixed $x
- * @return bool */
+ * @return bool
+ * @deprecated */
 function is_associative_array($x) {
-    // this method is surprisingly fast
-    return is_array($x) && array_values($x) !== $x;
+    return is_array($x) && !array_is_list($x);
 }
 
 /** @param mixed $x
  * @return bool */
 function is_list($x) {
-    return is_array($x) && array_values($x) === $x;
+    return is_array($x) && array_is_list($x);
 }
 
 /** @param mixed $x
  * @return bool */
 function is_int_list($x) {
-    if (is_array($x) && array_values($x) === $x) {
-        foreach ($x as $i) {
-            if (!is_int($i))
-                return false;
-        }
-        return true;
-    } else {
+    if (!is_array($x) || !array_is_list($x)) {
         return false;
     }
+    foreach ($x as $i) {
+        if (!is_int($i))
+            return false;
+    }
+    return true;
 }
 
 /** @param mixed $x
  * @return bool */
 function is_string_list($x) {
-    if (is_array($x) && array_values($x) === $x) {
-        foreach ($x as $i) {
-            if (!is_string($i))
-                return false;
-        }
-        return true;
-    } else {
+    if (!is_array($x) || !array_is_list($x)) {
         return false;
+    }
+    foreach ($x as $i) {
+        if (!is_string($i))
+            return false;
+    }
+    return true;
+}
+
+/** @return list */
+function make_array(...$x) {
+    // This works around a syntax error in PHP 7
+    return $x;
+}
+
+/** @param list<mixed> &$a */
+function array_sort_unique(&$a) {
+    if (($n = count($a)) > 1) {
+        sort($a);
+        for ($i = 0, $j = 1; $j !== $n; ++$j) {
+            if ($a[$i] !== $a[$j]) {
+                ++$i;
+                if ($i !== $j) {
+                    $a[$i] = $a[$j];
+                }
+            }
+        }
+        if ($i !== $n - 1) {
+            array_splice($a, $i + 1);
+        }
     }
 }
 
 
 // string helpers
+
+/** @param string $haystack
+ * @param string $needle
+ * @param int $pos
+ * @return int */
+function strlpos($haystack, $needle, $pos = 0) {
+    $x = strpos($haystack, $needle, $pos);
+    return $x === false ? strlen($haystack) : $x;
+}
 
 if (PHP_VERSION_ID < 80000) {
     /** @suppress PhanRedefineFunctionInternal */
@@ -157,43 +188,30 @@ function is_valid_utf8($str) {
     return !!preg_match('//u', $str);
 }
 
-if (function_exists("iconv")) {
-    function windows_1252_to_utf8(string $str) {
-        return iconv("Windows-1252", "UTF-8//IGNORE", $str);
-    }
-    function mac_os_roman_to_utf8(string $str) {
-        return iconv("Mac", "UTF-8//IGNORE", $str);
-    }
-} else if (function_exists("mb_convert_encoding")) {
-    function windows_1252_to_utf8(string $str) {
-        return mb_convert_encoding($str, "UTF-8", "Windows-1252");
-    }
-}
-if (!function_exists("windows_1252_to_utf8")) {
-    function windows_1252_to_utf8(string $str) {
-        return UnicodeHelper::windows_1252_to_utf8($str);
-    }
-}
-if (!function_exists("mac_os_roman_to_utf8")) {
-    function mac_os_roman_to_utf8(string $str) {
-        return UnicodeHelper::mac_os_roman_to_utf8($str);
-    }
-}
-
 /** @param string $str
  * @return string */
 function convert_to_utf8($str) {
-    if (str_starts_with($str, "\xEF\xBB\xBF")) {
+    if ($str === "") {
+        return "";
+    } else if (($has_bom = str_starts_with($str, "\xEF\xBB\xBF"))) {
         $str = substr($str, 3);
+    } else if (str_starts_with($str, "\xFE\xFF")) {
+        return UnicodeHelper::to_utf8("UTF-16LE", substr($str, 2));
+    } else if (str_starts_with($str, "\xFF\xFE")) {
+        return UnicodeHelper::to_utf8("UTF-16BE", substr($str, 2));
+    } else {
+        $n = min(strlen($str), 256);
+        if (substr_count($str, "\0", 0, $n) >= min(5, $n / 2)) {
+            $zp = strpos($str, "\0");
+            return UnicodeHelper::to_utf8($zp & 1 ? "UTF-16LE" : "UTF-16BE", $str);
+        }
     }
     if (is_valid_utf8($str)) {
         return $str;
-    }
-    $pfx = substr($str, 0, 5000);
-    if (substr_count($pfx, "\r") > 1.5 * substr_count($pfx, "\n")) {
-        return mac_os_roman_to_utf8($str);
+    } else if ($has_bom) {
+        return UnicodeHelper::utf8_replace_invalid($str);
     } else {
-        return windows_1252_to_utf8($str);
+        return UnicodeHelper::to_utf8("Windows-1252", $str);
     }
 }
 
@@ -352,9 +370,8 @@ function friendly_boolean($x) {
     } else if (is_string($x) || is_int($x)) {
         // 0, false, off, no: false; 1, true, on, yes: true
         return filter_var($x, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-    } else {
-        return null;
     }
+    return null;
 }
 
 /** @param ?string $varname
@@ -620,16 +637,15 @@ function num_list_lower_bound($needle, $haystack) {
 
 /** @param mixed $a */
 function array_to_object_recursive($a) {
-    if (is_array($a) && is_associative_array($a)) {
-        $o = (object) [];
-        foreach ($a as $k => $v) {
-            if ($k !== "")
-                $o->$k = array_to_object_recursive($v);
-        }
-        return $o;
-    } else {
+    if (!is_array($a) || array_is_list($a)) {
         return $a;
     }
+    $o = (object) [];
+    foreach ($a as $k => $v) {
+        if ($k !== "")
+            $o->$k = array_to_object_recursive($v);
+    }
+    return $o;
 }
 
 function object_replace($a, $b) {
@@ -655,7 +671,7 @@ function object_replace_recursive($a, $b) {
         }
     }
     foreach ($ba as $k => $v) {
-        if (is_object($v) || is_associative_array($v)) {
+        if (is_object($v) || (is_array($v) && !array_is_list($v))) {
             if (!is_object($a->$k ?? null)) {
                 $a->$k = (object) [];
             }
