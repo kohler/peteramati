@@ -295,7 +295,10 @@ class PsetView {
 
     /** @return ?CommitRecord */
     function latest_nontrivial_commit() {
-        return $this->repo ? $this->repo->latest_nontrivial_commit($this->pset, $this->branch) : null;
+        if (!$this->repo) {
+            return null;
+        }
+        return $this->repo->latest_nontrivial_commit($this->pset, $this->branch);
     }
 
     /** @return ?non-empty-string */
@@ -320,22 +323,22 @@ class PsetView {
     /** @param string $hashpart
      * @return ?CommitRecord */
     function find_commit($hashpart) {
-        if ($hashpart === "handout" || $hashpart === "base") {
+        if (!$hashpart) {
+            return null;
+        } else if ($hashpart === "handout" || $hashpart === "base") {
             return $this->base_handout_commit();
         } else if ($hashpart === "head" || $hashpart === "latest") {
             return $this->latest_commit();
         } else if ($hashpart === "grade" || $hashpart === "grading") {
             return $this->grading_commit();
-        } else if ($hashpart) {
-            list($cx, $definitive) = Repository::find_listed_commit($hashpart, $this->pset->handout_commits());
-            if ($cx) {
-                return $cx;
-            } else if ($this->repo) {
-                return $this->repo->connected_commit($hashpart, $this->pset, $this->branch);
-            } else {
-                return null;
-            }
         }
+        list($cx, $definitive) = Repository::find_listed_commit($hashpart, $this->pset->handout_commits());
+        if ($cx) {
+            return $cx;
+        } else if ($this->repo) {
+            return $this->repo->connected_commit($hashpart, $this->pset, $this->branch);
+        }
+        return null;
     }
 
 

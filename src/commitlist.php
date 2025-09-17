@@ -1,15 +1,24 @@
 <?php
 // commitlist.php -- Peteramati helper class representing commit lists
-// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2025 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class CommitList implements ArrayAccess, IteratorAggregate, Countable, JsonSerializable {
+    /** @var ?Repository
+     * @readonly */
+    public $repo;
     /** @var array<string,CommitRecord> */
     public $commits = [];
     /** @var bool */
     public $merges_checked = false;
     /** @var bool */
     public $suspicious_directory = false;
+    /** @var int */
+    public $_listflags = 0;
+
+    function __construct(?Repository $repo = null) {
+        $this->repo = $repo;
+    }
 
     function add(CommitRecord $c) {
         $this->commits[$c->hash] = $c;

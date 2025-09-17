@@ -14,6 +14,8 @@ class CommitRecord implements JsonSerializable {
     public $fromhead;
     /** @var null|string|list<string> */
     public $directory;
+    /** @var ?CommitRecordFile */
+    public $file_list;
     /** @var int */
     public $_flags = 0;
     /** @var ?Pset */
@@ -23,6 +25,8 @@ class CommitRecord implements JsonSerializable {
     const CRF_IS_HANDOUT = 1;
     const CRF_IS_MERGE = 2;
     const CRF_IS_TRIVIAL_MERGE = 4;
+    const CRF_HAS_DIRECTORY = 8;
+    const CRF_HAS_FILE_LIST = 16;
 
     /** @param int $commitat
      * @param non-empty-string $hash
@@ -34,6 +38,64 @@ class CommitRecord implements JsonSerializable {
         $this->subject = $subject;
         $this->fromhead = $fromhead;
     }
+
+    /** @param 8|24 $wantflags
+     * @return bool */
+    function need_file_list($wantflags) {
+        return ($this->_flags & $wantflags) !== $wantflags;
+    }
+
+    /** @param string $s
+     * @param 8|24 $wantflags */
+    function parse_file_list($s, $wantflags) {
+        if (($this->_flags & $wantflags) === $wantflags) {
+            return;
+        }
+        $want_directory = ($this->_flags & self::CRF_HAS_DIRECTORY) === 0;
+        $want_file_list = ($wantflags & self::CRF_HAS_FILE_LIST) !== 0;
+        $dir = $tail = null;
+        foreach (explode("\n", $s) as $ln) {
+            if ($want_file_list) {
+                if (($tab1 = strpos($ln, "\t")) !== false
+                    && ($tab2 = strpos($ln, "\t", $tab1 + 1)) !== false) {
+                    $add = substr($ln, 0, $tab1);
+                    $rem = substr($ln, $tab1 + 1, $tab2 - ($tab1 + 1));
+                    $ln = substr($ln, $tab2 + 1);
+                    if ($add === "-") {
+                        $crf = new CommitRecordFile($ln, null, null);
+                    } else {
+                        $crf = new CommitRecordFile($ln, intval($add), intval($rem));
+                    }
+                    if ($tail) {
+                        $tail->next = $crf;
+                    } else {
+                        $this->file_list = $crf;
+                    }
+                    $tail = $crf;
+                } else {
+                    $ln = "";
+                }
+            }
+            if ($ln === "" || !$want_directory) {
+                continue;
+            }
+            $d = substr($ln, 0, strlpos($ln, "/"));
+            if ($dir === null) {
+                $dir = $d;
+            } else if (is_string($dir)) {
+                if ($dir !== $d) {
+                    $dir = [$dir, $d];
+                }
+            } else if (!in_array($d, $dir)) {
+                $dir[] = $d;
+            }
+        }
+        if ($want_directory) {
+            $this->directory = $dir;
+        }
+        $this->_flags |= $wantflags;
+    }
+
     /** @param string $dir
      * @return bool */
     function touches_directory($dir) {
@@ -114,5 +176,22 @@ class CommitRecord implements JsonSerializable {
             return $s;
         }
         return null;
+    }
+}
+
+class CommitRecordFile {
+    /** @var string */
+    public $file;
+    /** @var ?int */
+    public $add;
+    /** @var ?int */
+    public $remove;
+    /** @var ?CommitRecordFile */
+    public $next;
+
+    function __construct($file, $add, $remove) {
+        $this->file = $file;
+        $this->add = $add;
+        $this->remove = $remove;
     }
 }

@@ -4,20 +4,25 @@
 // See LICENSE for open-source distribution terms
 
 class Repository {
-    /** @var Conf */
+    /** @var Conf
+     * @readonly */
     public $conf;
-
-    /** @var int */
+    /** @var int
+     * @readonly */
     public $repoid;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $url;
-    /** @var RepositorySite */
+    /** @var RepositorySite
+     * @readonly */
     public $reposite;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $cacheid;
     /** @var int */
     public $rflags;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $repogid;
     /** @var -1|0|1 */
     public $open;
@@ -57,6 +62,8 @@ class Repository {
     private $_refresh_count = 0;
     /** @var ?string */
     private $_original_cacheid;
+    /** @var bool */
+    private $_want_file_list = false;
 
     /** @var list<RepositoryFileContent> */
     static private $_contents = [];
@@ -67,12 +74,10 @@ class Repository {
 
     function __construct(Conf $conf) {
         $this->conf = $conf;
-        if (isset($this->repoid)) {
-            $this->db_load();
-        }
     }
 
-    private function db_load() {
+    /** @suppress PhanAccessReadOnlyProperty */
+    private function fetch_incorporate() {
         $this->repoid = (int) $this->repoid;
         $this->rflags = (int) $this->rflags;
         $this->open = (int) $this->open;
@@ -93,9 +98,9 @@ class Repository {
     static function fetch($result, Conf $conf) {
         $repo = $result ? $result->fetch_object("Repository", [$conf]) : null;
         '@phan-var-force ?Repository $repo';
-        if ($repo && !is_int($repo->repoid)) {
-            $repo->conf = $conf;
-            $repo->db_load();
+        if ($repo) {
+            assert($repo->conf !== null);
+            $repo->fetch_incorporate();
         }
         return $repo;
     }
@@ -162,15 +167,6 @@ class Repository {
             && (self::gitrun_at($conf, ["git", "remote", "get-url", "repo{$repogid}"], $repodir))->ok;
     }
 
-
-    /** param string $url
-     * @return Repository */
-    static function make_url($url, Conf $conf) {
-        $repo = new Repository($conf);
-        $repo->url = $url;
-        $repo->db_load();
-        return $repo;
-    }
 
     /** @param int $repoid
      * @return ?Repository */
@@ -563,37 +559,6 @@ class Repository {
         return null;
     }
 
-    static private function set_directory(CommitRecord $cr, $s, $x, $end) {
-        $x0 = $x;
-        $mode = 0;
-        $dir = null;
-        while ($x !== $end) {
-            $ch = $s[$x];
-            if ($mode === 1 && ($ch === "\n" || $ch === "/") && $x > $x0) {
-                $d = substr($s, $x0, $x - $x0);
-                if ($dir === null) {
-                    $dir = $d;
-                } else if (is_string($dir)) {
-                    if ($dir !== $d) {
-                        $dir = [$dir, $d];
-                    }
-                } else if (!in_array($d, $dir)) {
-                    $dir[] = $d;
-                }
-            }
-            if ($ch === "/") {
-                $mode = 2;
-            } else if ($ch === "\n") {
-                $mode = 0;
-            } else if ($mode === 0) {
-                $x0 = $x;
-                $mode = 1;
-            }
-            ++$x;
-        }
-        $cr->directory = $dir;
-    }
-
     /** @param string $branch */
     private function check_merges($branch) {
         $list = $this->commit_list(null, $branch);
@@ -643,21 +608,51 @@ class Repository {
         return explode(" ", substr($this->heads, $sp + 1));
     }
 
+    /** @return int */
+    private function want_commit_flags() {
+        return CommitRecord::CRF_HAS_DIRECTORY
+            | ($this->_want_file_list ? CommitRecord::CRF_HAS_FILE_LIST : 0);
+    }
+
+    /** @return bool */
+    private function list_ready(CommitList $list) {
+        $wantflags = $this->want_commit_flags();
+        return ($list->_listflags & $wantflags) === $wantflags;
+    }
+
+    /** @param string $key
+     * @return CommitList */
+    private function install_list(CommitList $list, $key) {
+        assert(($this->_commit_lists[$key] ?? $list) === $list);
+        $this->_commit_lists[$key] = $list;
+        $list->_listflags |= $this->want_commit_flags();
+        return $list;
+    }
+
     /** @param string $key
      * @param string $head
      * @return CommitList */
     private function head_commit_list($key, $head) {
         // check cache
-        if (isset($this->_commit_lists[$key])) {
-            return $this->_commit_lists[$key];
+        $list = $this->_commit_lists[$key] ?? new CommitList($this);
+        if ($this->list_ready($list)) {
+            return $list;
         }
-        $list = $this->_commit_lists[$key] = new CommitList;
 
         // read log
-        $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head, "--"]);
+        $wantflags = $this->want_commit_flags();
+        $cmd = ["git", "log", "-m"];
+        if (($wantflags & CommitRecord::CRF_HAS_FILE_LIST) !== 0) {
+            $cmd[] = "--numstat";
+            $cmd[] = "--no-renames";
+        } else {
+            $cmd[] = "--name-only";
+        }
+        array_push($cmd, "--format=%x00%ct %H %s%n%P", $head, "--");
+        $s = $this->gitrun($cmd);
         if ($s === "" && !$this->_refresh_count) {
             $this->refresh(30, true);
-            $s = $this->gitrun(["git", "log", "-m", "--name-only", "--format=%x00%ct %H %s%n%P", $head, "--"]);
+            $s = $this->gitrun($cmd);
         }
 
         // parse log
@@ -669,57 +664,56 @@ class Repository {
             if (($p = strpos($s, "\0", $p0)) === false) {
                 $p = $l;
             }
-            if (($sp1 = strpos($s, " ", $p0)) !== false
-                && ($sp2 = strpos($s, " ", $sp1 + 1)) !== false
-                && ($nl1 = strpos($s, "\n", $sp2 + 1)) !== false
-                && $nl1 < $p
-                && ($nl2 = strpos($s, "\n", $nl1 + 1)) !== false
-                && $nl2 < $p) {
-                $time = substr($s, $p0, $sp1 - $p0);
-                $hash = substr($s, $sp1 + 1, $sp2 - ($sp1 + 1));
-                if (strlen($time) > 8
-                    && strlen($hash) >= 40
-                    && ctype_digit($time)
-                    && ctype_xdigit($hash)) {
-                    if ($cr && $cr->hash === $hash) {
-                        // another branch of the merge commit
-                    } else if (($cr = $this->_commits[$hash] ?? null)) {
-                        // assume already completely populated
-                        $newcr = null;
-                        $list->commits[$hash] = $cr;
-                    } else {
-                        $subject = substr($s, $sp2 + 1, $nl1 - ($sp2 + 1));
-                        /** @phan-suppress-next-line PhanTypeMismatchArgument */
-                        $newcr = new CommitRecord((int) $time, $hash, $subject, $head);
-                        $this->_commits[$hash] = $list->commits[$hash] = $cr = $newcr;
-                        if (strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false) {
-                            $cr->_flags |= CommitRecord::CRF_IS_MERGE;
-                        }
-                    }
-                    if ($newcr) {
-                        self::set_directory($cr, $s, $nl2, $p);
-                    }
+            if (($sp1 = strpos($s, " ", $p0)) === false
+                || ($sp2 = strpos($s, " ", $sp1 + 1)) === false
+                || ($nl1 = strpos($s, "\n", $sp2 + 1)) === false
+                || $nl1 >= $p
+                || ($nl2 = strpos($s, "\n", $nl1 + 1)) === false
+                || $nl2 >= $p) {
+                continue;
+            }
+            $time = substr($s, $p0, $sp1 - $p0);
+            $hash = substr($s, $sp1 + 1, $sp2 - ($sp1 + 1));
+            if (strlen($time) <= 8
+                || strlen($hash) < 40
+                || !ctype_digit($time)
+                || !ctype_xdigit($hash)
+                || /* another branch of a merge commit */
+                   ($cr && $cr->hash === $hash)) {
+                continue;
+            }
+            $cr = $this->_commits[$hash] ?? null;
+            if ($cr === null) {
+                $subject = substr($s, $sp2 + 1, $nl1 - ($sp2 + 1));
+                /** @phan-suppress-next-line PhanTypeMismatchArgument */
+                $cr = new CommitRecord((int) $time, $hash, $subject, $head);
+                $this->_commits[$hash] = $cr;
+                if (strpos(substr($s, $nl1 + 1, $nl2 - ($nl1 + 1)), " ") !== false) {
+                    $cr->_flags |= CommitRecord::CRF_IS_MERGE;
                 }
+            }
+            $list->commits[$hash] = $cr;
+            if ($cr->need_file_list($wantflags)) {
+                $cr->parse_file_list(substr($s, $nl2, $p - $nl2), $wantflags);
             }
         }
 
-        return $list;
+        return $this->install_list($list, $key);
     }
 
     /** @param string $branch
      * @return CommitList */
     private function expanded_head_commit_list($branch) {
         $key = ".x/{$branch}";
-        if (isset($this->_commit_lists[$key])) {
-            return $this->_commit_lists[$key];
+        $list = $this->_commit_lists[$key] ?? new CommitList($this);
+        if ($this->list_ready($list)) {
+            return $list;
         }
-        $this->_commit_lists[$key] = $list = new CommitList;
-
         $list->merge($this->head_commit_list($branch, $this->repobranchname($branch)));
         foreach ($this->extra_heads() as $xhead) {
             $list->merge($this->head_commit_list(".h/{$xhead}", $xhead));
         }
-        return $list;
+        return $this->install_list($list, $key);
     }
 
     /** @param ?Pset $pset
@@ -747,10 +741,10 @@ class Repository {
         $test_file = $pset->test_file;
         assert(strpos($dir, "/") === false);
         $key = ".d/{$dir}/" . ($expanded ? ".x/" : "") . $branch;
-        if (isset($this->_commit_lists[$key])) {
-            return $this->_commit_lists[$key];
+        $list = $this->_commit_lists[$key] ?? new CommitList($this);
+        if ($this->list_ready($list)) {
+            return $list;
         }
-        $list = new CommitList;
 
         foreach ($this->commit_list(null, $branch, $expanded) as $cr) {
             if ($cr->__touches_directory($dir)) {
@@ -768,8 +762,7 @@ class Repository {
             return $this->commit_list(null, $branch, $expanded);
         }
 
-        $this->_commit_lists[$key] = $list;
-        return $list;
+        return $this->install_list($list, $key);
     }
 
     /** @param ?Pset $pset

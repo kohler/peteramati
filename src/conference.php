@@ -2730,7 +2730,7 @@ class Conf {
             $this->save_setting($key, 1, $hset);
             $this->qe("delete from Settings where name!=? and name like 'handoutcommits_%_?s'", $key, $pset->id);
         }
-        $commits = new CommitList;
+        $commits = new CommitList($hrepo);
         foreach ($hset->commits as $c) {
             $commits->add(new CommitRecord($c[1], $c[0], $c[2], CommitRecord::HANDOUTHEAD));
         }
