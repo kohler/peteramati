@@ -122,7 +122,20 @@ function make_flagger(what) {
             arg.grade = 1;
         }
         $.post(hoturl("=api/gradeflag", arg), {}, function (data) {
-            data && data.ok && apply_flagger(self, data);
+            if (!data) {
+                return;
+            }
+            const pv = self.closest(".pa-pv");
+            while (pv.lastChild && hasClass(pv.lastChild, "pa-inf-error")) {
+                pv.lastChild.remove();
+            }
+            if (data && data.ok) {
+                apply_flagger(self, data);
+            } else if (data && data.error) {
+                const e = $e("div", "pa-inf-error");
+                e.innerHTML = data.error;
+                pv.append(e);
+            }
         });
     };
 }

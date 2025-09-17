@@ -559,6 +559,13 @@ class Repository {
         return null;
     }
 
+    /** @param bool $x
+     * @return $this */
+    function set_want_file_list($x) {
+        $this->_want_file_list = $x;
+        return $this;
+    }
+
     /** @param string $branch */
     private function check_merges($branch) {
         $list = $this->commit_list(null, $branch);
@@ -614,12 +621,6 @@ class Repository {
             | ($this->_want_file_list ? CommitRecord::CRF_HAS_FILE_LIST : 0);
     }
 
-    /** @return bool */
-    private function list_ready(CommitList $list) {
-        $wantflags = $this->want_commit_flags();
-        return ($list->_listflags & $wantflags) === $wantflags;
-    }
-
     /** @param string $key
      * @return CommitList */
     private function install_list(CommitList $list, $key) {
@@ -635,12 +636,12 @@ class Repository {
     private function head_commit_list($key, $head) {
         // check cache
         $list = $this->_commit_lists[$key] ?? new CommitList($this);
-        if ($this->list_ready($list)) {
+        $wantflags = $this->want_commit_flags();
+        if ($list->ready($wantflags)) {
             return $list;
         }
 
         // read log
-        $wantflags = $this->want_commit_flags();
         $cmd = ["git", "log", "-m"];
         if (($wantflags & CommitRecord::CRF_HAS_FILE_LIST) !== 0) {
             $cmd[] = "--numstat";
@@ -693,7 +694,7 @@ class Repository {
                 }
             }
             $list->commits[$hash] = $cr;
-            if ($cr->need_file_list($wantflags)) {
+            if (!$cr->ready($wantflags)) {
                 $cr->parse_file_list(substr($s, $nl2, $p - $nl2), $wantflags);
             }
         }
@@ -706,7 +707,7 @@ class Repository {
     private function expanded_head_commit_list($branch) {
         $key = ".x/{$branch}";
         $list = $this->_commit_lists[$key] ?? new CommitList($this);
-        if ($this->list_ready($list)) {
+        if ($list->ready($this->want_commit_flags())) {
             return $list;
         }
         $list->merge($this->head_commit_list($branch, $this->repobranchname($branch)));
@@ -716,19 +717,29 @@ class Repository {
         return $this->install_list($list, $key);
     }
 
+    const CL_EXPAND = 1;
+    const CL_HASH = 2;
+
     /** @param ?Pset $pset
      * @param ?string $branch
-     * @param bool $expanded
+     * @param int $flags
      * @return CommitList */
-    function commit_list($pset, $branch, $expanded = false) {
-        $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
+    function commit_list($pset, $branch, $flags = 0) {
+        if (($flags & self::CL_HASH) !== 0) {
+            assert(git_refname_is_full_hash($branch ?? ""));
+        } else {
+            $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
+        }
 
         // simple cases first
         if (!$pset
             || $pset->directory_noslash === ""
             || ($this->_truncated_psetdir[$pset->psetid] ?? false)) {
             // simplest case: just this branch
-            if (!$expanded || strlen($this->heads ?? "") <= 40) {
+            if (($flags & self::CL_HASH) !== 0) {
+                return $this->head_commit_list(".h/{$branch}", $branch);
+            } else if (($flags & self::CL_EXPAND) === 0
+                       || strlen($this->heads ?? "") <= 40) {
                 return $this->head_commit_list($branch, $this->repobranchname($branch));
             }
 
@@ -740,13 +751,20 @@ class Repository {
         $dir = $pset->directory_noslash;
         $test_file = $pset->test_file;
         assert(strpos($dir, "/") === false);
-        $key = ".d/{$dir}/" . ($expanded ? ".x/" : "") . $branch;
+        $key = ".d/{$dir}/";
+        if (($flags & self::CL_HASH) !== 0) {
+            $key .= ".h/{$branch}";
+        } else if (($flags & self::CL_EXPAND) !== 0) {
+            $key .= ".x/{$branch}";
+        } else {
+            $key .= $branch;
+        }
         $list = $this->_commit_lists[$key] ?? new CommitList($this);
-        if ($this->list_ready($list)) {
+        if ($list->ready($this->want_commit_flags())) {
             return $list;
         }
 
-        foreach ($this->commit_list(null, $branch, $expanded) as $cr) {
+        foreach ($this->commit_list(null, $branch, $flags) as $cr) {
             if ($cr->__touches_directory($dir)) {
                 $list->commits[$cr->hash] = $cr;
             } else if (empty($list->commits)
@@ -759,7 +777,7 @@ class Repository {
 
         if (empty($list->commits) && $list->suspicious_directory) {
             $this->_truncated_psetdir[$pset->psetid] = true;
-            return $this->commit_list(null, $branch, $expanded);
+            return $this->commit_list(null, $branch, $flags);
         }
 
         return $this->install_list($list, $key);
@@ -767,10 +785,10 @@ class Repository {
 
     /** @param ?Pset $pset
      * @param ?string $branch
-     * @param bool $expanded
+     * @param int $flags
      * @return array<string,CommitRecord> */
-    function commits($pset, $branch, $expanded = false) {
-        return $this->commit_list($pset, $branch, $expanded)->commits;
+    function commits($pset, $branch, $flags = 0) {
+        return $this->commit_list($pset, $branch, $flags)->commits;
     }
 
     /** @param ?string $branch

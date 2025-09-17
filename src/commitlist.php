@@ -20,6 +20,23 @@ class CommitList implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
         $this->repo = $repo;
     }
 
+    /** @param 8|24 $flags
+     * @return bool */
+    function ready($flags) {
+        if (($this->_listflags & $flags) === $flags) {
+            return true;
+        } else if (($this->_listflags & CommitRecord::CRF_HAS_DIRECTORY) === 0) {
+            return false;
+        }
+        foreach ($this->commits as $cr) {
+            if (($cr->_flags & $flags) !== $flags) {
+                return false;
+            }
+        }
+        $this->_listflags |= $flags;
+        return true;
+    }
+
     function add(CommitRecord $c) {
         $this->commits[$c->hash] = $c;
     }

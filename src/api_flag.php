@@ -51,6 +51,9 @@ class Flag_API {
 
     static function gradeflag(Contact $viewer, Qrequest $qreq, APIData $api) {
         $info = PsetView::make($api->pset, $api->user, $viewer);
+        if ($info->repo && friendly_boolean($qreq->grade) && $api->pset->grading_commit_function) {
+            $info->repo->set_want_file_list(true);
+        }
         if (($err = $api->prepare_commit($info))) {
             return $err;
         } else if (!$viewer->isPC && $viewer !== $api->user) {
@@ -74,6 +77,11 @@ class Flag_API {
                     if ($wantlock) {
                         $placeholder = RepositoryPsetInfo::PL_LOCKED;
                     }
+                } else if ($api->pset->grading_commit_function) {
+                    $error = call_user_func($api->pset->grading_commit_function, $info);
+                    if ($error) {
+                        return ["ok" => false, "error" => $error];
+                    }
                 }
                 $info->change_grading_commit($placeholder, $mode);
             } else if ($nograde) {
@@ -89,12 +97,12 @@ class Flag_API {
                 }
             }
         }
-        if ($rpi->placeholder === 2) {
+        if ($rpi->placeholder === RepositoryPsetInfo::PL_DONOTGRADE) {
             return ["ok" => true, "gradecommit" => ""];
-        } else if ($rpi->placeholder === 1) {
+        } else if ($rpi->placeholder === RepositoryPsetInfo::PL_NONE) {
             return ["ok" => true, "gradecommit" => null];
         } else {
-            return ["ok" => true, "gradecommit" => $rpi->gradehash, "gradelock" => $rpi->placeholder === 0];
+            return ["ok" => true, "gradecommit" => $rpi->gradehash, "gradelock" => $rpi->placeholder === RepositoryPsetInfo::PL_LOCKED];
         }
     }
 

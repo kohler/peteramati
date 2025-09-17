@@ -41,8 +41,8 @@ class CommitRecord implements JsonSerializable {
 
     /** @param 8|24 $wantflags
      * @return bool */
-    function need_file_list($wantflags) {
-        return ($this->_flags & $wantflags) !== $wantflags;
+    function ready($wantflags) {
+        return ($this->_flags & $wantflags) === $wantflags;
     }
 
     /** @param string $s

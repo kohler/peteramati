@@ -736,7 +736,6 @@ class PsetRequest {
             return;
         }
 
-        echo '<div class="pa-p"><div class="pa-pt"></div><div class="pa-pv"><form>';
         $any = false;
         $all_resolved = true;
         foreach ($this->info->commit_jnote("flags") ?? [] as $k => $v) {
@@ -749,9 +748,11 @@ class PsetRequest {
             if ($resolved && $conversation === "") {
                 continue;
             }
-            echo $any ? "" : '<ul class="x mb-0">',
-                $resolved ? '<li class="pa-flag-resolved">🏳️' : '<li class="pa-flag-active">🏴';
-            $any = true;
+            if (!$any) {
+                echo '<div class="pa-p"><div class="pa-pt"></div><div class="pa-pv"><form><ul class="x mb-0">';
+                $any = true;
+            }
+            echo $resolved ? '<li class="pa-flag-resolved">🏳️' : '<li class="pa-flag-active">🏴';
             if ($conversation !== "") {
                 echo ' ', $conversation;
             }
@@ -763,11 +764,11 @@ class PsetRequest {
             echo '</li>';
         }
         if ($any) {
-            echo '</li>';
+            echo '</ul></form></div></div>';
         }
 
         $rpi = $this->info->rpi();
-        echo '<div class="no-print">';
+        echo '<div class="pa-p no-print"><div class="pa-pt"></div><div class="pa-pv"><form>';
         $gradelock = $rpi->placeholder === 0;
         if ($admin) {
             echo '<div class="btnbox mr-3">',

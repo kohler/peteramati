@@ -260,7 +260,7 @@ class PsetView {
         if (!$this->repo) {
             return new CommitList;
         }
-        return $this->repo->commit_list($this->pset, $this->branch, true);
+        return $this->repo->commit_list($this->pset, $this->branch, Repository::CL_EXPAND);
     }
 
     /** @return ?CommitRecord */

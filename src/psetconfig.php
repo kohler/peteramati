@@ -101,10 +101,16 @@ class Pset {
     /** @var ?bool */
     public $handout_warn_merge;
     public $repo_guess_patterns = [];
+    /** @var string */
     public $directory;
+    /** @var string */
     public $directory_slash;
+    /** @var string */
     public $directory_noslash;
+    /** @var ?string */
     public $test_file;
+    /** @var ?string */
+    public $grading_commit_function;
 
     /** @var null|int|float */
     public $deadline;
@@ -357,6 +363,7 @@ class Pset {
         }
         $this->directory_noslash = preg_replace('/\/+\z/', '', $this->directory_slash);
         $this->test_file = self::cstr($p, "test_file");
+        $this->grading_commit_function = self::cstr($p, "grading_commit_function");
 
         // deadlines
         $this->deadline = self::cdate($p, "deadline");
