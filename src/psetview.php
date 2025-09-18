@@ -332,7 +332,7 @@ class PsetView {
         } else if ($hashpart === "grade" || $hashpart === "grading") {
             return $this->grading_commit();
         }
-        list($cx, $definitive) = Repository::find_listed_commit($hashpart, $this->pset->handout_commits());
+        list($cx, $definitive) = Repository::find_listed_commit($hashpart, $this->pset->handout_commit_list());
         if ($cx) {
             return $cx;
         } else if ($this->repo) {
@@ -492,7 +492,7 @@ class PsetView {
     /** @return bool */
     function is_handout_commit() {
         return $this->_hash !== null
-            && $this->pset->handout_commits()->contains($this->_hash);
+            && $this->pset->handout_commit_list()->contains($this->_hash);
     }
 
     /** @return bool */
@@ -555,13 +555,13 @@ class PsetView {
     function derived_handout_commit() {
         if ($this->_derived_handout_commit === false) {
             $this->_derived_handout_commit = null;
-            $hbases = $this->pset->handout_commits();
+            $hbases = $this->pset->handout_commit_list();
             $seen_hash = !$this->_hash;
             foreach ($this->commit_list() as $c) {
                 if ($c->hash === $this->_hash) {
                     $seen_hash = true;
                 }
-                if (isset($hbases[$c->hash])) {
+                if ($hbases->contains($c->hash)) {
                     $this->_derived_handout_commit = $c;
                     if ($seen_hash) {
                         break;

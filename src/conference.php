@@ -2734,16 +2734,22 @@ class Conf {
     }
 
     /** @return CommitList */
-    function handout_commits(Pset $pset) {
+    function handout_commit_list(Pset $pset) {
         if (!array_key_exists($pset->id, $this->_handout_commits)) {
             $this->populate_handout_commits($pset);
         }
         return $this->_handout_commits[$pset->id];
     }
 
+    /** @return CommitList
+     * @deprecated */
+    function handout_commits(Pset $pset) {
+        return $this->handout_commit_list($pset);
+    }
+
     /** @return ?CommitRecord */
     function handout_commit(Pset $pset, $hash) {
-        $commits = $this->handout_commits($pset);
+        $commits = $this->handout_commit_list($pset);
         if (strlen($hash) === 40 || strlen($hash) === 64) {
             return $commits[$hash];
         }

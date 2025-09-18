@@ -683,8 +683,14 @@ class Pset {
     }
 
     /** @return CommitList */
+    function handout_commit_list() {
+        return $this->conf->handout_commit_list($this);
+    }
+
+    /** @return CommitList
+     * @deprecated */
     function handout_commits() {
-        return $this->conf->handout_commits($this);
+        return $this->handout_commit_list();
     }
 
     /** @return ?CommitRecord */
