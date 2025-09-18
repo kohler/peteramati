@@ -645,6 +645,7 @@ class Repository {
         $cmd = ["git", "log", "-m"];
         if (($wantflags & CommitRecord::CRF_HAS_FILE_LIST) !== 0) {
             $cmd[] = "--numstat";
+            $cmd[] = "-w";
             $cmd[] = "--no-renames";
         } else {
             $cmd[] = "--name-only";
