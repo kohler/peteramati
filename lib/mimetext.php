@@ -112,10 +112,11 @@ class MimeText {
         }
     }
 
-    /** @param string $header
+    /** @param string $field
      * @param string $str
      * @return false|string */
-    function encode_email_header($header, $str) {
+    function encode_email_header($field, $str) {
+        $header = $field === "" ? "" : "{$field}: ";
         $this->reset($header, $str);
         if (strpos($this->in, chr(0xE2)) !== false) {
             $this->in = str_replace(["“", "”"], ["\"", "\""], $this->in);
@@ -150,7 +151,7 @@ class MimeText {
                 $email = $m[1];
                 $str = $m[3];
             } else {
-                $this->mi = $mi = new MessageItem(null, "", MessageSet::ERROR);
+                $this->mi = $mi = MessageItem::error_at($field);
                 $mi->pos1 = $inlen - strlen($str);
                 $mi->context = $this->in;
                 if (preg_match('/[\s<>@]/', $str)) {
@@ -167,7 +168,7 @@ class MimeText {
             if (!validate_email($email)
                 && $email !== "none"
                 && $email !== "hidden") {
-                $this->mi = $mi = new MessageItem(null, "<0>Invalid email address", MessageSet::ERROR);
+                $this->mi = $mi = MessageItem::error_at($field, "<0>Invalid email address");
                 $mi->pos1 = $emailpos;
                 $mi->pos2 = $emailpos + strlen($email);
                 $mi->context = $this->in;
@@ -179,7 +180,7 @@ class MimeText {
                 && $str[0] !== ","
                 && $str[0] !== ";") {
                 if (!$this->mi) {
-                    $this->mi = $mi = new MessageItem(null, "<0>Destinations must be separated with commas", MessageSet::ERROR);
+                    $this->mi = $mi = MessageItem::error_at($field, "<0>Destinations must be separated with commas");
                     $mi->pos1 = $mi->pos2 = $inlen - strlen($str);
                     $mi->context = $this->in;
                 }
@@ -246,18 +247,17 @@ class MimeText {
     /** @param string $text
      * @return string */
     static function decode_header($text) {
-        if (strlen($text) > 2 && $text[0] === '=' && $text[1] === '?') {
-            $out = '';
-            while (preg_match('/\A=\?utf-8\?q\?(.*?)\?=(\r?\n )?/i', $text, $m)) {
-                $f = str_replace('_', ' ', $m[1]);
-                $out .= preg_replace_callback('/=([0-9A-F][0-9A-F])/',
-                                              "MimeText::chr_hexdec_callback",
-                                              $f);
-                $text = substr($text, strlen($m[0]));
-            }
-            return $out . $text;
-        } else {
+        if (strlen($text) <= 2 || $text[0] !== "=" || $text[1] !== "?") {
             return $text;
         }
+        $out = '';
+        while (preg_match('/\A=\?utf-8\?q\?(.*?)\?=(\r?\n )?/i', $text, $m)) {
+            $f = str_replace('_', ' ', $m[1]);
+            $out .= preg_replace_callback('/=([0-9A-F][0-9A-F])/',
+                                          "MimeText::chr_hexdec_callback",
+                                          $f);
+            $text = substr($text, strlen($m[0]));
+        }
+        return $out . $text;
     }
 }

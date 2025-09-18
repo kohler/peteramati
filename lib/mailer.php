@@ -527,7 +527,7 @@ class Mailer {
         // parse headers
         $fromHeader = $this->conf->opt("emailFromHeader");
         if ($fromHeader === null) {
-            $fromHeader = $mimetext->encode_email_header("From: ", $this->conf->opt("emailFrom"));
+            $fromHeader = $mimetext->encode_email_header("From", $this->conf->opt("emailFrom"));
             $this->conf->set_opt("emailFromHeader", $fromHeader);
         }
         $prep->headers = [];
@@ -540,7 +540,7 @@ class Mailer {
             if (($text = $mail[$lcfield] ?? "") === "" || $text === "<none>") {
                 continue;
             }
-            if (($hdr = $mimetext->encode_email_header($field . ": ", $text))) {
+            if (($hdr = $mimetext->encode_email_header($field, $text))) {
                 $prep->headers[$lcfield] = $hdr . $this->eol;
             } else {
                 $mimetext->mi->field = $lcfield;

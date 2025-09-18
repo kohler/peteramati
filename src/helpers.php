@@ -270,13 +270,13 @@ class JsonResult {
             $this->content = $values;
         }
     }
-    static function make($json, ?Contact $user = null, $arg2 = null) {
-        if (is_int($json)) {
-            $json = new JsonResult($json, $arg2);
-        } else if (!is_object($json) || !($json instanceof JsonResult)) {
-            $json = new JsonResult($json);
+    static function make($json) {
+        if ($json instanceof JsonResult) {
+            return $json;
+        } else if ($json instanceof MessageItem) {
+            return new JsonResult($json->make_json());
         }
-        return $json;
+        return new JsonResult($json);
     }
     function export_errors() {
         if (isset($this->content["error"])) {
@@ -300,34 +300,33 @@ class JsonResultException extends Exception {
     }
 }
 
-function json_exit($json, $arg2 = null) {
+function json_exit($json) {
     global $Me, $Qreq;
-    $json = JsonResult::make($json, $Me ? : null, $arg2);
+    $json = JsonResult::make($json, $Me ? : null);
     if (JsonResultException::$capturing) {
         throw new JsonResultException($json);
-    } else {
-        if ($Qreq && $Qreq->valid_token()) {
-            if ($json->status) {
-                http_response_code($json->status);
-            }
-            header("Access-Control-Allow-Origin: *");
-        } else if ($json->status) {
-            // Don’t set status on unvalidated requests, since that can leak
-            // information (e.g. via <link prefetch onerror>).
-            if (!isset($json->content["ok"])) {
-                $json->content["ok"] = $json->status <= 299;
-            }
-            if (!isset($json->content["status"])) {
-                $json->content["status"] = $json->status;
-            }
-            if ($Qreq->post && !$Qreq->valid_token()) {
-                $json->content["postvalue"] = $Qreq->maybe_post_value();
-            }
-        }
-        header("Content-Type: application/json; charset=utf-8");
-        echo json_encode_browser($json->content);
-        exit(0);
     }
+    if ($Qreq && $Qreq->valid_token()) {
+        if ($json->status) {
+            http_response_code($json->status);
+        }
+        header("Access-Control-Allow-Origin: *");
+    } else if ($json->status) {
+        // Don’t set status on unvalidated requests, since that can leak
+        // information (e.g. via <link prefetch onerror>).
+        if (!isset($json->content["ok"])) {
+            $json->content["ok"] = $json->status <= 299;
+        }
+        if (!isset($json->content["status"])) {
+            $json->content["status"] = $json->status;
+        }
+        if ($Qreq->post && !$Qreq->valid_token()) {
+            $json->content["postvalue"] = $Qreq->maybe_post_value();
+        }
+    }
+    header("Content-Type: application/json; charset=utf-8");
+    echo json_encode_browser($json->content);
+    exit(0);
 }
 
 function foldarrow($open) {
