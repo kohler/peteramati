@@ -8,16 +8,15 @@ class RepoConfig_API {
         $user = $api->user;
         if (!$viewer->has_account_here()
             || (!$viewer->isPC && $user !== $viewer)) {
-            return (new MessageItem(null, "<0>Permission denied", 2))->make_json();
+            return MessageItem::error("<0>Permission denied")->make_json();
         } else if ($api->pset->gitless) {
-            return (new MessageItem(null, "<0>Problem set does not use git", 2))->make_json();
+            return MessageItem::error("<0>Problem set does not use git")->make_json();
         }
         if ($qreq->valid_post()) {
             if (!$qreq->repo) {
-                return (new MessageItem(null, "<0>Invalid request", 2))->make_json();
-                return ["ok" => false, "error" => "Invalid request"];
+                return MessageItem::error("<0>Invalid request")->make_json();
             } else if (!$viewer->can_set_repo($api->pset, $user)) {
-                return (new MessageItem(null, "<0>Permission denied", 2))->make_json();
+                return MessageItem::error("<0>Permission denied")->make_json();
             } else if (($em = self::post_repo($viewer, $api->pset, $api->user, $qreq->repo))) {
                 return $em;
             }
@@ -49,7 +48,7 @@ class RepoConfig_API {
             }
         }
         if (preg_match('/[,;\[\](){}\\<>&#=\\000-\\027]/', $repo_url)) {
-            return (new MessageItem("repo", "<0>Invalid characters in repository name", 2))->make_json();
+            return MessageItem::error_at("repo", "<0>Invalid characters in repository name")->make_json();
         }
 
         // enumerate interested repository classes
@@ -64,7 +63,7 @@ class RepoConfig_API {
             }
         }
         if (empty($try_classes)) {
-            return (new MessageItem("repo", "<0>Invalid repository URL {$repo_url}", 2))->make_json();
+            return MessageItem::error_at("repo", "<0>Invalid repository URL {$repo_url}")->make_json();
         }
 
         // check repository classes
@@ -83,7 +82,7 @@ class RepoConfig_API {
 
         // if !working, complain
         if (!$ms->has_problem()) {
-            return (new MessageItem("repo", "<0>Repository inaccessible", 2))->make_json();
+            return MessageItem::error_at("repo", "<0>Repository inaccessible")->make_json();
         }
         return ["ok" => false, "message_list" => $ms->message_list()];
     }
@@ -92,16 +91,16 @@ class RepoConfig_API {
         $user = $api->user;
         if (!$viewer->has_account_here()
             || (!$viewer->isPC && $user !== $viewer)) {
-            return (new MessageItem(null, "<0>Permission denied", 2))->make_json();
+            return MessageItem::error("<0>Permission denied")->make_json();
         } else if ($api->pset->gitless || $api->pset->no_branch) {
-            return (new MessageItem(null, "<0>Problem set does not use git branches", 2))->make_json();
+            return MessageItem::error("<0>Problem set does not use git branches")->make_json();
         }
         if ($qreq->valid_post()) {
             if (!$qreq->branch) {
-                return (new MessageItem(null, "<0>Invalid request", 2))->make_json();
+                return MessageItem::error("<0>Invalid request")->make_json();
                 return ["ok" => false, "error" => "Invalid request"];
             } else if (!$viewer->can_set_repo($api->pset, $user)) {
-                return (new MessageItem(null, "<0>Permission denied", 2))->make_json();
+                return MessageItem::error("<0>Permission denied")->make_json();
             } else if (($em = self::post_branch($viewer, $api->pset, $api->user, $qreq->branch))) {
                 return $em;
             }
@@ -118,7 +117,7 @@ class RepoConfig_API {
             $branch = $pset->main_branch;
         }
         if (!Repository::validate_branch($branch)) {
-            return (new MessageItem("branch", "<0>Invalid characters in branch name", 2))->make_json();
+            return MessageItem::error_at("branch", "<0>Invalid characters in branch name")->make_json();
         }
         $branchid = $user->conf->ensure_branch($branch);
         if ($branchid === null

@@ -34,10 +34,10 @@ class Flag_API {
 
     static function flag(Contact $viewer, Qrequest $qreq, APIData $api) {
         $info = PsetView::make($api->pset, $api->user, $viewer);
-        if (($err = $api->prepare_commit($info))) {
-            return $err;
+        if (($mi = $api->prepare_commit($info))) {
+            return $mi;
         } else if (!$viewer->isPC && $viewer !== $api->user) {
-            return ["ok" => false, "error" => "Permission error"];
+            return MessageItem::error_at("u", "<0>Permission error");
         }
         if ($qreq->is_post()) {
             $flagid = $qreq->flagid;
@@ -54,17 +54,21 @@ class Flag_API {
         if ($info->repo && friendly_boolean($qreq->grade) && $api->pset->grading_commit_function) {
             $info->repo->set_want_file_list(true);
         }
-        if (($err = $api->prepare_commit($info))) {
-            return $err;
+        if (($mi = $api->prepare_commit($info))) {
+            return $mi;
         } else if (!$viewer->isPC && $viewer !== $api->user) {
-            return ["ok" => false, "error" => "Permission error"];
+            return MessageItem::error_at("u", "<0>Permission error");
         }
         $rpi = $info->rpi();
+        $ml = null;
         if ($qreq->valid_post()) {
-            $grade = $nograde = null;
-            if ((isset($qreq->grade) && ($grade = friendly_boolean($qreq->grade)) === null)
-                || (isset($qreq->nograde) && ($nograde = friendly_boolean($qreq->nograde)) === null)) {
-                return ["ok" => false, "error" => "Parameter error"];
+            $grade = friendly_boolean($qreq->grade);
+            if (isset($qreq->grade) && $grade === null) {
+                return MessageItem::error_at("grade", "<0>Parameter error");
+            }
+            $nograde = friendly_boolean($qreq->nograde);
+            if (isset($qreq->nograde) && $nograde === null) {
+                return MessageItem::error_at("nograde", "<0>Parameter error");
             }
             $admin = $viewer->isPC && $viewer !== $api->user;
             $mode = $admin ? RepositoryPsetInfo::UTYPE_ADMIN : RepositoryPsetInfo::UTYPE_USER;

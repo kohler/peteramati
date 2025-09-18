@@ -484,7 +484,7 @@ function gv_resolve_change(f, data) {
         }
     } else {
         removeClass(sm, "compact"),
-        sm.replaceChildren($e("strong", "err", data.error));
+        sm.replaceChildren(feedback.render_xhr_error_onto($e("strong", "err"), data));
     }
 }
 

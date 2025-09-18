@@ -6,7 +6,7 @@ import { hasClass, addClass, removeClass } from "./ui.js";
 import { escape_entities } from "./encoders.js";
 import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
-import { ftext, render_onto } from "./render.js";
+import { ftext, render_onto, feedback } from "./render.js";
 import { text_eq } from "./utils.js";
 import { Filediff, Linediff } from "./diff.js";
 
@@ -274,9 +274,11 @@ export class Note {
                         addClass(self.element, "pa-save-failed");
                     }
                     if (editing) {
-                        $(self.element).find(".pa-save-message").html('<strong class="err">' + escape_entities(data.error || "Failed") + '</strong>');
+                        $(self.element).find(".pa-save-message").html(
+                            feedback.render_xhr_error_onto($e("strong", "err"), data)
+                        );
                     }
-                    reject(new Error(data.error || "Save failed"));
+                    reject(new Error("Save failed"));
                 }
                 if (grb) {
                     resolve_grade_range(grb);

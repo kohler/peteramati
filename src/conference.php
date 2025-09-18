@@ -31,24 +31,20 @@ class APIData {
         $this->at = Conf::$now;
     }
     /** @param PsetView $info
-     * @return ?array */
+     * @return ?MessageItem */
     function prepare_commit($info) {
-        if ($this->repo) {
-            $this->commit = $this->conf->check_api_hash($this->hash, $this);
-            if ($this->commit) {
-                $info->set_commit($this->commit);
-                return null;
-            } else if ($this->hash) {
-                return ["ok" => false, "error" => "Disconnected commit."];
-            } else {
-                return ["ok" => false, "error" => "Missing commit."];
-            }
-        } else {
-            return ["ok" => false, "error" => "Missing repository."];
+        if (!$this->repo) {
+            return MessageItem::error("<0>Missing repository");
         }
+        $this->commit = $this->conf->check_api_hash($this->hash, $this);
+        if ($this->commit) {
+            $info->set_commit($this->commit);
+            return null;
+        }
+        return MessageItem::error($this->hash ? "<0>Disconnected commit" : "<0>Missing commit");
     }
     /** @param PsetView $info
-     * @return ?array */
+     * @return ?MessageItem */
     function prepare_grading_commit($info) {
         return $this->pset->gitless_grades ? null : $this->prepare_commit($info);
     }

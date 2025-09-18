@@ -265,6 +265,29 @@ function render_alert_onto(elt, ml) {
     return elt;
 }
 
+function render_xhr_error_onto(elt, data) {
+    elt.replaceChildren();
+    if (data.message_list) {
+        for (let mi of data.message_list) {
+            if (mi.status < 1 || !mi.message) {
+                continue;
+            }
+            const e = $e("span", "format-inline");
+            render_onto(e, "f", mi.message);
+            if (elt.firstChild) {
+                elt.appendChild($e("br"));
+            }
+            elt.appendChild(e);
+        }
+    } else if (data.error) {
+        elt.innerHTML = data.error;
+    }
+    if (!elt.firstChild) {
+        elt.append("Failure");
+    }
+    return elt;
+}
+
 function render_alert(ml) {
     return render_alert_onto(document.createElement("div"), ml);
 }
@@ -353,5 +376,6 @@ export let feedback = {
     render_list: render_list,
     maybe_render_list: maybe_render_list,
     render_alert: render_alert,
-    render_alert_onto: render_alert_onto
+    render_alert_onto: render_alert_onto,
+    render_xhr_error_onto: render_xhr_error_onto
 };

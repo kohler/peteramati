@@ -47,9 +47,9 @@ class APIRequest {
             $user = $this->conf->user_by_whatever($this->qreq->u);
             if (!$this->viewer->isPC
                 && (!$user || $user->contactId !== $this->viewer->contactId)) {
-                return ["ok" => false, "error" => "Permission denied"];
+                return MessageItem::error("u", "<0>Permission denied");
             } else if (!$user) {
-                return ["ok" => false, "error" => "User not found"];
+                return MessageItem::error_at("u", "<0>User not found");
             } else {
                 $user->set_anonymous(substr($this->qreq->u, 0, 5) === "[anon");
                 $api->user = $user;
@@ -59,16 +59,16 @@ class APIRequest {
         // check pset
         if ($this->qreq->pset
             && !($api->pset = $this->conf->pset_by_key($this->qreq->pset))) {
-            return ["ok" => false, "error" => "Pset not found"];
+            return MessageItem::error_at("pset", "<0>Pset not found");
         }
         if ($api->pset && $api->pset->disabled && !$this->viewer->privChair) {
             if ($this->viewer->isPC) {
-                return ["ok" => false, "error" => "Pset disabled"];
+                return MessageItem::error_at("pset", "<0>Pset disabled");
             } else {
-                return ["ok" => false, "error" => "Pset not found"];
+                return MessageItem::error_at("pset", "<0>Pset not found");
             }
         } else if ($api->pset && !$api->pset->visible && !$this->viewer->isPC) {
-            return ["ok" => false, "error" => "Pset not found"];
+            return MessageItem::error_at("pset", "<0>Pset not found");
         }
 
         // check commit
@@ -94,7 +94,7 @@ class APIRequest {
             && $api->pset
             && $api->pset->disabled
             && !($uf->anypset ?? false)) {
-            return ["ok" => false, "error" => "Pset disabled"];
+            return MessageItem::error_at("pset", "<0>Pset disabled");
         }
         if ($uf
             && ($uf->redirect ?? false)

@@ -7,6 +7,7 @@ import { event_key } from "./ui-key.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
 import { Bubble, global_tooltip } from "./tooltip.js";
+import { feedback } from "./render.js";
 
 
 handle_ui.on("js-repo-copy", function () {
@@ -62,13 +63,13 @@ handle_ui.on("js-pset-setgrader", function () {
         dataType: "json",
         success: function (data) {
             var a;
-            $form.find(".ajaxsave61").html(data.ok ? "Saved" : "<span class='error'>Error: " + data.error + "</span>");
+            $form.find(".ajaxsave61").html(data.ok ? "Saved" : feedback.render_xhr_error_onto($e("strong", "err"), data));
             if (data.ok && (a = $form.find("a.actas")).length) {
                 a.attr("href", a.attr("href").replace(/actas=[^&;]+/, "actas=" + encodeURIComponent(data.grader_email)));
             }
         },
         error: function () {
-            $form.find(".ajaxsave61").html("<span class='error'>Failed</span>");
+            $form.find(".ajaxsave61").html("<strong class=\"err\">Failed</strong>");
         }
     });
 });
@@ -101,7 +102,7 @@ handle_ui.on("pa-flagger", function () {
                     $(form).find(".flagreasoneditor").remove();
                     $(self).replaceWith($e("strong", null, "Flagged"));
                 } else {
-                    $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
+                    $(form).find(".ajaxsave61").html('<strong class="err">Failed</strong>');
                 }
             });
     }
@@ -126,14 +127,15 @@ function make_flagger(what) {
                 return;
             }
             const pv = self.closest(".pa-pv");
-            while (pv.lastChild && hasClass(pv.lastChild, "pa-inf-error")) {
+            while (pv.lastChild && hasClass(pv.lastChild, "feedback-list")) {
                 pv.lastChild.remove();
             }
             if (data && data.ok) {
                 apply_flagger(self, data);
-            } else if (data && data.error) {
-                const e = $e("div", "pa-inf-error");
-                e.innerHTML = data.error;
+            }
+            if (data && data.message_list) {
+                const e = feedback.render_list(data.message_list || []);
+                addClass(e, "pa-feedback-list");
                 pv.append(e);
             }
         });
@@ -151,7 +153,7 @@ handle_ui.on("pa-flagger-resolve", function () {
             if (data && data.ok) {
                 $(self).replaceWith("<strong>Resolved</strong>");
             } else {
-                $(form).find(".ajaxsave61").html('<span class="error">Failed</span>');
+                $(form).find(".ajaxsave61").html('<strong class="err">Failed</strong>');
             }
         });
 });

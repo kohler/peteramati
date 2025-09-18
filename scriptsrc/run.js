@@ -655,9 +655,7 @@ export function run(button, opts) {
             if (data && data.loggedout) {
                 x = "You have been logged out (perhaps due to inactivity). Please reload this page.";
             } else if (data) {
-                if (data.error_text) {
-                    x = data.error_text;
-                } else if (data.error && data.error !== true) {
+                if (data.error && data.error !== true) {
                     x = data.error;
                 } else if (data.message) {
                     x = data.message;
