@@ -218,7 +218,8 @@ class Repository {
         return $this->conf->_($name, ...$this->reposite->message_defs($user));
     }
 
-    /** @param ?string $cacheid */
+    /** @param ?string $cacheid
+     * @suppress PhanAccessReadOnlyProperty */
     function override_cacheid($cacheid) {
         $this->_original_cacheid = $this->_original_cacheid ?? $this->cacheid;
         $this->cacheid = $cacheid ?? $this->_original_cacheid;
@@ -1067,16 +1068,16 @@ class Repository {
     static function fix_diff_files($files) {
         if ($files === null || empty($files)) {
             return null;
-        } else if (is_array($files) && !array_is_list($files)) {
-            return $files;
         } else if (is_string($files)) {
             return [$files => true];
+        } else if (array_is_list($files)) {
+            $xfiles = [];
+            foreach ($files as $f) {
+                $xfiles[$f] = true;
+            }
+            return $xfiles;
         }
-        $xfiles = [];
-        foreach ($files as $f) {
-            $xfiles[$f] = true;
-        }
-        return $xfiles;
+        return $files;
     }
 
     /** @param array<string,DiffInfo> $diffargs

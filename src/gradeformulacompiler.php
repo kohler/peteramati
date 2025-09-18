@@ -407,7 +407,7 @@ class GradeFormulaCompiler {
         if (!$sex->op) {
             return $this->_compile_search_keyword($sex, $context);
         } else if (($sex->op->flags & SearchOperator::F_NOT) !== 0) {
-            if (!$sex->child[0]) {
+            if (!isset($sex->child[0])) {
                 return new Constant_GradeFormula(true);
             }
             $gf = $this->_compile_search($sex->child[0], $context);
