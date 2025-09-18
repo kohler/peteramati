@@ -426,10 +426,9 @@ class PsetView {
         } else if ($refresh) {
             $this->repo->refresh(10, true);
             return $this->set_hash($hashpart, false, $sset);
-        } else {
-            $this->force_set_hash(null, $sset);
-            return false;
         }
+        $this->force_set_hash(null, $sset);
+        return false;
     }
 
 
@@ -445,15 +444,15 @@ class PsetView {
     }
 
     private function _eval_before(SearchExpr $e) {
-        if ($e->info === null) {
+        if ($e->user_data === null) {
             try {
-                $d = new DateTimeImmutable($e->text);
-                $e->info = $d->getTimestamp();
+                $d = new DateTimeImmutable(SearchParser::unquote($e->text));
+                $e->user_data = $d->getTimestamp();
             } catch (Exception $x) {
-                $e->info = false;
+                $e->user_data = false;
             }
         }
-        return $e->info !== false && ($this->commitat() ?? PHP_INT_MAX) < $e->info;
+        return $e->user_data !== false && ($this->commitat() ?? PHP_INT_MAX) < $e->user_data;
     }
 
     function _eval_expr(SearchExpr $e) {
@@ -1050,9 +1049,8 @@ class PsetView {
         } else if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
             $ld = $this->late_hours_data();
             return $ld ? $ld->autohours : null;
-        } else {
-            return null;
         }
+        return null;
     }
 
 
