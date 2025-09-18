@@ -181,8 +181,7 @@ class Report_Page {
         }
 
         $csv->set_filename("{$this->pset->nonnumeric_key}-{$this->filename}.csv");
-        $csv->download_headers();
-        $csv->download();
+        $csv->emit();
         exit;
     }
 }
