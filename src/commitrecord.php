@@ -172,10 +172,10 @@ class CommitRecord implements JsonSerializable {
             return null;
         } else if (strlen($s) > 1 && ($s[0] === "@" || $s[0] === "~")) {
             return substr($s, 1);
-        } else if (!$explicit) {
-            return $s;
+        } else if ($explicit) {
+            return null;
         }
-        return null;
+        return $s;
     }
 }
 

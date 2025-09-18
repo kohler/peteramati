@@ -100,7 +100,8 @@ class Diff_Page {
             $qreq->u1 = $qreq->u;
         }
         if (!$this->viewer->isPC
-            && (!$this->viewer->matches_key($qreq->u) || !$this->viewer->matches_key($qreq->u1))) {
+            && (!$this->viewer->matches_key($qreq->u, true)
+                || !$this->viewer->matches_key($qreq->u1, true))) {
             $this->error_exit(404, "User not found");
         }
         if ($qreq->u === "me") {
