@@ -81,10 +81,15 @@ class Flag_API {
                     if ($wantlock) {
                         $placeholder = RepositoryPsetInfo::PL_LOCKED;
                     }
-                } else if ($api->pset->grading_commit_function) {
-                    $error = call_user_func($api->pset->grading_commit_function, $info);
-                    if ($error) {
-                        return ["ok" => false, "error" => $error];
+                }
+                if ($api->pset->grading_commit_function) {
+                    $override = $placeholder === RepositoryPsetInfo::PL_LOCKED;
+                    $mlx = call_user_func($api->pset->grading_commit_function, $info, $override);
+                    if ($mlx) {
+                        $ml = MessageSet::make_list($mlx);
+                        if (MessageSet::list_status($ml) > 1 && !$override) {
+                            return ["ok" => false, "message_list" => $ml];
+                        }
                     }
                 }
                 $info->change_grading_commit($placeholder, $mode);
@@ -101,13 +106,19 @@ class Flag_API {
                 }
             }
         }
-        if ($rpi->placeholder === RepositoryPsetInfo::PL_DONOTGRADE) {
-            return ["ok" => true, "gradecommit" => ""];
-        } else if ($rpi->placeholder === RepositoryPsetInfo::PL_NONE) {
-            return ["ok" => true, "gradecommit" => null];
-        } else {
-            return ["ok" => true, "gradecommit" => $rpi->gradehash, "gradelock" => $rpi->placeholder === RepositoryPsetInfo::PL_LOCKED];
+        $rv = ["ok" => true];
+        if (!empty($ml)) {
+            $rv["message_list"] = $ml;
         }
+        if ($rpi->placeholder === RepositoryPsetInfo::PL_DONOTGRADE) {
+            $rv["gradecommit"] = "";
+        } else if ($rpi->placeholder === RepositoryPsetInfo::PL_NONE) {
+            $rv["gradecommit"] = null;
+        } else {
+            $rv["gradecommit"] = $rpi->gradehash;
+            $rv["gradelock"] = $rpi->placeholder === RepositoryPsetInfo::PL_LOCKED;
+        }
+        return $rv;
     }
 
     static function multiresolve(Contact $viewer, Qrequest $qreq, APIData $api) {

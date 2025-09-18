@@ -1355,6 +1355,14 @@ label.f-c, .f-i > label {
 	margin-top: -0.3rem;
 }
 
+.feedback-list.pa-feedback-list {
+	font-size: inherit;
+	margin-bottom: 0.2rem;
+}
+.feedback-list.pa-feedback-list > li {
+	margin-bottom: 0;
+}
+
 .is-diagnostic.is-error::before, .feedback.is-error::before,
 .is-diagnostic.is-warning::before, .feedback.is-warning::before,
 .is-diagnostic.is-success::before, .feedback.is-success::before,
@@ -1379,6 +1387,9 @@ label.f-c, .f-i > label {
 .is-diagnostic.is-error::before, .feedback.is-error::before,
 .error-mark {
 	content: url("data:image/svg+xml,%3Csvg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle style='fill:none;stroke:%23e00;stroke-width:2.5px' cx='16' cy='16' r='14.5' /%3E%3Cpath d='M21.1 8.3L23.6 10.9L18.5 15.9L23.6 21L21.1 23.6L16 18.5L10.9 23.6L8.4 21L13.5 15.9L8.4 10.9L10.9 8.3L16 13.4Z' style='fill:%23e00' /%3E%3C/svg%3E");
+}
+.pa-feedback-list .is-diagnostic.is-error::before {
+	content: "\26a0 ";
 }
 .is-diagnostic.is-warning::before, .feedback.is-warning::before,
 .warning-mark {
@@ -1423,6 +1434,9 @@ label.has-error,
 h3.has-error,
 .is-error {
 	color: #ee0000;
+}
+.pa-feedback-list .is-error {
+	font-weight: bold;
 }
 .has-error input[type=text],
 .has-error input[type=email],
@@ -2703,9 +2717,9 @@ td.mhcb {
 }
 .pa-inf-error, .pa-gradeabovemax {
 	font-weight: bold;
-	color: red;
+	color: #ee0000;
 }
-.pa-inf-error:before, .pa-gradeabovemax:before {
+.pa-inf-error::before, .pa-gradeabovemax::before {
 	content: "\26a0 ";
 }
 .pa-inf {
@@ -2734,7 +2748,7 @@ td.mhcb {
 	font-variant-numeric: tabular-nums;
 }
 .pa-timermark-alert.urgent {
-	color: red;
+	color: #ee0000;
 	font-weight: bold;
 	background: yellow;
 }
@@ -2885,7 +2899,7 @@ td.gt-grade:hover {
 	font-weight: bold;
 }
 .gt-highlight {
-	color: red;
+	color: #ee0000;
 }
 .gt-anonymous .gt-name, .gt-anonymous .gt-year {
 	display: none;
@@ -3287,7 +3301,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-gradediffers {
 	padding-left: 1em;
 	font-size: smaller;
-	color: red;
+	color: #ee0000;
 }
 .pa-gradeboxref {
 	padding-left: 1em;

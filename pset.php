@@ -783,7 +783,7 @@ class PsetRequest {
         }
         echo Ht::button("Flag this commit", ["class" => "ui pa-flagger" . ($all_resolved ? "" : " hidden"), "name" => "flag"]),
             '</div>',
-            '</form></div></div>';
+            '</form></div>';
     }
 
     private function echo_runner_buttons() {
