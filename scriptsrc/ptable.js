@@ -13,6 +13,7 @@ import { $popup } from "./popup.js";
 import { tooltip } from "./tooltip.js";
 import { ptable_gdialog } from "./ptable-grades.js";
 import { SearchParser } from "./search.js";
+import { feedback } from "./render.js";
 
 
 function render_name(s, last_first) {
@@ -54,9 +55,8 @@ function render_year(yr) {
         }
     } else if (yr.length === 1 && yr >= "A" && yr <= "Z") {
         return String.fromCharCode(9333 + yr.charCodeAt(0));
-    } else {
-        return yr;
     }
+    return yr;
 }
 
 function user_compare(a, b) {
@@ -1788,7 +1788,7 @@ function ptable_recolor(tb) {
 let search_ptconf, search_target;
 
 const search_keywords = {
-    grade: (text) => {
+    grade: (text, ml) => {
         if (text === "no") {
             return (se, su) => su.grade_status < 0 || (!su.grade_status && su.emptydiff);
         } else if (text === "yes") {
@@ -1797,11 +1797,11 @@ const search_keywords = {
             return (se, su) => su.grade_status === 1;
         } else if (text === "none") {
             return (se, su) => !su.grade_status;
-        } else {
-            return () => false;
         }
+        ml.push({status: 2, message: `<0>Expected \`grade:no\`, \`grade:yes\`, \`grade:user\`, or \`grade:none\``});
+        return () => false;
     },
-    grader: (text) => {
+    grader: (text, ml) => {
         if (text === "any") {
             return (se, su) => !!su.gradercid;
         } else if (text === "none") {
@@ -1816,12 +1816,15 @@ const search_keywords = {
         }
         if (mcids.length === 1) {
             return (se, su) => su.gradercid === mcids[0];
-        } else {
+        } else if (mcids.length > 1) {
             return (se, su) => mcids.includes(su.gradercid);
         }
+        ml.push({status: 2, message: `<0>\`${text}\` matches no graders`});
+        return () => false;
     },
-    year: (text) => {
+    year: (text, ml) => {
         if (!/^(?:(?:\d+[-–—]\d+|[a-zA-Z\d]+)(?=,\w|$),?)+$/.test(text)) {
+            ml.push({status: 2, message: `<0>Bad \`year\``});
             return () => false;
         }
         text = text.toUpperCase();
@@ -1849,16 +1852,16 @@ const search_keywords = {
             return false;
         };
     },
-    is: (text) => {
+    is: (text, ml) => {
         if (text === "x" || text === "X") {
             return (se, su) => !!su.x;
         } else if (text === "college") {
             return (se, su) => !su.x;
         } else if (text === "dropped") {
             return (se, su) => !!su.dropped;
-        } else {
-            return () => false;
         }
+        ml.push({status: 2, message: `<0>Expected \`is:x\`, \`is:college\`, or \`is:dropped\``});
+        return () => false;
     }
 };
 
@@ -1925,7 +1928,7 @@ function make_compare(op) {
     }
 }
 
-function make_search_keyword_compare(gi, ge, text) {
+function make_search_keyword_compare(gi, ge, text, ml) {
     const gidx = ge.value_order_in(gi);
     if (text === "any") {
         return grade_search_keywords.any(gidx);
@@ -1933,13 +1936,14 @@ function make_search_keyword_compare(gi, ge, text) {
         return grade_search_keywords.none(gidx);
     }
     const compar = parse_search_compar(text);
-    if (compar) {
-        return grade_search_keywords[compar.op](gidx, compar.value);
+    if (!compar) {
+        ml.push({status: 2, message: `<0>Search comparison \`${text}\` not understood`});
+        return null;
     }
-    return null;
+    return grade_search_keywords[compar.op](gidx, compar.value);
 }
 
-function find_search_keyword(se, ptconf) {
+function find_search_keyword(se, ptconf, ml) {
     let kw = se.kword, text = se.text;
     if (!kw) {
         if (text === "" || text === "*" || text === "ANY" || text === "ALL") {
@@ -1955,7 +1959,7 @@ function find_search_keyword(se, ptconf) {
 
     const skw = search_keywords[kw];
     if (skw) {
-        return skw(text);
+        return skw(text, ml);
     }
 
     const gi = ptconf.gradesheet,
@@ -1975,7 +1979,7 @@ function find_search_keyword(se, ptconf) {
         matchge = titlege[0];
     }
     if (matchge) {
-        return make_search_keyword_compare(gi, matchge, text);
+        return make_search_keyword_compare(gi, matchge, text, ml);
     }
     if ((kw === "tot" || kw === "total")
         && ptconf.need_total) {
@@ -1985,14 +1989,16 @@ function find_search_keyword(se, ptconf) {
             return (se, su) => f(su.total, compar.value);
         }
     }
+    ml.push({status: 2, message: `<0>Search \`${kw}\` not understood`});
     return null;
 }
 
+function prepare_search(se, ml) {
+    se.user_data = find_search_keyword(se, search_ptconf, ml);
+}
+
 function evaluate_search(se) {
-    if (se.info === undefined) {
-        se.info = find_search_keyword(se, search_ptconf);
-    }
-    return se.info ? se.info(se, search_target) : false;
+    return se.user_data ? se.user_data(se, search_target) : false;
 }
 
 function ptable_search(search) {
@@ -2005,6 +2011,14 @@ function ptable_search(search) {
     let pexpr = new SearchParser(search.value).parse_expression();
     if (pexpr && !pexpr.op && !pexpr.kword && !pexpr.text) {
         pexpr = null;
+    }
+    tooltip.close_under(search);
+    if (pexpr) {
+        const ml = [];
+        pexpr.prepare_simple(prepare_search, ml);
+        if (ml.length > 0) {
+            tooltip.enter(search, {content: feedback.render_list(ml), className: "gray"});
+        }
     }
     search_ptconf = ptconf;
     const changed = [];

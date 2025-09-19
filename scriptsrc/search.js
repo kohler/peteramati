@@ -293,6 +293,16 @@ export class SearchExpr {
         return ts.join("");
     }
 
+    prepare_simple(f, ...args) {
+        if (!this.op) {
+            f(this, ...args);
+        } else {
+            for (const ch of this.child) {
+                ch.prepare_simple(f, ...args);
+            }
+        }
+    }
+
     evaluate_simple(f) {
         let ok;
         if (!this.op) {

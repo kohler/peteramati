@@ -453,6 +453,8 @@ function show_tooltip(info) {
     const self = this;
     if (info && typeof info === "string") {
         info = {builder: info};
+    } else if (info instanceof HTMLElement) {
+        info = {content: info};
     } else {
         info = Object.assign({}, info || {});
     }
