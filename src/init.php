@@ -36,8 +36,7 @@ const NAME_MAILQUOTE = 128; // quote name by RFC822
 const NAME_A = 256; // affiliation
 const NAME_PARSABLE = 512; // `last, first` if `first last` would be ambiguous
 
-global $OK, $Conf, $Opt;
-$OK = 1;
+global $Conf, $Opt;
 
 
 require_once("siteloader.php");

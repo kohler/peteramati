@@ -811,18 +811,16 @@ class PsetView {
     function grade_jnotes() {
         if ($this->pset->gitless_grades) {
             return $this->user_jnotes();
-        } else {
-            return $this->commit_jnotes();
         }
+        return $this->commit_jnotes();
     }
 
     /** @return ?object */
     function grade_jxnotes() {
         if ($this->pset->gitless_grades) {
             return $this->user_jxnotes();
-        } else {
-            return $this->commit_jxnotes();
         }
+        return $this->commit_jxnotes();
     }
 
     /** @param non-empty-string $key
