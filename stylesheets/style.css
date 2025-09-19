@@ -1511,6 +1511,23 @@ li:last-child > .msg-context:last-child {
 	bottom: -2.5ex;
 }
 
+input.pa-checkbox-mark {
+	appearance: none;
+}
+input.pa-checkbox-mark::before {
+	content: attr(data-pa-mark);
+	filter: contrast(20%) brightness(1.6);
+}
+input.pa-checkbox-mark:checked::before {
+	filter: none;
+}
+span:hover > input.pa-checkbox-mark::before {
+	filter: contrast(20%) brightness(1.6);
+}
+span:hover > input.pa-checkbox-mark.pa-hover::before {
+	filter: none;
+}
+
 div.helpside {
 	float: right;
 	width: 20%;

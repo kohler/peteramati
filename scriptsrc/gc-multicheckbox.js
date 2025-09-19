@@ -4,10 +4,28 @@
 
 import { GradeClass } from "./gc.js";
 import { Checkbox_GradeClass } from "./gc-checkbox.js";
-import { handle_ui } from "./ui.js";
+import { handle_ui, toggleClass } from "./ui.js";
 
+
+function mouseover(evt) {
+    let max, colon;
+    if (evt.target === this && evt.type === "mouseout") {
+        max = -1;
+    } else if (evt.target.type === "checkbox" && (colon = evt.target.name.indexOf(":")) >= 0) {
+        max = +evt.target.name.substring(colon + 1);
+    } else {
+        return;
+    }
+    for (let ch = this.firstChild; ch; ch = ch.nextSibling) {
+        if (ch.type === "checkbox" && (colon = ch.name.indexOf(":")) >= 0) {
+            const idx = +ch.name.substring(colon + 1);
+            toggleClass(ch, "pa-hover", idx <= max);
+        }
+    }
+}
 
 function make_multicheckbox(mark) {
+    let extraclass = mark === "✓" ? "" : " pa-checkbox-mark";
     return {
         text: function (v) {
             if (v == null || v === 0) {
@@ -18,6 +36,17 @@ function make_multicheckbox(mark) {
             return "" + v;
         },
         simple_text: GradeClass.basic_text,
+        tcell: function (v) {
+            if (v == null || v === 0 || v === false) {
+                return "";
+            } else if (v > 0 && Math.abs(v - Math.round(v)) < 0.05) {
+                return mark.repeat(Math.round(v));
+            }
+            return "" + v;
+        },
+        tcell_width: function () {
+            return this.max * 1.5;
+        },
         mount_edit: function (elt, id) {
             const chhidden = document.createElement("input");
             chhidden.type = "hidden";
@@ -26,13 +55,16 @@ function make_multicheckbox(mark) {
             const chsp = document.createElement("span");
             chsp.className = "pa-gradewidth";
             chsp.append(chhidden);
+            chsp.addEventListener("mouseover", mouseover);
+            chsp.addEventListener("mouseout", mouseover);
             for (let i = 0; i < this.max; ++i) {
                 const ch = document.createElement("input");
                 ch.type = "checkbox";
-                ch.className = "ui js-multicheckbox-grade ml-0";
+                ch.className = "ui js-multicheckbox-grade ml-0" + extraclass;
                 ch.name = this.key + ":" + i;
                 ch.value = 1;
                 ch.disabled = this.disabled;
+                extraclass && ch.setAttribute("data-pa-mark", mark);
                 if (i === this.max - 1) {
                     ch.id = id;
                 }

@@ -77,7 +77,7 @@ export class Checkbox_GradeClass {
     }
     static finish_mount_edit(ge, chsp) {
         const fr = new DocumentFragment;
-        fr.append(chsp, " ", $e("span", "pa-gradesc", "of " + ge.max + " ", $e("button", {
+        fr.append(chsp, " ", $e("span", "pa-gradedesc", "of " + ge.max + " ", $e("button", {
                 type: "button", "class": "link x ui pa-grade-uncheckbox", "tabindex": -1
             }, "#")));
         return fr;
