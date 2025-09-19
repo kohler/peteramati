@@ -1,9 +1,8 @@
 <?php
-// subprocess.php -- Peteramati helper class for subprocess running
-// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
-// See LICENSE for open-source distribution terms
+// subprocess.php -- Helper class for subprocess running
+// Copyright (c) 2006-2024 Eddie Kohler; see LICENSE.
 
-class Subprocess implements JsonSerializable {
+class Subprocess {
     /** @var list<string> */
     public $command;
     /** @var string */
@@ -23,6 +22,35 @@ class Subprocess implements JsonSerializable {
     private $lineno = 1;
     /** @var int */
     private $linepos = 0;
+
+
+    /** @param string $word
+     * @return string */
+    static function shell_quote_light($word) {
+        if (preg_match('/\A[-_.,:+\/a-zA-Z0-9][-_.,:=+\/a-zA-Z0-9~]*\z/', $word)) {
+            return $word;
+        }
+        return escapeshellarg($word);
+    }
+
+    /** @param list<string> $args
+     * @return string */
+    static function shell_quote_args($args) {
+        $s = [];
+        foreach ($args as $word) {
+            $s[] = self::shell_quote_light($word);
+        }
+        return join(" ", $s);
+    }
+
+    /** @param list<string> $args
+     * @return list<string>|string */
+    static function args_to_command($args) {
+        if (PHP_VERSION_ID < 70400) {
+            return self::shell_quote_args($args);
+        }
+        return $args;
+    }
 
 
     /** @param int $firstline
@@ -76,11 +104,11 @@ class Subprocess implements JsonSerializable {
         if ($stdinpos !== $stdinlen) {
             $descriptors[0] = ["pipe", "r"];
         }
-        $cmd = self::unparse_command($command);
+        $cmd = self::args_to_command($command);
         $env = $args["env"] ?? null;
         $proc = proc_open($cmd, $descriptors, $pipes, $cwd, $env);
         if (!$proc) {
-            error_log(self::unparse_command($command));
+            error_log(self::shell_quote_args($command));
         }
         if ($stdinpos !== $stdinlen) {
             stream_set_blocking($pipes[0], false);
@@ -137,17 +165,6 @@ class Subprocess implements JsonSerializable {
      * @param string $cwd */
     static function runok($command, $cwd) {
         return self::run($command, $cwd)->ok;
-    }
-
-
-    /** @param list<string> $command
-     * @return string */
-    static function unparse_command($command) {
-        $s = [];
-        foreach ($command as $w) {
-            $s[] = preg_match('/\A[-_.,:=+~\/a-zA-Z0-9]+\z/', $w) ? $w : escapeshellarg($w);
-        }
-        return join(" ", $s);
     }
 
     #[\ReturnTypeWillChange]

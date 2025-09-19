@@ -446,7 +446,7 @@ class PsetView {
     private function _eval_before(SearchExpr $e) {
         if ($e->user_data === null) {
             try {
-                $d = new DateTimeImmutable(SearchParser::unquote($e->text));
+                $d = new DateTimeImmutable(SearchWord::unquote($e->text));
                 $e->user_data = $d->getTimestamp();
             } catch (Exception $x) {
                 $e->user_data = false;

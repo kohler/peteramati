@@ -473,7 +473,7 @@ class GradeFormulaCompiler {
     /** @param string $text
      * @return GradeFormula */
     private function _compile_search_name($text) {
-        $text = SearchParser::unquote($text);
+        $text = SearchWord::unquote($text);
         if ($text === "" || $text === "*" || $text === "ANY" || $text === "ALL") {
             return new Constant_GradeFormula(true);
         }

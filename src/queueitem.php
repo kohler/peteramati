@@ -1161,10 +1161,10 @@ class QueueItem {
         $main_command = $opts["main"] ?? false;
         $env = $cmdarg[0] === "git" ? Repository::git_env_vars() : null;
         $cmdarg = $this->conf->fix_command($cmdarg);
-        fwrite($this->_logstream, "++ " . Subprocess::unparse_command($cmdarg) . ($main_command ? "\n\n" : "\n"));
+        fwrite($this->_logstream, "++ " . Subprocess::shell_quote_args($cmdarg) . ($main_command ? "\n\n" : "\n"));
         fflush($this->_logstream);
 
-        $cmd = PHP_VERSION_ID >= 70400 ? $cmdarg : Subprocess::unparse_command($cmdarg);
+        $cmd = Subprocess::args_to_command($cmdarg);
         $redirects = [];
         if (isset($opts["stdin"])) {
             $redirects[0] = $opts["stdin"];

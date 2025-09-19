@@ -103,7 +103,7 @@ class RepoFetch_Batch {
                 ++$i;
             }
         }
-        return Subprocess::unparse_command($command);
+        return Subprocess::shell_quote_args($command);
     }
 
     /** @param list<string> $command
