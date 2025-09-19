@@ -347,9 +347,12 @@ class ContactView {
             $repo->check_ownership($user, $partner, $ms);
         }
         $prefixes = ["", "WARNING: ", "ERROR: "];
-        $notes = array_map(function ($m) use ($prefixes) {
-            return [$m->status > 0, $prefixes[max($m->status, 0)] . $m->message_as(5)];
-        }, $ms->message_list());
+        $notes = [];
+        foreach ($ms->message_list() as $mi) {
+            if (($s = $mi->message_as(5)) !== "") {
+                $notes[] = [$mi->status > 0, $prefixes[max($mi->status, 0)] . $s];
+            }
+        }
         if ($repo
             && $pset->handout_warn_merge !== false
             && $repo->truncated_psetdir($pset)) {
