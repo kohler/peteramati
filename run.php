@@ -60,9 +60,9 @@ class RunRequest {
 
     static function go(Contact $user, Qrequest $qreq) {
         $rreq = new RunRequest($user, $qreq);
-        if ($qreq->runmany) {
+        if (friendly_boolean($qreq->runmany)) {
             $rreq->runmany();
-        } else if ($qreq->download) {
+        } else if (friendly_boolean($qreq->download)) {
             $rreq->download();
         } else {
             json_exit($rreq->run());
