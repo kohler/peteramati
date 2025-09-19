@@ -67,6 +67,7 @@ function make_multicheckbox(mark) {
 
 GradeClass.add("checkboxes", make_multicheckbox("✓"));
 GradeClass.add("stars", make_multicheckbox("⭐"));
+GradeClass.add("poops", make_multicheckbox("💩"));
 
 handle_ui.on("js-multicheckbox-grade", function () {
     const colon = this.name.indexOf(":"),

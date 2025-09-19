@@ -229,7 +229,7 @@ class GradeEntry {
         $this->max = Pset::cnum($loc, $g, "max");
         if ($this->type === "checkbox") {
             $this->max = $this->max ?? 1;
-        } else if ($this->type === "checkboxes" || $this->type === "stars") {
+        } else if ($this->type === "checkboxes" || $this->type === "stars" || $this->type === "poops") {
             $this->max = $this->max ?? 1;
             if ($this->max != (int) $this->max
                 || $this->max < 1
@@ -336,7 +336,7 @@ class GradeEntry {
         } else if ($type === "letter") {
             $this->type_tabular = $this->type_numeric = true;
             $this->vtype = self::VTLETTER;
-        } else if (in_array($type, ["checkboxes", "stars"], true)) {
+        } else if (in_array($type, ["checkboxes", "stars", "poops"], true)) {
             $this->type_tabular = $this->type_numeric = true;
         } else if ($type === "timermark") {
             $this->type_tabular = $this->type_numeric = true;
@@ -672,7 +672,7 @@ class GradeEntry {
         }
         if ((int) $v1 === 0
             && (int) $v2 === 0
-            && in_array($this->type, ["checkbox", "checkboxes", "stars", "timermark"])) {
+            && in_array($this->type, ["checkbox", "checkboxes", "stars", "poops", "timermark"])) {
             return false;
         }
         $v1 = $v1 ?? false;
@@ -736,7 +736,8 @@ class GradeEntry {
             && $this->type_numeric
             && $this->type !== "checkbox"
             && $this->type !== "checkboxes"
-            && $this->type !== "stars";
+            && $this->type !== "stars"
+            && $this->type !== "poops";
     }
 
     /** @return bool */
