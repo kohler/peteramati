@@ -154,7 +154,7 @@ class DiffMany_Page {
                 if (count($diff) > 2) {
                     $sbflags |= PsetView::SIDEBAR_FILENAV;
                 }
-                PsetView::print_sidebar_open($sbflags, $diff);
+                $info->print_sidebar_open($sbflags, $diff);
                 foreach ($diff as $file => $dinfo) {
                     $info->echo_file_diff($file, $dinfo, $lnorder, [
                         "expand" => true,
@@ -163,7 +163,7 @@ class DiffMany_Page {
                         "diffcontext" => $linkdetails
                     ]);
                 }
-                PsetView::print_sidebar_close($sbflags);
+                $info->print_sidebar_close($sbflags);
             }
 
             $this->all_viewed += $info->viewed_gradeentries; // XXX off if want all grades

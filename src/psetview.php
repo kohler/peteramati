@@ -2821,7 +2821,7 @@ class PsetView {
     const SIDEBAR_FILENAV = 4;
     /** @param int $flags
      * @param array<string,DiffInfo> $diff */
-    static function print_sidebar_open($flags, $diff) {
+    function print_sidebar_open($flags, $diff) {
         if ($flags === 0) {
             return;
         }
@@ -2830,7 +2830,11 @@ class PsetView {
             echo '<div class="pa-gradebox pa-filenavbox"><nav>',
                 '<ul class="pa-filenav-list">';
             foreach ($diff as $file => $di) {
-                echo '<li><a class="ui pa-filenav ulh" href="#F', html_id_encode($file), '">',
+                echo '<li><a class="ui pa-filenav ulh" href="#';
+                if ($this->conf->multiuser_page) {
+                    echo "U", html_id_encode($this->user_linkpart()), "/";
+                }
+                echo 'F', html_id_encode($file), '">',
                     htmlspecialchars($file), '</a></li>';
             }
             echo '</ul></nav></div>';
@@ -2846,7 +2850,7 @@ class PsetView {
     }
 
     /** @param int $flags */
-    static function print_sidebar_close($flags) {
+    function print_sidebar_close($flags) {
         if ($flags !== 0) {
             echo '</div></div>';
         }

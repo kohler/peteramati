@@ -981,11 +981,11 @@ class PsetRequest {
                 if (count($diff) > 2) {
                     $sbflags |= PsetView::SIDEBAR_FILENAV;
                 }
-                PsetView::print_sidebar_open($sbflags, $diff);
+                $this->info->print_sidebar_open($sbflags, $diff);
                 foreach ($diff as $file => $dinfo) {
                     $this->info->echo_file_diff($file, $dinfo, $lnorder, ["hide_left" => $this->info->can_edit_scores()]);
                 }
-                PsetView::print_sidebar_close($sbflags);
+                $this->info->print_sidebar_close($sbflags);
                 echo '</div>';
             }
 
