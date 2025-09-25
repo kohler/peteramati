@@ -72,17 +72,11 @@ class Report_Page {
             } else if (is_array($f)) {
                 $x[$f[0]] = $f[1]->evaluate($info->user, $info);
             } else if ($f === "first") {
-                if (!$info->user->is_anonymous) {
-                    $x[$f] = $info->user->firstName;
-                }
+                $x[$f] = $info->user->firstName;
             } else if ($f === "last") {
-                if (!$info->user->is_anonymous) {
-                    $x[$f] = $info->user->lastName;
-                }
+                $x[$f] = $info->user->lastName;
             } else if ($f === "email") {
-                if (!$info->user->is_anonymous) {
-                    $x[$f] = $info->user->email;
-                }
+                $x[$f] = $info->user->email;
             } else if ($f === "huid") {
                 $x[$f] = $info->user->huid;
             } else if ($f === "user") {
