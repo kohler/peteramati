@@ -261,31 +261,43 @@ function my_note_feedback(ln) {
         return 1;
     } else if (ln.dislike && ln.dislike.indexOf(uid) >= 0) {
         return -1;
-    } else {
-        return 0;
     }
+    return 0;
 }
 
 function display_note_suggestions(form, ns) {
-    let $f = $(form).find(".pa-note-suggestions");
-    if (!$f.length) {
-        const sugui = document.createElement("div"),
+    let suggctr = form.querySelector(".pa-note-suggestions"),
+        searchre;
+    if (!suggctr) {
+        const aa = form.querySelector(".pa-note-aa"),
             search = document.createElement("input");
-        sugui.className = "pa-note-suggestions mt-4";
         search.type = "search";
-        search.className = "uikd uii pa-search-suggestions mb-3";
+        search.className = "uikd uii pa-search-suggestions mt-4 mb-3";
         search.placeholder = "Search…";
-        sugui.append(search);
-        $(sugui).insertBefore($(form).find(".pa-note-aa"));
-        $f = $(sugui);
+        suggctr = document.createElement("div");
+        suggctr.className = "pa-note-suggestions";
+        aa.before(search, suggctr);
+    } else {
+        const search = form.querySelector(".pa-search-suggestions");
+        searchre = search_suggestions_re(search ? search.value : "");
+    }
+    const known = new Set;
+    for (let ch = suggctr.firstChild; ch; ch = ch.nextSibling) {
+        known.add(ch.getAttribute("data-content"));
     }
     for (const n of ns) {
+        if (known.has(n.ftext)) {
+            continue;
+        }
         const mf = my_note_feedback(n),
             li = document.createElement("div"),
             gf = (n.like || []).length - (n.dislike || []).length;
         li.className = "pa-note-suggestion".concat(mf < 0 || (mf === 0 && gf < 0) ? " dim" : "");
         li.setAttribute("data-content", n.ftext);
-        $f[0].appendChild(li);
+        if (searchre && !searchre.test(n.ftext)) {
+            li.hidden = true;
+        }
+        suggctr.appendChild(li);
         const bbox = document.createElement("div"),
             b1 = document.createElement("button"),
             b2 = document.createElement("button"),
@@ -307,75 +319,79 @@ function display_note_suggestions(form, ns) {
     }
 }
 
-function my_note_compare(/*linea*/) {
-    return function (a, b) {
-        if (a.status !== b.status) {
-            return a.status > b.status ? -1 : 1;
-        } else if (a.ftext.substring(0, 3) === b.ftext.substring(0, 3)) {
-            return a.ftext.localeCompare(b.ftext);
-        } else {
-            const af = ftext.parse(a.ftext), bf = ftext.parse(b.ftext);
-            return af.localeString(bf);
-        }
-    };
+function my_note_compare(a, b) {
+    if (a.status !== b.status) {
+        return a.status > b.status ? -1 : 1;
+    } else if (a.ftext.substring(0, 3) === b.ftext.substring(0, 3)) {
+        return a.ftext.localeCompare(b.ftext);
+    }
+    const af = ftext.parse(a.ftext), bf = ftext.parse(b.ftext);
+    return af.localeString(bf);
 }
 
-function note_suggestions(form, notelist) {
-    let oldindex = $(form).data("paNoteSuggestionIndex") || 0;
-    display_note_suggestions(form, notelist.slice(oldindex, notelist.length));
-    $(form).data("paNoteSuggestionIndex", notelist.length)
-        .find(".pa-load-note-suggestions")
-        .prop("disabled", true);
+function note_suggestions(form, suggdata) {
+    display_note_suggestions(form, suggdata.notelist);
+    $(form).find(".pa-load-note-suggestions").prop("disabled", !suggdata.more);
 }
 
 handle_ui.on("pa-load-note-suggestions", function () {
     const form = this.closest("form");
-    let notelist = $(form).data("paNoteSuggestions");
-    if (notelist) {
-        note_suggestions(form, notelist);
-    } else {
-        const ld = Linediff.closest(this),
-            args = {file: ld.file, pset: ld.pset},
-            gi = GradeSheet.closest(this);
-        if (!gi || !gi.base_commit || gi.base_handout) {
-            args.linea = ld.linea;
-        } else if (gi.user && gi.commit) {
-            let x = ld.lineb;
-            if (x !== null) {
-                args.u = gi.user;
-                args.line = "b" + x;
-                args.commit = gi.commit;
-            }
+    let suggdata = $(form).data("paNoteSuggestions");
+    if (suggdata && !suggdata.more) {
+        note_suggestions(form, data);
+        return;
+    }
+    const ld = Linediff.closest(this),
+        args = {file: ld.file, pset: ld.pset},
+        gi = GradeSheet.closest(this);
+    if (!gi || !gi.base_commit || gi.base_handout) {
+        args.linea = ld.linea;
+    } else if (gi.user && gi.commit) {
+        let x = ld.lineb;
+        if (x !== null) {
+            args.u = gi.user;
+            args.line = "b" + x;
+            args.commit = gi.commit;
         }
-        this.disabled = true;
-        $.ajax(hoturl("api/linenotesuggest", args), {
-            success: function (data) {
-                if (data.ok) {
-                    notelist = data.notelist || [];
-                    for (const note of notelist) {
-                        const mf = my_note_feedback(note),
-                            gf = (note.like || []).length - (note.dislike || []).length;
-                        if (mf > 0 && gf > 1) {
-                            note.status = 3;
-                        } else if (mf > 0) {
-                            note.status = 2;
-                        } else if (mf === 0 && gf > 0) {
-                            note.status = 1;
-                        } else if (mf === 0 && gf === 0) {
-                            note.status = 0;
-                        } else if (mf === -1 && gf >= 0) {
-                            note.status = -1;
-                        } else {
-                            note.status = -2;
-                        }
-                    }
-                    notelist.sort(my_note_compare(data.linea || 0));
-                    $(form).data("paNoteSuggestions", notelist);
-                    note_suggestions(form, notelist);
+    }
+    if (!suggdata) {
+        args.neighborhood = 5;
+        args.my_neighborhood = 20;
+    } else if (suggdata.neighborhood >= 0 && suggdata.neighborhood <= 5) {
+        args.neighborhood = 20;
+        args.my_neighborhood = -1;
+    } else {
+        args.neighborhood = -1;
+    }
+    this.disabled = true;
+    $.ajax(hoturl("api/linenotesuggest", args), {
+        success: function (data) {
+            if (!data.ok) {
+                return;
+            }
+            data.notelist = data.notelist || [];
+            for (const note of data.notelist) {
+                const mf = my_note_feedback(note),
+                    gf = (note.like || []).length - (note.dislike || []).length;
+                if (mf > 0 && gf > 1) {
+                    note.status = 3;
+                } else if (mf > 0) {
+                    note.status = 2;
+                } else if (mf === 0 && gf > 0) {
+                    note.status = 1;
+                } else if (mf === 0 && gf === 0) {
+                    note.status = 0;
+                } else if (mf === -1 && gf >= 0) {
+                    note.status = -1;
+                } else {
+                    note.status = -2;
                 }
             }
-        });
-    }
+            data.notelist.sort(my_note_compare);
+            $(form).data("paNoteSuggestions", data);
+            note_suggestions(form, data);
+        }
+    });
 });
 
 function linenotemark(context, mark) {
@@ -396,19 +412,20 @@ handle_ui.on("pa-use-suggestion", function () {
     }
 });
 
+function search_suggestions_re(value) {
+    let patterns = "";
+    for (const str of value.split(/\s+/)) {
+        str !== "" && (patterns = patterns.concat("(?=.*", regexp_quote(str), ")"));
+    }
+    return patterns ? new RegExp(patterns, "i") : null;
+}
+
 handle_ui.on("pa-search-suggestions", function (event) {
     if (event.type === "input") {
-        const el = this.closest(".pa-note-suggestions");
-        let patterns = "";
-        for (const str of this.value.split(/\s+/)) {
-            str !== "" && (patterns = patterns.concat("(?=.*", regexp_quote(str), ")"));
-        }
-        const regex = patterns ? new RegExp(patterns, "i") : null;
+        const el = this.nextSibling, regex = search_suggestions_re(this.value);
         for (let ne = el.firstChild; ne; ne = ne.nextSibling) {
-            if (ne.classList.contains("pa-note-suggestion")) {
-                const hidden = regex && !regex.test(ne.getAttribute("data-content"));
-                ne.hidden = !!hidden;
-            }
+            const hidden = regex && !regex.test(ne.getAttribute("data-content"));
+            ne.hidden = !!hidden;
         }
     } else if (event.type === "keydown"
                && !(event_key.modcode(event) & (event_key.SHIFT | event_key.ALT))

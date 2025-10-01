@@ -1,6 +1,6 @@
 <?php
 // linenote.php -- CS61-monster class representing a line note
-// Peteramati is Copyright (c) 2006-2021 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2025 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class LineNote implements JsonIsReplacement, JsonSerializable {
@@ -80,9 +80,8 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
     function linea() {
         if (str_starts_with($this->lineid, "a")) {
             return intval(substr($this->lineid, 1));
-        } else {
-            return (int) $this->linea;
         }
+        return (int) $this->linea;
     }
 
 
@@ -104,16 +103,14 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
     function jsonSerialize() {
         if ((string) $this->ftext === "") {
             return $this->version;
-        } else {
-            $u = count($this->users) === 1 ? $this->users[0] : $this->users;
-            if ($this->linea) {
-                return [$this->iscomment, $this->ftext, $u, $this->version, $this->linea];
-            } else if ($this->version) {
-                return [$this->iscomment, $this->ftext, $u, $this->version];
-            } else {
-                return [$this->iscomment, $this->ftext, $u];
-            }
         }
+        $u = count($this->users) === 1 ? $this->users[0] : $this->users;
+        if ($this->linea) {
+            return [$this->iscomment, $this->ftext, $u, $this->version, $this->linea];
+        } else if ($this->version) {
+            return [$this->iscomment, $this->ftext, $u, $this->version];
+        }
+        return [$this->iscomment, $this->ftext, $u];
     }
 
     /** @return null|int|non-empty-list */
@@ -126,10 +123,9 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
             }
         } else if ((string) $this->ftext === "") {
             return $this->version;
-        } else {
-            $u = count($this->users) === 1 ? $this->users[0] : $this->users;
-            return [$this->iscomment, $this->ftext, $u, $this->version];
         }
+        $u = count($this->users) === 1 ? $this->users[0] : $this->users;
+        return [$this->iscomment, $this->ftext, $u, $this->version];
     }
 
     /** @return array */
