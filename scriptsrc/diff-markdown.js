@@ -8,6 +8,7 @@ import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
 
 let md, mdcontext;
+const nonwsre = /[^ \t\r\n]/;
 
 
 function hljs_line(lang, s, hlstate) {
@@ -356,29 +357,45 @@ Filediff.define_method("highlight", function () {
     // collect content
     const langclass = "language-" + lang;
     let e = elt.firstChild, hlstatei = null, hlstated = null;
-    while (e) {
+    for (; e; e = e.nextSibling) {
         const type = hasClass(e, "pa-gi") ? 2 : (hasClass(e, "pa-gc") ? 3 : (hasClass(e, "pa-gd") ? 1 : 0));
-        if (type !== 0) {
-            const ce = e.lastChild,
-                ishl = hasClass(ce, langclass),
-                s = ishl ? ce.getAttribute("data-pa-text") : ce.textContent,
-                result = hljs_line(lang, s, type & 2 ? hlstatei : hlstated);
-            if (!result) {
+        if (type === 0) {
+            continue;
+        }
+        const ce = e.lastChild,
+            ishl = hasClass(ce, langclass),
+            s = ishl ? ce.getAttribute("data-pa-text") : ce.textContent,
+            result = hljs_line(lang, s, type & 2 ? hlstatei : hlstated);
+        if (!result) {
+            break;
+        }
+        if (type & 1) {
+            hlstated = result.top;
+        }
+        if (type & 2) {
+            hlstatei = result.top;
+        }
+        if (ishl) {
+            continue;
+        }
+        ce.setAttribute("data-pa-text", s);
+        ce.innerHTML = result.value;
+        addClass(ce, langclass);
+        let state = 0;
+        for (let xe = ce.firstChild; xe; xe = xe.nextSibling) {
+            if ((xe.nodeType === 1 && !hasClass(xe, "hljs-comment"))
+                || (xe.nodeType === 3 && nonwsre.test(xe.textContent))) {
+                state = -1;
                 break;
-            }
-            if (type & 1) {
-                hlstated = result.top;
-            }
-            if (type & 2) {
-                hlstatei = result.top;
-            }
-            if (!ishl) {
-                ce.setAttribute("data-pa-text", s);
-                ce.innerHTML = result.value;
-                addClass(ce, langclass);
+            } else if (xe.nodeType === 1) {
+                state = 1;
             }
         }
-        e = e.nextSibling;
+        if (state === 0) {
+            addClass(e, "pa-gblank");
+        } else if (state === 1) {
+            addClass(e, "pa-gcomment");
+        }
     }
     addClass(elt, "pa-highlight");
     removeClass(elt, "need-highlight");

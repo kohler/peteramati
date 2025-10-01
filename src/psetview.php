@@ -2482,6 +2482,19 @@ class PsetView {
         $no_grades = ($args["only_diff"] ?? false) || $only_content;
         $hide_left = ($args["hide_left"] ?? false) && !$only_content && !$dinfo->removed;
 
+        if (!$no_heading) {
+            $icons = ["download"];
+            if (!$dinfo->removed && $dinfo->markdown_allowed) {
+                $icons[] = "markdown";
+            }
+            if (!$dinfo->removed && !$dinfo->markdown_allowed && $dinfo->language) {
+                $icons[] = "hide-comments";
+            }
+            if (Icons::stash_defs(...$icons)) {
+                echo Ht::unstash();
+            }
+        }
+
         $tabid = "F" . html_id_encode($file);
         if ($this->conf->multiuser_page) {
             $tabid = "U" . html_id_encode($this->user_linkpart()) . "/{$tabid}";
@@ -2563,14 +2576,17 @@ class PsetView {
             $bts = [];
             $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
                 . ($hide_left ? "" : " btn-primary")
-                . ' need-tooltip" aria-label="Toggle diff view">±</button>';
+                . ' need-tooltip" aria-label="Diff view">±</button>';
             if (!$dinfo->removed && $dinfo->markdown_allowed) {
                 $bts[] = '<button type="button" class="btn ui pa-diff-toggle-markdown need-tooltip'
                     . ($hide_left && $dinfo->markdown ? " btn-primary" : "")
-                    . '" aria-label="Toggle Markdown"><span class="icon-markdown"></span></button>';
+                    . '" aria-label="Markdown">' . Icons::markdown() . '</button>';
+            } else if (!$dinfo->removed && $dinfo->language) {
+                $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-comments'
+                    . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
             }
-            if (!$dinfo->fileless && !$dinfo->removed) {
-                $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $this->rawfile($file)]) . '" class="btn need-tooltip" aria-label="Download"><span class="icon-download"></span></a>';
+            if (!$dinfo->removed && !$dinfo->fileless) {
+                $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $this->rawfile($file)]) . '" class="btn need-tooltip" aria-label="Download">' . Icons::download() . '</a>';
             }
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';

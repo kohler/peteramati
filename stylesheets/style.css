@@ -3284,6 +3284,11 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-hide-left .pa-gi {
 	background-color: #f0fff0;
 }
+.pa-hide-comments .pa-gi.pa-gblank,
+.pa-hide-comments .pa-gi.pa-gcomment,
+.pa-hide-comments .pa-gi .hljs-comment {
+	display: none;
+}
 .live .pa-gi:hover, .pa-dl.live {
 	background-color: #f8eec7;
 }

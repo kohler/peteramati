@@ -118,6 +118,13 @@ export class Filediff {
         toggleClass(this.element, "pa-hide-left", !show);
         $(this.element.previousSibling).find(".pa-diff-toggle-hide-left").toggleClass("btn-primary", show);
     }
+    toggle_show_comments(show) {
+        if (show == null) {
+            show = hasClass(this.element, "pa-hide-comments");
+        }
+        toggleClass(this.element, "pa-hide-comments", !show);
+        $(this.element.previousSibling).find(".pa-diff-toggle-hide-comments").toggleClass("btn-primary", !show);
+    }
     get file() {
         const id = this.element.id;
         if (id.charAt(0) === "U") {
@@ -462,6 +469,12 @@ handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-hide-left") : $(this),
         show = hasClass(Filediff.referenced(this).element, "pa-hide-left");
     $es.each(function () { Filediff.referenced(this).toggle_show_left(show); });
+});
+
+handle_ui.on("pa-diff-toggle-hide-comments", function (evt) {
+    const $es = evt.metaKey ? $(".pa-diff-toggle-hide-comments") : $(this),
+        show = hasClass(Filediff.referenced(this).element, "pa-hide-comments");
+    $es.each(function () { Filediff.referenced(this).toggle_show_comments(show); });
 });
 
 handle_ui.on("pa-filenav", function () {
