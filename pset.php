@@ -69,6 +69,11 @@ class PsetRequest {
                 $this->info->set_answer_version(true);
             }
         }
+
+        // change anonymity
+        if (($anonymous = friendly_boolean($qreq->anonymous)) !== null) {
+            $this->conf->redirect_self($qreq, ["u" => $anonymous ? $this->user->anon_username : $this->user->github_username, "anonymous" => null]);
+        }
     }
 
     static function go(Contact $viewer, Qrequest $qreq) {
