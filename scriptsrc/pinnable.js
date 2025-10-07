@@ -19,6 +19,10 @@ export function resolve_pinnable() {
         return;
     }
     const d = $e("div", "pa-pinnable");
+    for (const attr of this.attributes) {
+        if (attr.name === "title" || attr.name.startsWith("data-pa-"))
+            d.setAttribute(attr.name, attr.value);
+    }
     e.parentElement.replaceChild(d, e);
     d.append(e, $e("button", {type: "button", class: "ui pa-pinnable-pin"}, "📌"));
 };
@@ -50,18 +54,22 @@ function dragend(evt) {
     document.body.removeEventListener("drop", drop);
 }
 
+function unpin(e) {
+    // unpin: reveal normal element, remove this element
+    removeClass(e, "pinned");
+    const orig = pinmap.get(e);
+    if (orig) {
+        orig.style.opacity = "";
+    }
+    e.closest(".pa-pinnable-fixed").remove();
+    pinmap.delete(e);
+}
+
 handle_ui.on("pa-pinnable-pin", function (evt) {
     const e = this.parentElement;
     if (hasClass(e, "pinned")) {
-        // unpin: reveal normal element, remove this element
-        removeClass(e, "pinned");
-        const orig = pinmap.get(e);
-        if (orig) {
-            orig.style.visibility = "";
-        }
-        e.closest(".pa-pinnable-fixed").remove();
-        pinmap.delete(e);
-        return
+        unpin(e);
+        return;
     }
 
     // pin: copy this element
@@ -70,7 +78,7 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
     for (const img of ecopy.querySelectorAll("img")) {
         img.draggable = false;
     }
-    let par = e.parentElement, pine = ecopy;
+    let par = e.parentElement, pag = par, pine = ecopy;
     while (!hasClass(par, "pa-gsection")) {
         for (let k of par.classList) {
             if (k === "pa-pdesc" || k === "pa-dr" || k.startsWith("format")) {
@@ -78,6 +86,8 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
                     pine = $e("div", null, ecopy);
                 }
                 addClass(pine, k);
+            } else if (k === "pa-grade") {
+                pag = par;
             }
         }
         par = par.parentElement;
@@ -93,20 +103,31 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
     pine.draggable = true;
     pine.addEventListener("dragstart", dragstart);
     pine.addEventListener("dragend", dragend);
+    pine.addEventListener("dblclick", evt => unpin(ecopy));
     addClass(pine, "pa-pinnable-fixed");
     par.appendChild(pine);
-    e.style.visibility = "hidden";
+    e.style.opacity = 0.2;
     pinmap.set(ecopy, e);
 
     // append title
+    let t = "";
     if (par.hasAttribute("data-pa-grade")) {
         const gs = GradeSheet.closest(e),
-            ge = gs ? gs.xentry(par.getAttribute("data-pa-grade")) : null;
-        if (ge && ge.title) {
-            const s = ge.title.replace(/\s*\([\d.]+ points?\)\s*$/, ""),
-                te = $e("div", "pa-pinnable-title");
-            render_onto(te, "f", s);
-            ecopy.append(te);
+            sge = gs ? gs.xentry(par.getAttribute("data-pa-grade")) : null,
+            gge = gs && pag !== par ? gs.xentry(pag.getAttribute("data-pa-grade")) : null;
+        if (sge && sge.title) {
+            t = sge.title.replace(/\s*\([\d.]+ points?\)\s*$/, "");
         }
+        if (gge && gge.title && !e.getAttribute("title")) {
+            t += (t ? " → " : "") + gge.title.replace(/\s*\([\d.]+ points?\)\s*$/, "");
+        }
+    }
+    if (e.getAttribute("title")) {
+        t += (t ? " → " : "") + e.getAttribute("title");
+    }
+    if (t !== "") {
+        const te = $e("div", "pa-pinnable-title");
+        render_onto(te, "f", t);
+        ecopy.append(te);
     }
 });

@@ -56,7 +56,6 @@ function attribute_block(state, startLine, endLine, silent) {
         } else {
             dest.attrSet(mm[3], mm[4] /* XXX quoting */);
         }
-
     }
     state.line = startLine + 1;
     return true;
