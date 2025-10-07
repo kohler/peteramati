@@ -7,7 +7,7 @@ import { GradeSheet } from "./gradeentry.js";
 import { render_onto } from "./render.js";
 
 const pinmap = new WeakMap;
-let dragging, drag_dx, drag_dy;
+let dragging, drag_rect, drag_x1, drag_y1, resizing;
 
 export function resolve_pinnable() {
     removeClass(this, "pinnable");
@@ -29,13 +29,13 @@ export function resolve_pinnable() {
 
 function dragstart(evt) {
     dragging = this;
-    const br = dragging.getBoundingClientRect();
-    drag_dx = evt.clientX - br.x;
-    drag_dy = evt.clientY - br.y;
+    drag_rect = dragging.getBoundingClientRect();
+    drag_x1 = evt.clientX;
+    drag_y1 = evt.clientY;
     evt.dataTransfer.dropEffect = "move";
     evt.dataTransfer.effectAllowed = "move";
-    evt.dataTransfer.setData("application/x-pa-dragging-pinnable", "N/A")
-    evt.dataTransfer.setDragImage(this, drag_dx, drag_dy);
+    evt.dataTransfer.setData("application/x-pa-dragging-pinnable", "N/A");
+    evt.dataTransfer.setDragImage(this, drag_x1 - drag_rect.x, drag_y1 - drag_rect.y);
     document.body.addEventListener("dragover", dragover);
     document.body.addEventListener("drop", drop);
 }
@@ -45,13 +45,50 @@ function dragover(evt) {
 }
 
 function drop(evt) {
-    dragging.style.left = (evt.clientX - drag_dx) + "px";
-    dragging.style.top = (evt.clientY - drag_dy) + "px";
+    dragging.style.left = (evt.clientX - drag_x1 + drag_rect.x) + "px";
+    dragging.style.top = (evt.clientY - drag_y1 + drag_rect.y) + "px";
 }
 
 function dragend(evt) {
     document.body.removeEventListener("dragover", dragover);
     document.body.removeEventListener("drop", drop);
+}
+
+function resizestart(evt) {
+    dragging = this.parentElement;
+    resizing = this.getAttribute("data-pa-resize");
+    drag_rect = dragging.getBoundingClientRect();
+    drag_x1 = evt.clientX;
+    drag_y1 = evt.clientY;
+    evt.dataTransfer.dropEffect = "move";
+    evt.dataTransfer.effectAllowed = "move";
+    evt.dataTransfer.setData("application/x-pa-dragging-pinnable", "N/A");
+    evt.dataTransfer.setDragImage(this, drag_x1 - drag_rect.x, drag_y1 - drag_rect.y);
+    document.body.addEventListener("dragover", resizeover);
+    evt.stopImmediatePropagation();
+}
+
+function resizeover(evt) {
+    evt.preventDefault();
+    if (resizing === "l") {
+        const left = Math.min(drag_rect.x + evt.clientX - drag_x1, drag_rect.right - 20);
+        dragging.style.left = left + "px";
+        dragging.style.width = (drag_rect.right - left) + "px";
+    } else if (resizing === "r") {
+        const right = Math.max(drag_rect.right + evt.clientX - drag_x1, drag_rect.x + 20);
+        dragging.style.width = (right - drag_rect.x) + "px";
+    } else if (resizing === "t") {
+        const top = Math.min(drag_rect.y + evt.clientY - drag_y1, drag_rect.bottom - 40);
+        dragging.style.top = top + "px";
+        dragging.style.height = (drag_rect.bottom - top) + "px";
+    } else if (resizing === "b") {
+        const bottom = Math.max(drag_rect.bottom + evt.clientY - drag_y1, drag_rect.y + 40);
+        dragging.style.height = (bottom - drag_rect.y) + "px";
+    }
+}
+
+function resizeend(evt) {
+    document.body.removeEventListener("dragover", resizeover);
 }
 
 function unpin(e) {
@@ -78,13 +115,10 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
     for (const img of ecopy.querySelectorAll("img")) {
         img.draggable = false;
     }
-    let par = e.parentElement, pag = par, pine = ecopy;
+    let par = e.parentElement, pag = par, pine = $e("div", "pa-pinned", ecopy);
     while (!hasClass(par, "pa-gsection")) {
         for (let k of par.classList) {
             if (k === "pa-pdesc" || k === "pa-dr" || k.startsWith("format")) {
-                if (pine === ecopy) {
-                    pine = $e("div", null, ecopy);
-                }
                 addClass(pine, k);
             } else if (k === "pa-grade") {
                 pag = par;
@@ -128,6 +162,17 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
     if (t !== "") {
         const te = $e("div", "pa-pinnable-title");
         render_onto(te, "f", t);
-        ecopy.append(te);
+        pine.append(te);
+        const tebr = te.getBoundingClientRect();
+        pine.style.height = (br.height + tebr.height) + "px";
+    }
+
+    for (const k of ["l", "r", "t", "b"]) {
+        const drage = $e("div", "pa-pinnable-resize-" + k);
+        drage.setAttribute("data-pa-resize", k);
+        drage.draggable = true;
+        pine.append(drage);
+        drage.addEventListener("dragstart", resizestart);
+        drage.addEventListener("dragend", resizeend);
     }
 });

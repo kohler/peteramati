@@ -3577,14 +3577,19 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	position: relative;
 	margin-bottom: 1rem;
 }
+.pa-pinnable.pinned {
+	border: 0;
+}
 .pa-pinnable > * {
 	margin-bottom: 0;
 }
-.pa-pinnable.pinned {
+.pa-pinned {
 	background-color: #f8f8f8;
 	cursor: move;
+	border: 1px solid lightgray;
+	border-radius: 4px;
 }
-.pa-pinnable.pinned:hover {
+.pa-pinned:hover {
 	border-color: mediumslateblue;
 }
 .pa-pinnable-fixed {
@@ -3603,17 +3608,46 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	background: #aab0ff;
 }
 .pa-pinnable-title {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	right: 0;
 	font-size: 65%;
 	background-color: #aab0ff;
 	color: black;
 	font-weight: 500;
-	margin: 2px -8px -4px -8px;
 	padding: 2px 8px;
 	border-bottom-left-radius: 3px;
 	border-bottom-right-radius: 3px;
 }
 .pa-pinnable-title > p {
 	margin: 0;
+}
+.pa-pinnable-resize-l, .pa-pinnable-resize-r {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 8px;
+	cursor: ew-resize;
+}
+.pa-pinnable-resize-l {
+	left: -1px;
+}
+.pa-pinnable-resize-r {
+	right: -1px;
+}
+.pa-pinnable-resize-t, .pa-pinnable-resize-b {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: 8px;
+	cursor: ns-resize;
+}
+.pa-pinnable-resize-t {
+	top: -1px;
+}
+.pa-pinnable-resize-b {
+	bottom: -1px;
 }
 
 .pa-gradewidth {

@@ -2013,15 +2013,14 @@ function ptable_search(search) {
         pexpr = null;
     }
     tooltip.close_under(search);
+    search_ptconf = ptconf;
     if (pexpr) {
         const ml = [];
-        search_ptconf = ptconf;
         pexpr.prepare_simple(prepare_search, ml);
         if (ml.length > 0) {
             tooltip.enter(search, {content: feedback.render_list(ml), className: "gray"});
         }
     }
-    search_ptconf = ptconf;
     const changed = [];
     ptconf.has_hidden = false;
     for (const ss of ptconf.smap) {
