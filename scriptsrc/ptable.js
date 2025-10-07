@@ -2015,6 +2015,7 @@ function ptable_search(search) {
     tooltip.close_under(search);
     if (pexpr) {
         const ml = [];
+        search_ptconf = ptconf;
         pexpr.prepare_simple(prepare_search, ml);
         if (ml.length > 0) {
             tooltip.enter(search, {content: feedback.render_list(ml), className: "gray"});
