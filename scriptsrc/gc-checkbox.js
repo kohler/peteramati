@@ -5,6 +5,7 @@
 import { GradeClass } from "./gc.js";
 import { GradeEntry } from "./gradeentry.js";
 import { hasClass, addClass, removeClass, $e, handle_ui } from "./ui.js";
+import { friendly_boolean } from "./utils.js";
 
 
 GradeClass.add("checkbox", {
@@ -46,7 +47,13 @@ GradeClass.add("checkbox", {
             ve.value = "" + v;
         }
     },
-    justify: "center"
+    justify: "center",
+    parse_search: function (text, gidx) {
+        const fb = friendly_boolean(text);
+        if (fb !== null) {
+            return (ss) => (ss.grades[gidx] > 0) === fb;
+        }
+    }
 });
 
 export class Checkbox_GradeClass {

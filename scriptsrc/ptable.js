@@ -1905,9 +1905,8 @@ function parse_search_compar(text) {
         return {op: "le", value: gv};
     } else if (m[1] === ">") {
         return {op: "gt", value: gv};
-    } else {
-        return {op: "ge", value: gv};
     }
+    return {op: "ge", value: gv};
 }
 
 function make_compare(op) {
@@ -1923,9 +1922,8 @@ function make_compare(op) {
         return (a, b) => a > b;
     } else if (op === "ge") {
         return (a, b) => a >= b;
-    } else {
-        return () => false;
     }
+    return () => false;
 }
 
 function make_search_keyword_compare(gi, ge, text, ml) {
@@ -1934,6 +1932,11 @@ function make_search_keyword_compare(gi, ge, text, ml) {
         return grade_search_keywords.any(gidx);
     } else if (text === "none") {
         return grade_search_keywords.none(gidx);
+    }
+    const sfunc = ge.gc.parse_search
+        && ge.gc.parse_search.call(ge, text, gidx, ml);
+    if (sfunc) {
+        return () => sfunc(search_target);
     }
     const compar = parse_search_compar(text);
     if (!compar) {

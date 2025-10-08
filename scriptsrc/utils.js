@@ -333,3 +333,19 @@ export function string_utf8_index(str, index) {
     }
     return r;
 }
+
+
+export function friendly_boolean(str) {
+    if (str === false || str === true) {
+        return str;
+    } else if (str === 0 || str === 1) {
+        return str === 1;
+    } else if (typeof str !== "string") {
+        return null;
+    }
+    const m = /^(?:(y|yes|1|true|t|on)|(n|no|0|false|f|off))$/.exec(str);
+    if (m) {
+        return m[1] ? true : false;
+    }
+    return null;
+}

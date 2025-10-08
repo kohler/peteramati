@@ -270,6 +270,10 @@ this format.
     increasing `order`, and second by the order they appear in
     `psets.json`. Negative `order` entries appear first.
 
+* `collate`: boolean
+
+    If true, then gradesheets allow selecting this grade for many students.
+
 * `landmark`: string, like "FILENAME:LINE" or "FILENAME:LINE1:LINE:LINE2"
 
     If set, then in diff display, a text box for grade entry will be placed
