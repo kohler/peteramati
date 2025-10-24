@@ -77,9 +77,8 @@ export class GradeEntry {
                    && (ch = t.charCodeAt(1)) >= 48
                    && ch <= 57) {
             return title_span(t);
-        } else {
-            return t;
         }
+        return t;
     }
 
     get title_html() {
@@ -90,9 +89,8 @@ export class GradeEntry {
                    && (ch = t.charCodeAt(1)) >= 48
                    && ch <= 57) {
             return title_span(t).innerHTML;
-        } else {
-            return escape_entities(t);
         }
+        return escape_entities(t);
     }
 
     get title_text() {
@@ -103,9 +101,8 @@ export class GradeEntry {
                    && (ch = t.charCodeAt(1)) >= 48
                    && ch <= 57) {
             return title_span(t).textContext;
-        } else {
-            return t;
         }
+        return t;
     }
 
     abbr() {
@@ -734,6 +731,89 @@ export class GradeSheet {
         for (const [k, v] of Object.entries(linenotes || {})) {
             this.linenotes[k] = this.linenotes[k] || {};
             Object.assign(this.linenotes[k], v);
+        }
+    }
+
+    show_text_as_diff(ve, v, fileid) {
+        addClass(ve, "bg-none");
+        addClass(ve, "align-self-start");
+        let div = ve.firstChild;
+        if (!div) {
+            div = document.createElement("div");
+            div.className = "pa-filediff";
+            div.id = this.file_anchor(fileid);
+            ve.appendChild(div);
+        }
+        if (div.tagName !== "DIV" || div.nextSibling || !hasClass(div, "pa-filediff")) {
+            throw new Error("bad ve.firstChild in GradeSheet.show_text_as_diff");
+        }
+        div.className = "pa-filediff pa-dg pa-hide-left pa-hide-landmarks uim" + (this.scores_editable ? " pa-editablenotes live" : "") + (this.scores_visible ? "" : " pa-scores-hidden");
+
+        // apply new lines
+        // All lines in Markdown answers are `.pa-gi` insertions. There are no
+        // `.pa-gc` context lines or `.pa-gd` deletions. This loop removes
+        // possible Markdown translations (`.pa-dlr`), but preserves linenotes
+        // (`.pa-gw`).
+        let pos1 = 0, lineno = 1, dl = div.firstChild;
+        while (pos1 !== v.length) {
+            let pos2 = v.indexOf("\n", pos1);
+            pos2 = pos2 < 0 ? v.length : pos2 + 1;
+            const str = v.substring(pos1, pos2);
+            // find next textual line
+            while (dl && (!hasClass(dl, "pa-gi") || hasClass(dl, "pa-dlr"))) {
+                const ndl = dl.nextSibling;
+                if (!hasClass(dl, "pa-gw")) {
+                    dl.remove();
+                }
+                dl = ndl;
+            }
+            // insert line or replace its contents
+            if (!dl) {
+                dl = document.createElement("div");
+                dl.className = "pa-dl pa-gi";
+                const da = document.createElement("div"),
+                    db = document.createElement("div"),
+                    dd = document.createElement("div");
+                da.className = "pa-da";
+                da.hidden = true;
+                db.className = "pa-db";
+                db.hidden = true;
+                db.setAttribute("data-landmark", lineno);
+                dd.className = "pa-dd pa-dhlm";
+                dl.append(da, db, dd);
+                div.append(dl);
+            } else if (dl.firstChild.nextSibling.getAttribute("data-landmark") != lineno) {
+                throw new Error(`bad data-landmark in gc-markdown, ${dl.firstChild.nextSibling.getAttribute("data-landmark")} vs. ${lineno}`);
+            }
+            dl.lastChild.textContent = str;
+            dl = dl.nextSibling;
+            ++lineno;
+            pos1 = pos2;
+        }
+
+        // remove old lines
+        while (dl) {
+            const ndl = dl.nextSibling;
+            if (!hasClass(dl, "pa-gw")) {
+                dl.remove();
+            }
+            dl = ndl;
+        }
+
+        // apply markdown
+        const fd = new Filediff(div);
+        if (hasClass(ve.parentElement, "pa-markdown")) {
+            fd.markdown();
+        }
+        let lns;
+        if (this.linenotes
+            && (lns = this.linenotes[fileid])) {
+            for (let lineid in lns) {
+                const ln = lns[lineid];
+                fd.line(lineid).then(line => {
+                    Note.near(line).assign(ln).render(false);
+                });
+            }
         }
     }
 

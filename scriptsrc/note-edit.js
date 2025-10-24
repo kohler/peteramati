@@ -338,7 +338,7 @@ handle_ui.on("pa-load-note-suggestions", function () {
     const form = this.closest("form");
     let suggdata = $(form).data("paNoteSuggestions");
     if (suggdata && !suggdata.more) {
-        note_suggestions(form, data);
+        note_suggestions(form, suggdata);
         return;
     }
     const ld = Linediff.closest(this),

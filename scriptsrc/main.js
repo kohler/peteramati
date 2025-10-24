@@ -32,6 +32,7 @@ import "./gc-multicheckbox.js";
 import "./gc-select.js";
 import "./gc-markdown.js";
 import "./gc-timermark.js";
+import "./gc-text.js";
 import "./ptable-grades.js";
 import "./ptable-diff.js";
 import "./ptable-run.js";

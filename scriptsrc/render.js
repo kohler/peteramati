@@ -123,7 +123,7 @@ function render_link_open_3(tokens, idx, options, env, self) {
 
 add_format({
     format: 3,
-    render: function (text, context) {
+    render: function (text) {
         if (!md2) {
             md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true, attributes: true}).use(markdownit_katex).use(markdownit_attributes);
             md2.renderer.rules.link_open = render_link_open_3;

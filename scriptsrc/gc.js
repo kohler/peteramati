@@ -173,45 +173,6 @@ GradeClass.add("duration", {
     sort: "forward"
 });
 
-GradeClass.add("text", {
-    mount_show: function (elt, id) {
-        elt.id = id;
-        addClass(elt, "pa-textv");
-        addClass(elt, "pa-gradevalue");
-    },
-    mount_edit: function (elt, id) {
-        addClass(elt, "pa-textv");
-        const ta = document.createElement("textarea");
-        ta.className = "uich uii pa-gradevalue need-autogrow pa-fresh";
-        ta.name = this.key;
-        ta.id = id;
-        ta.disabled = this.disabled;
-        return ta;
-    },
-    justify: "left",
-    sort: "forward",
-    type_tabular: false
-});
-
-GradeClass.add("shorttext", {
-    mount_show: function (elt, id) {
-        elt.id = id;
-        addClass(elt, "pa-gradevalue");
-    },
-    mount_edit: function (elt, id) {
-        const ta = document.createElement("textarea");
-        ta.className = "uich uii pa-gradevalue need-autogrow pa-fresh";
-        ta.setAttribute("rows", 1);
-        ta.name = this.key;
-        ta.id = id;
-        ta.disabled = this.disabled;
-        return ta;
-    },
-    justify: "left",
-    sort: "forward",
-    type_tabular: false
-});
-
 GradeClass.add("section", {
     text: () => "",
     mount_show: function (elt, id) {
@@ -231,9 +192,9 @@ GradeClass.add("section", {
 });
 
 GradeClass.add("none", {
-    mount_show: function (elt, id) {
+    mount_show: function (/*elt, id*/) {
     },
-    mount_edit: function (elt) {
+    mount_edit: function (/*elt*/) {
     },
     update_show: function () {
         return false;

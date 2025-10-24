@@ -27,9 +27,8 @@ function hljs_line(lang, s, hlstate) {
 function render_map(map) {
     if (map[0] + 1 === map[1]) {
         return String(map[1]);
-    } else {
-        return (map[0] + 1) + "-" + map[1];
     }
+    return (map[0] + 1) + "-" + map[1];
 }
 
 function add_landmark(tokens, idx, options, env, self) {

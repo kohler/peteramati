@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { $e, hasClass, addClass, removeClass, fold61, handle_ui } from "./ui.js";
+import { hasClass, handle_ui } from "./ui.js";
 import { GradeSheet } from "./gradeentry.js";
 
 function pa_cluster_diff() {
@@ -72,6 +72,7 @@ function pa_cluster_diff() {
 }
 
 function cluster_by_none(sxs) {
+    const coll = new Intl.Collator("en-US", {numeric: true});
     sxs.sort((a, b) => {
         const aid = a.element.id, bid = b.element.id;
         return aid && bid ? coll.compare(aid, bid) : a.index - b.index;

@@ -49,7 +49,7 @@ function drop(evt) {
     dragging.style.top = (evt.clientY - drag_y1 + drag_rect.y) + "px";
 }
 
-function dragend(evt) {
+function dragend() {
     document.body.removeEventListener("dragover", dragover);
     document.body.removeEventListener("drop", drop);
 }
@@ -87,7 +87,7 @@ function resizeover(evt) {
     }
 }
 
-function resizeend(evt) {
+function resizeend() {
     document.body.removeEventListener("dragover", resizeover);
 }
 
@@ -102,7 +102,7 @@ function unpin(e) {
     pinmap.delete(e);
 }
 
-handle_ui.on("pa-pinnable-pin", function (evt) {
+handle_ui.on("pa-pinnable-pin", function () {
     const e = this.parentElement;
     if (hasClass(e, "pinned")) {
         unpin(e);
@@ -137,7 +137,7 @@ handle_ui.on("pa-pinnable-pin", function (evt) {
     pine.draggable = true;
     pine.addEventListener("dragstart", dragstart);
     pine.addEventListener("dragend", dragend);
-    pine.addEventListener("dblclick", evt => unpin(ecopy));
+    pine.addEventListener("dblclick", () => unpin(ecopy));
     addClass(pine, "pa-pinnable-fixed");
     par.appendChild(pine);
     e.style.opacity = 0.2;

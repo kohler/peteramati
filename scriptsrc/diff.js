@@ -532,7 +532,7 @@ handle_ui.on("pa-gx", function (evt) {
 $(Filediff.decorate_page);
 
 
-function diffmany_dropmenu_toggle(evt) {
+function diffmany_dropmenu_toggle() {
     const h3 = this.closest(".pa-fileref");
     if (this.open) {
         h3 && (h3.style.zIndex = 2);
@@ -544,7 +544,7 @@ function diffmany_dropmenu_toggle(evt) {
     }
 }
 
-dropmenu.add_builder("pa-dropmenu-diffmany", function (e) {
+dropmenu.add_builder("pa-dropmenu-diffmany", function () {
     const psim = this.closest(".pa-diffset"),
         pme = this.closest(".pa-psetinfo"),
         menu = $e("ul", "dropmenu need-dropmenu-events");

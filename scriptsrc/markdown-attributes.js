@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-const attr_re = /\{(?:(?:\.[^#.=\s}]+(?=[#.\s}])|\#[^#.=\s}]+(?=[#.\s}])|[^.#="}]+="[^"]*"(?=[\s}]))\s*)+\}[ \t]*(?:\n|$)/y;
+const attr_re = /\{(?:(?:\.[^#.=\s}]+(?=[#.\s}])|#[^#.=\s}]+(?=[#.\s}])|[^.#="}]+="[^"]*"(?=[\s}]))\s*)+\}[ \t]*(?:\n|$)/y;
 
 function find_opener(state, idx) {
     let nest = state.tokens[idx].nesting || 0;

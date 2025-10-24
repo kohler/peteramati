@@ -2,8 +2,7 @@
 // Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { hasClass, addClass, removeClass } from "./ui.js";
-import { escape_entities } from "./encoders.js";
+import { $e, hasClass, addClass, removeClass } from "./ui.js";
 import { hoturl } from "./hoturl.js";
 import { api_conditioner } from "./xhr.js";
 import { ftext, render_onto, feedback } from "./render.js";

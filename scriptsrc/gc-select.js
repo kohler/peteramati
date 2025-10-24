@@ -81,7 +81,7 @@ GradeClass.add("select", {
         let w = 0;
         for (const opt of this.options) {
             let ot = typeof opt === "object" ? opt.title || opt.value : opt;
-            w = Math.max(w, opt.toString().length);
+            w = Math.max(w, ot.toString().length);
         }
         return Math.max(GradeClass.basic_tcell_width.call(this, col),
                         Math.floor(Math.min(w, 10) * 1.25) / 2);

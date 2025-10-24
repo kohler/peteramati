@@ -145,7 +145,7 @@ function dropmenu_keydown(evt) {
     evt.stopPropagation();
 }
 
-function dropmenu_mousemove(evt) {
+function dropmenu_mousemove() {
     addClass(this, "dropmenu-hovering");
 }
 

@@ -547,7 +547,7 @@ function ptable_body_click(evt) {
     }
 }
 
-function ptable_make_hotlist(evt) {
+function ptable_make_hotlist() {
     const ptconf = this.closest("form").pa__ptconf,
         rowmap = ptconf.tbody_rowmap(this),
         j = [];
