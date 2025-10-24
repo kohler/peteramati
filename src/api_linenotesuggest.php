@@ -37,9 +37,12 @@ class LineNoteSuggest_API {
                 continue;
             }
             if ($this->neighborhood >= 0) {
-                $n = in_array($this->user->contactId, $ln->users) ? $this->my_neighborhood : $this->neighborhood;
+                $n = in_array($this->user->contactId, $ln->users)
+                    ? $this->my_neighborhood
+                    : $this->neighborhood;
                 if ($n >= 0
-                    && (!($lna = $ln->linea()) || abs($this->linea - $lna) > $n)) {
+                    && ($lna = $ln->linea())
+                    && abs($this->linea - $lna) > $n) {
                     $this->more = true;
                     continue;
                 }
