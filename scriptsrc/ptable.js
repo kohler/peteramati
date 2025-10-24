@@ -1890,7 +1890,7 @@ const grade_search_keywords = {
 };
 
 function parse_search_compar(text) {
-    const m = text.match(/^(<=?|>=?|==?|!=?|≤|≥|≠|(?=[\d\.]))\s*(\d+\.?\d*|\.\d+)$/);
+    const m = text.match(/^(<=?|>=?|==?|!=?|≤|≥|≠|(?=[\d.]))\s*(\d+\.?\d*|\.\d+)$/);
     if (!m) {
         return null;
     }

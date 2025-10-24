@@ -392,7 +392,7 @@ export class GradeEntry {
             }
             let $nd = $(ln.element).find(".pa-note-gradecontrib");
             if (!$nd.length && gch) {
-                $nd = $('<div class="pa-note-gradecontrib"></div>').insertBefore($(ln.element).find(".pa-note"));
+                $nd = $($e("div", "pa-note-gradecontrib")).insertBefore($(ln.element).find(".pa-note"));
             }
             gch ? $nd.html(gch) : $nd.remove();
         }

@@ -28,7 +28,6 @@ function update_show(ve, v, opts) {
     } else {
         render_onto(ve, 0, v);
     }
-    return ve.firstChild === null;
 }
 
 GradeClass.add("text", {
