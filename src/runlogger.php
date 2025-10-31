@@ -87,7 +87,6 @@ class RunLogger {
                 @unlink(substr($fn, 0, -4) . ".{$runat}.in");
             }
             unlink($fn);
-            flock($f, LOCK_UN);
             $result = false;
         } else {
             $result = max($runat, 1);

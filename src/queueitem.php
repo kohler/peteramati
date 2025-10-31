@@ -1159,6 +1159,8 @@ class QueueItem {
 
         $this->_runstatus = 2;
         $sproc = $this->run_and_log_proc($cmdarg, null, ["main" => true]);
+        // truncate lockfile so `active_job_at` doesn't win the race
+        ftruncate($this->_lockstream, 0);
         fclose($this->_lockstream);
         $this->_lockstream = null;
         $s = proc_close($sproc);
