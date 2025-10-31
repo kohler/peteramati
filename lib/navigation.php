@@ -234,7 +234,6 @@ class NavigationState {
         $origsn = $server["ORIG_SCRIPT_NAME"] ?? null;
         $origsfn = $server["ORIG_SCRIPT_FILENAME"] ?? null;
         if ($origsn === null && $origsfn === null) {
-            $nsn = strlen($sn);
             $sfx = substr($sfn, strrpos($sfn, "/") + 1);
             $npfx = strlen($sn) - strlen($sfx);
             if ($npfx > 0
@@ -387,7 +386,7 @@ class NavigationState {
         if ($this->path !== "") {
             $p = explode("/", substr($this->path, 1));
             if ($n + 1 < count($p)
-                || ($n + 1 == count($p) && $p[$n] !== "")) {
+                || ($n + 1 === count($p) && $p[$n] !== "")) {
                 return $decoded ? urldecode($p[$n]) : $p[$n];
             }
         }
@@ -705,5 +704,22 @@ class Navigation {
 <script>location=", json_encode($url), ";</script></head>
 <body><p>You should be redirected <a href=\"", htmlspecialchars($url), "\">to here</a>.</p></body></html>\n";
         exit(0);
+    }
+
+    /** @param int $t
+     * @return string */
+    static function http_date($t) {
+        return gmdate("D, d M Y H:i:s", $t) . " GMT";
+    }
+
+    /** @param string $s
+     * @return ?int */
+    static function parse_http_date($s) {
+        try {
+            $dt = DateTimeImmutable::createFromFormat("!D, d M Y H:i:s T", $s);
+            return $dt !== false ? $dt->getTimestamp() : null;
+        } catch (Exception $ex) {
+            return null;
+        }
     }
 }

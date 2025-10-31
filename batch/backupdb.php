@@ -90,6 +90,8 @@ class BackupDB_Batch {
     private $_deflatebuf;
     /** @var ?string */
     private $_s3_tmp;
+    /** @var array<string,string> */
+    private $_s3_tags;
     /** @var bool */
     private $_has_dblink = false;
     /** @var ?\mysqli */
@@ -203,6 +205,15 @@ class BackupDB_Batch {
         $this->_after = isset($arg["after"]) ? strtotime($arg["after"]) : null;
         if ($this->_before === false || $this->_after === false) {
             $this->throw_error("Bad time format");
+        }
+        foreach ($arg["s3-tag"] ?? [] as $tp) {
+            if (($eq = strpos($tp, "=")) === false
+                || !is_valid_utf8($tp)
+                || UnicodeHelper::utf16_strlen(substr($tp, 0, $eq)) > 127
+                || UnicodeHelper::utf16_strlen(substr($tp, $eq + 1)) > 255) {
+                throw new CommandLineException("Bad `--s3-tag`");
+            }
+            $this->_s3_tags[substr($tp, 0, $eq)] = substr($tp, $eq + 1);
         }
 
         foreach (["restore", "s3-list", "s3-get", "s3-put", "s3-restore"] as $i => $key) {
@@ -362,15 +373,24 @@ class BackupDB_Batch {
 
         $ans = [];
         foreach ($s3->ls_all_keys($pfx) as $key) {
-            if ($key
-                && $bp->match($key)
-                && ($this->_before === null || ($bp->timestamp !== null && $bp->timestamp <= $this->_before))
-                && ($this->_after === null || ($bp->timestamp !== null && $bp->timestamp >= $this->_after))) {
-                if ($bp->timestamp !== null) {
-                    $ans[$bp->timestamp] = $key;
-                } else {
-                    $ans[] = $key;
+            if (!$key
+                || !$bp->match($key)
+                || ($this->_before !== null && ($bp->timestamp === null || $bp->timestamp > $this->_before))
+                || ($this->_after !== null && ($bp->timestamp === null || $bp->timestamp < $this->_after))) {
+                continue;
+            }
+            if ($this->_s3_tags) {
+                $tags = $s3->get_tagging($key);
+                foreach ($this->_s3_tags as $k => $v) {
+                    if (($tags[$k] ?? null) !== $v) {
+                        continue 2;
+                    }
                 }
+            }
+            if ($bp->timestamp !== null) {
+                $ans[$bp->timestamp] = $key;
+            } else {
+                $ans[] = $key;
             }
         }
 
@@ -724,7 +744,13 @@ class BackupDB_Batch {
         if ($this->compress) {
             rewind($this->out);
         }
-        $ok = $this->s3_client()->put_file($bpk, $this->out, $this->compress ? "application/gzip" : "application/sql");
+        $user_data = [];
+        if (!empty($this->_s3_tags)) {
+            $user_data["x-amz-tagging"] = http_build_query($this->_s3_tags);
+        }
+        $ok = $this->s3_client()->put_file($bpk, $this->out,
+            $this->compress ? "application/gzip" : "application/sql",
+            $user_data);
         if (!$ok) {
             $this->throw_error("S3 error saving backup");
         } else if ($this->verbose) {
@@ -921,6 +947,7 @@ class BackupDB_Batch {
             "s3-list !s3 List backups on S3",
             "s3-dbname: =DBNAME !s3 Set dbname component of S3 path",
             "s3-confid:,s3-name: =CONFID !s3 Set confid component of S3 path",
+            "s3-tag[] =TAGPAIR !s3 Add S3 tag",
             "before: =DATE !s3 Include S3 backups before DATE",
             "after: =DATE !s3 Include S3 backups after DATE",
             "count: {n} =N !s3 Fetch N backups (--s3-get only)",
@@ -928,9 +955,10 @@ class BackupDB_Batch {
             "help::,h:: Print help"
         )->description("Back up Peteramati database or restore from backup.
 Usage: php batch/backupdb.php [-c FILE | -n CONFID] [OPTS...] [-z] -o DUMP
-       php batch/backupdb.php [-c FILE | -n CONFID] -r [OPTS...] DUMP")
+       php batch/backupdb.php [-c FILE | -n CONFID] [OPTS...] -r DUMP")
          ->helpopt("help")
          ->otheropt(true)
+         ->interleave(true)
          ->maxarg(1)
          ->parse($argv);
 
