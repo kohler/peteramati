@@ -1150,17 +1150,18 @@ class QueueItem {
             }
         } else {
             $cmdarg[] = "--fg";
-            flock($this->_lockstream, LOCK_UN);
         }
 
         $cmdarg[] = $homedir;
         $cmdarg[] = $username;
         $cmdarg[] = "TERM=xterm-256color";
         $cmdarg[] = $this->expand($runner->command);
+
         $this->_runstatus = 2;
-        $s = $this->run_and_log($cmdarg, null, ["main" => true]);
+        $sproc = $this->run_and_log_proc($cmdarg, null, ["main" => true]);
         fclose($this->_lockstream);
         $this->_lockstream = null;
+        $s = proc_close($sproc);
 
         // save information about execution
         if ($foreground) {
