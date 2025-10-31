@@ -1014,7 +1014,7 @@ class QueueItem {
         $logbase = $runlog->job_prefix($runat);
         $pidfile = $runlog->pid_file();
 
-        $this->_lockstream = @fopen($pidfile, "c") ? : null;
+        $this->_lockstream = @fopen($pidfile, "ce") ? : null;
         if (!$this->_lockstream) {
             throw new RunnerException("Can’t create pidfile");
         }
