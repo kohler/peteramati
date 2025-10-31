@@ -86,6 +86,8 @@ class QueueItem {
     private $_jaildir;
     /** @var string */
     private $_jailhomedir;
+    /** @var resource */
+    private $_lockstream;
     /** @var string */
     private $_logfile;
     /** @var resource */
@@ -1007,14 +1009,24 @@ class QueueItem {
         }
         $this->_jailhomedir = "{$this->_jaildir}/" . preg_replace('/\A\/+/', '', $userhome);
 
-        // create logfile and pidfile
+        // create pidfile, which must be locked
         $runat = time();
         $logbase = $runlog->job_prefix($runat);
         $pidfile = $runlog->pid_file();
-        $pidresult = @file_put_contents($pidfile, "{$runat}\n");
-        if ($pidresult === false) {
+
+        $this->_lockstream = @fopen($pidfile, "c") ? : null;
+        if (!$this->_lockstream) {
             throw new RunnerException("Can’t create pidfile");
         }
+        if (!flock($this->_lockstream, LOCK_EX | LOCK_NB)) {
+            fclose($this->_lockstream);
+            $this->_lockstream = null;
+            return;
+        }
+        fwrite($this->_lockstream, "{$runat}\n");
+        fflush($this->_lockstream);
+
+        // create log stream and maybe timing file
         $inputfifo = $timingfile = null;
         if (!$foreground) {
             if (posix_mkfifo("{$logbase}.in", 0660)) {
@@ -1031,6 +1043,8 @@ class QueueItem {
             $logstream = fopen("/dev/null", "w");
         }
         if (!$logstream) {
+            fclose($this->_lockstream);
+            $this->_lockstream = null;
             @unlink($pidfile);
             throw new RunnerException("Can’t create log file");
         }
@@ -1050,6 +1064,7 @@ class QueueItem {
         }
 
         if (!$this->swap_status(self::STATUS_WORKING, ["runat" => $runat, "lockfile" => $pidfile, "eventsource" => $esid])) {
+            $this->cleanup();
             return;
         }
         $this->_runstatus = 1;
@@ -1061,6 +1076,7 @@ class QueueItem {
         // create jail
         $this->remove_old_jails();
         if ($this->run_and_log(["jail/pa-jail", "add", $this->_jaildir, $username])) {
+            $this->cleanup();
             throw new RunnerException("Can’t initialize jail");
         }
 
@@ -1134,6 +1150,7 @@ class QueueItem {
             }
         } else {
             $cmdarg[] = "--fg";
+            flock($this->_lockstream, LOCK_UN);
         }
 
         $cmdarg[] = $homedir;
@@ -1142,6 +1159,8 @@ class QueueItem {
         $cmdarg[] = $this->expand($runner->command);
         $this->_runstatus = 2;
         $s = $this->run_and_log($cmdarg, null, ["main" => true]);
+        fclose($this->_lockstream);
+        $this->_lockstream = null;
 
         // save information about execution
         if ($foreground) {
@@ -1401,10 +1420,15 @@ class QueueItem {
     }
 
     function cleanup() {
+        if ($this->_lockstream) {
+            fclose($this->_lockstream);
+            $this->_lockstream = null;
+        }
         if ($this->_runstatus === 1) {
             $runlog = $this->run_logger();
             unlink($runlog->pid_file());
             @unlink($runlog->job_prefix($this->runat) . ".in");
+            $this->_runstatus = 0;
         }
         if ($this->_logstream) {
             fclose($this->_logstream);
