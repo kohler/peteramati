@@ -1184,6 +1184,15 @@ class QueueItem {
         fwrite($this->_logstream, "++ " . Subprocess::shell_quote_args($cmdarg) . ($main_command ? "\n\n" : "\n"));
         fflush($this->_logstream);
 
+        // Since `proc_open` doesn’t report an error if $cwd does not exist,
+        // check the directory ourselves. On failure, substitute a fake command.
+        if ($cwd) {
+            clearstatcache(true, $cwd);
+            if (!is_dir($cwd)) {
+                $cmdarg = ["false", "cd", $cwd];
+            }
+        }
+
         $cmd = Subprocess::args_to_command($cmdarg);
         $redirects = [];
         if (isset($opts["stdin"])) {
@@ -1232,7 +1241,7 @@ class QueueItem {
             }
 
             $this->run_and_log(["jail/pa-jail", "rm", "--bg", $newdir]);
-            clearstatcache(false, $this->_jaildir);
+            clearstatcache(true, $this->_jaildir);
             ++$tries;
         }
     }
