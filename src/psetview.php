@@ -1,6 +1,6 @@
 <?php
 // psetview.php -- CS61-monster helper class for pset view
-// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2025 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class PsetView {
@@ -539,10 +539,9 @@ class PsetView {
                    && $this->_rpi->commitat !== null
                    && $this->_rpi->gradehash === $this->_hash) {
             return $this->_rpi->commitat;
-        } else {
-            $c = $this->commit();
-            return $c ? $c->commitat : null;
         }
+        $c = $this->commit();
+        return $c ? $c->commitat : null;
     }
 
     /** @return bool */
@@ -1544,9 +1543,8 @@ class PsetView {
             return $this->pset->deadline_college;
         } else if ($this->user->extension && $this->pset->deadline_extension) {
             return $this->pset->deadline_extension;
-        } else {
-            return $this->pset->deadline;
         }
+        return $this->pset->deadline;
     }
 
     /** @param bool $force
@@ -1561,9 +1559,8 @@ class PsetView {
             return $rpi->commitat;
         } else if ($this->_hash && ($ls = $this->commit())) {
             return $ls->commitat;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param ?int $deadline
@@ -1574,9 +1571,8 @@ class PsetView {
             return null;
         } else if ($deadline < $ts) {
             return (int) ceil(($ts - $deadline) / 3600);
-        } else {
-            return 0;
         }
+        return 0;
     }
 
     /** @return ?LateHoursData */
@@ -1602,9 +1598,8 @@ class PsetView {
         if ($ts) {
             $ld->timestamp = $ts;
         }
-        if ($deadline) {
-            $ld->deadline = $deadline;
-        }
+        $ld->deadline = $deadline;
+
         return $ld->is_empty() ? null : $ld;
     }
 
@@ -1615,9 +1610,8 @@ class PsetView {
             return $cn->late_hours;
         } else if (($lhd = $this->late_hours_data()) && isset($lhd->hours)) {
             return $lhd->hours;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @return ?int */
@@ -1629,9 +1623,8 @@ class PsetView {
             $ts = $cn ? $cn->timestamp ?? null : null;
             $ts = $ts ?? $this->student_timestamp(false);
             return self::auto_late_hours($deadline, $ts);
-        } else {
-            return null;
         }
+        return null;
     }
 
 
@@ -1732,9 +1725,8 @@ class PsetView {
             return $jlist;
         } else if (is_int($jlist)) {
             return $jobid < $jlist ? [$jlist, $jobid] : [$jobid, $jlist];
-        } else {
-            return $jobid;
         }
+        return $jobid;
     }
 
     /** @param string $runner_name
@@ -1795,10 +1787,9 @@ class PsetView {
             $s = @file_get_contents($fn);
             $this->last_runner_error = $s === false ? self::ERROR_LOGMISSING : 0;
             return $s;
-        } else {
-            $this->last_runner_error = self::ERROR_NOTRUN;
-            return false;
         }
+        $this->last_runner_error = self::ERROR_NOTRUN;
+        return false;
     }
 
     /** @param string $runner_name
@@ -1949,9 +1940,8 @@ class PsetView {
         if ($slash !== false
             && isset($this->transferred_warnings[substr($file, $slash + 1)])) {
             return $this->transferred_warnings[substr($file, $slash + 1)];
-        } else {
-            return [];
         }
+        return [];
     }
 
 
@@ -1995,9 +1985,8 @@ class PsetView {
         $url = $this->hoturl("pset", ["commit" => $hash]);
         if ($rest_html) {
             return "<a href=\"{$url}\" class=\"q xtrack\"><code class=\"link\">{$commit_html}</code>{$rest_html}</a>";
-        } else {
-            return "<a href=\"{$url}\" class=\"track\"><code>{$commit_html}</code></a>";
         }
+        return "<a href=\"{$url}\" class=\"track\"><code>{$commit_html}</code></a>";
     }
 
 

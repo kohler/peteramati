@@ -1,6 +1,6 @@
 <?php
 // psetconfig.php -- Peteramati configuration classes
-// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2025 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class PsetConfigException extends Exception {
@@ -736,9 +736,8 @@ class Pset {
             return $this->late_hours_entry();
         } else if ($key === "student_timestamp") {
             return $this->student_timestamp_entry();
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param string $key
@@ -863,9 +862,8 @@ class Pset {
                     $g[] = $ge;
             }
             return $g;
-        } else {
-            return [];
         }
+        return [];
     }
 
     /** @return GradeEntry */
@@ -954,16 +952,12 @@ class Pset {
         } else if (strpos($x, "/") === false) {
             if ($prefix) {
                 return '|\A' . preg_quote($prefix) . '/' . $x;
-            } else {
-                return '|' . $x;
             }
-        } else {
-            if ($prefix) {
-                return '|\A' . preg_quote($prefix) . '/' . $x . '\z';
-            } else {
-                return '|\A' . $x . '\z';
-            }
+            return '|' . $x;
+        } else if ($prefix) {
+            return '|\A' . preg_quote($prefix) . '/' . $x . '\z';
         }
+        return '|\A' . $x . '\z';
     }
 
     function file_ignore_regex() {
@@ -1066,19 +1060,18 @@ class Pset {
     function maybe_prefix_directory($files) {
         if (!$this->directory_slash) {
             return $files;
-        } else {
-            $pfiles = [];
-            foreach ($files as $f) {
-                if (str_starts_with($f, $this->directory_slash)
-                    || str_starts_with($f, "./")
-                    || str_starts_with($f, "../")) {
-                    return $files;
-                } else {
-                    $pfiles[] = $this->directory_slash . $f;
-                }
-            }
-            return $pfiles;
         }
+        $pfiles = [];
+        foreach ($files as $f) {
+            if (str_starts_with($f, $this->directory_slash)
+                || str_starts_with($f, "./")
+                || str_starts_with($f, "../")) {
+                return $files;
+            } else {
+                $pfiles[] = $this->directory_slash . $f;
+            }
+        }
+        return $pfiles;
     }
 
     /** @return ?PsetView */

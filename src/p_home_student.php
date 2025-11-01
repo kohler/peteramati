@@ -1,6 +1,6 @@
 <?php
 // src/p_home_student.php -- Peteramati home page, student view
-// HotCRP and Peteramati are Copyright (c) 2006-2021 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2025 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class Home_Student_Page {
@@ -112,9 +112,8 @@ class Home_Student_Page {
                 || $pset->upi_for($this->user)
                 || $pset->answers_editable_student())) {
             return PsetView::make($pset, $this->user, $this->viewer);
-        } else {
-            return null;
         }
+        return null;
     }
 
     function render_default() {

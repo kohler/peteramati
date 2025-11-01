@@ -1,6 +1,6 @@
 <?php
 // commitpsetinfo.php -- Peteramati helper class representing commit/pset
-// Peteramati is Copyright (c) 2013-2024 Eddie Kohler
+// Peteramati is Copyright (c) 2013-2025 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 class CommitPsetInfo {
@@ -66,14 +66,13 @@ class CommitPsetInfo {
 
     /** @return ?CommitPsetInfo */
     static function fetch($result) {
-        if (($x = $result->fetch_object())) {
-            $cpi = new CommitPsetInfo((int) $x->pset, $x->bhash, (int) $x->repoid);
-            $cpi->merge($x);
-            $cpi->phantom = false;
-            return $cpi;
-        } else {
+        if (!($x = $result->fetch_object())) {
             return null;
         }
+        $cpi = new CommitPsetInfo((int) $x->pset, $x->bhash, (int) $x->repoid);
+        $cpi->merge($x);
+        $cpi->phantom = false;
+        return $cpi;
     }
 
     function reload(Conf $conf) {
@@ -180,27 +179,28 @@ class CommitPsetInfo {
     /** @return null|int|float */
     function grade_total(Pset $pset) {
         assert($pset->id === $this->pset);
+        if (!$this->notes || !($jn = $this->jnotes())) {
+            return null;
+        }
+        $g = $jn->grades ?? null;
+        $ag = $jn->autogrades ?? null;
+        if (!$g && !$ag) {
+            return null;
+        }
         $t = null;
-        if ($this->notes && ($jn = $this->jnotes())) {
-            $g = $jn->grades ?? null;
-            $ag = $jn->autogrades ?? null;
-            if ($g || $ag) {
-                foreach ($pset->grades as $ge) {
-                    if (!$ge->no_total) {
-                        if ($g && property_exists($g, $ge->key)) {
-                            $v = $g->{$ge->key};
-                        } else {
-                            $v = $ag ? $ag->{$ge->key} ?? null : null;
-                        }
-                        if ($v !== null) {
-                            $t = ($t ?? 0) + $v;
-                        }
-                    }
+        foreach ($pset->grades as $ge) {
+            if (!$ge->no_total) {
+                if ($g && property_exists($g, $ge->key)) {
+                    $v = $g->{$ge->key};
+                } else {
+                    $v = $ag ? $ag->{$ge->key} ?? null : null;
                 }
-                $t = round_grade($t);
+                if ($v !== null) {
+                    $t = ($t ?? 0) + $v;
+                }
             }
         }
-        return $t;
+        return round_grade($t);
     }
 
 
@@ -248,11 +248,9 @@ class CommitPsetInfo {
     /** @param ?object $j
      * @return int */
     static function notes_hasactiveflags($j) {
-        if ($j && isset($j->flags)) {
-            foreach ($j->flags as $f) {
-                if (!($f->resolved ?? false))
-                    return 1;
-            }
+        foreach ($j->flags ?? [] as $f) {
+            if (!($f->resolved ?? false))
+                return 1;
         }
         return 0;
     }

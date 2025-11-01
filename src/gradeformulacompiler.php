@@ -1,6 +1,6 @@
 <?php
 // gradeformulacompiler.php -- Peteramati grade formulas
-// HotCRP is Copyright (c) 2006-2024 Eddie Kohler and Regents of the UC
+// HotCRP is Copyright (c) 2006-2025 Eddie Kohler and Regents of the UC
 // See LICENSE for open-source distribution terms
 
 require_once(SiteLoader::$root . "/src/gradeformula.php");
@@ -103,11 +103,11 @@ class GradeFormulaCompiler {
     private function parse_pset_grade($pset, $gkey, $self) {
         if (($f = self::$total_gkeys[$gkey] ?? -1) >= 0) {
             return new PsetTotal_GradeFormula($pset, $f & 3);
-        } else if (($ge = $pset->gradelike_by_key_or_title($gkey)) && $ge !== $self) {
+        } else if (($ge = $pset->gradelike_by_key_or_title($gkey))
+                   && $ge !== $self) {
             return $this->parse_grade_entry($ge);
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param string $pkey
@@ -174,10 +174,9 @@ class GradeFormulaCompiler {
             return new PsetTotal_GradeFormula($pset, $tf);
         } else if (($cat = $this->conf->category($gkey))) {
             return new CategoryTotal_GradeFormula($this->conf, $cat, $tf);
-        } else {
-            $this->error_at($this->state->pos1, $this->state->pos2, "<0>Undefined problem set or category");
-            return null;
         }
+        $this->error_at($this->state->pos1, $this->state->pos2, "<0>Undefined problem set or category");
+        return null;
     }
 
     /** @param int $p
@@ -231,9 +230,8 @@ class GradeFormulaCompiler {
 
         if ($fe->complete($this, $p0, $p)) {
             return [$fe, $p];
-        } else {
-            return [null, $p];
         }
+        return [null, $p];
     }
 
     /** @param int $p
@@ -324,38 +322,37 @@ class GradeFormulaCompiler {
 
         while (true) {
             $p = $this->skip_space($p);
-            if (preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|\^\^|==?|<=?|>=?|!=|≠|≤|≥|:)/s', $s, $m, 0, $p)) {
-                $op = self::$synonyms[$m[0]] ?? $m[0];
-                $prec = self::$precedences[$op];
-                if ($prec < $minprec) {
-                    return [$e, $p];
-                } else if ($op === ":") {
-                    $this->error_near($p, "<0>Syntax error");
-                    return [null, $p];
-                }
-                list($e2, $p) = $this->parse_prefix($p + strlen($m[0]), $op === "**" ? $prec : $prec + 1);
-                if ($e2 === null) {
-                    return [null, $p];
-                }
-                if (in_array($op, ["+?", "??", "||", "&&", "^^"])) {
-                    $e = new NullableBin_GradeFormula($op, $e, $e2);
-                } else if (in_array($op, ["<", "=", "==", ">", "<=", ">=", "!=", "≠", "≤", "≥"])) {
-                    $e = new Relation_GradeFormula($op, $e, $e2);
-                } else if ($op === "?") {
-                    if (!preg_match('/\G\s*:/s', $s, $m, 0, $p)) {
-                        $this->error_near($p, "<0>Missing “:”");
-                        return [null, $p];
-                    }
-                    list($e3, $p) = $this->parse_prefix($p + strlen($m[0]), $prec);
-                    if (!$e3) {
-                        return [null, $p];
-                    }
-                    $e = new Ternary_GradeFormula($e, $e2, $e3);
-                } else {
-                    $e = new Bin_GradeFormula($op, $e, $e2);
-                }
-            } else {
+            if (!preg_match('/\G(?:\+\??|-|\*\*?|\/|%|\?\??|\|\||\&\&|\^\^|==?|<=?|>=?|!=|≠|≤|≥|:)/s', $s, $m, 0, $p)) {
                 return [$e, $p];
+            }
+            $op = self::$synonyms[$m[0]] ?? $m[0];
+            $prec = self::$precedences[$op];
+            if ($prec < $minprec) {
+                return [$e, $p];
+            } else if ($op === ":") {
+                $this->error_near($p, "<0>Syntax error");
+                return [null, $p];
+            }
+            list($e2, $p) = $this->parse_prefix($p + strlen($m[0]), $op === "**" ? $prec : $prec + 1);
+            if ($e2 === null) {
+                return [null, $p];
+            }
+            if (in_array($op, ["+?", "??", "||", "&&", "^^"])) {
+                $e = new NullableBin_GradeFormula($op, $e, $e2);
+            } else if (in_array($op, ["<", "=", "==", ">", "<=", ">=", "!=", "≠", "≤", "≥"])) {
+                $e = new Relation_GradeFormula($op, $e, $e2);
+            } else if ($op === "?") {
+                if (!preg_match('/\G\s*:/s', $s, $m, 0, $p)) {
+                    $this->error_near($p, "<0>Missing “:”");
+                    return [null, $p];
+                }
+                list($e3, $p) = $this->parse_prefix($p + strlen($m[0]), $prec);
+                if (!$e3) {
+                    return [null, $p];
+                }
+                $e = new Ternary_GradeFormula($e, $e2, $e3);
+            } else {
+                $e = new Bin_GradeFormula($op, $e, $e2);
             }
         }
     }
