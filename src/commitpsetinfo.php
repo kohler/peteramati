@@ -164,17 +164,50 @@ class CommitPsetInfo {
         $this->jxnotes = $jxnotes;
     }
 
+
     /** @return null|'grade'|'nograde' */
     function gradeflag() {
         if (($this->cnflags & self::CNF_GRADE) !== 0) {
             return "grade";
         } else if (($this->cnflags & self::CNF_NOGRADE) !== 0) {
             return "nograde";
-        } else {
-            return null;
         }
+        return null;
     }
 
+    /** @param string|GradeEntry $ge
+     * @return null|int|float|string */
+    function grade_value($ge) {
+        if (is_string($ge)) {
+            $ge = $this->pset->gradelike_by_key($ge);
+        }
+        if (!$ge || !$this->notes || !($jn = $this->jnotes())) {
+            return null;
+        }
+        assert($ge->pcview_index !== null && !$ge->is_formula());
+        $g = $jn->grades ?? null;
+        $ag = $jn->autogrades ?? null;
+        if ($g && property_exists($g, $ge->key)) {
+            return $g->{$ge->key};
+        } else if ($ag) {
+            return $ag->{$ge->key} ?? null;
+        }
+        return null;
+    }
+
+    /** @param string|GradeEntry $ge
+     * @return null|int|float|string */
+    function autograde_value($ge) {
+        if (is_string($ge)) {
+            $ge = $this->pset->gradelike_by_key($ge);
+        }
+        if (!$ge || !$this->notes || !($jn = $this->jnotes())) {
+            return null;
+        }
+        assert($ge->pcview_index !== null && !$ge->is_formula());
+        $ag = $jn->autogrades ?? null;
+        return $ag->{$ge->key} ?? null;
+    }
 
     /** @return null|int|float */
     function grade_total(Pset $pset) {
