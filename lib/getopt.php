@@ -11,8 +11,8 @@ class Getopt {
     private $helpopt;
     /** @var ?callable(?array<string,mixed>,Getopt):(?string) */
     private $helpcallback;
-    /** @var ?string */
-    private $description;
+    /** @var string */
+    private $description = "";
     /** @var bool */
     private $allmulti = false;
     /** @var ?bool */
@@ -673,16 +673,15 @@ class Getopt {
 
     /** @return string */
     function short_usage() {
-        $s = $this->description ?? "";
+        $s = $this->description;
         if (($pos = strpos($s, "Usage: ")) === false) {
             return "";
         }
         $s = substr($s, $pos);
         if (($pos = strpos($s, "\n\n")) !== false) {
             return substr($s, 0, $pos + 1);
-        } else {
-            return rtrim($s) . "\n";
         }
+        return rtrim($s) . "\n";
     }
 
     /** @param list<string> $argv
