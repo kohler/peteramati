@@ -1,6 +1,6 @@
 <?php
 // recordedjobs.php -- Peteramati script for updating database information
-// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2025 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
@@ -27,8 +27,6 @@ class RecordedJobs_Batch {
     public $mode;
     /** @var bool */
     public $verbose = false;
-    /** @var int */
-    public $sset_flags;
 
     /** @param list<Pset> $psets
      * @param list<string> $usermatch
@@ -36,48 +34,8 @@ class RecordedJobs_Batch {
     function __construct(Conf $conf, $psets, $usermatch, $mode) {
         $this->conf = $conf;
         $this->psets = $psets;
-        if (count($usermatch) === 1 && $usermatch[0] === "dropped") {
-            $this->sset_flags |= StudentSet::DROPPED;
-        } else {
-            $this->sset_flags |= StudentSet::ENROLLED;
-        }
-        if (count($usermatch) === 1 && $usermatch[0] === "college") {
-            $this->sset_flags |= StudentSet::COLLEGE;
-        } else if (count($usermatch) === 1 && $usermatch[0] === "extension") {
-            $this->sset_flags |= StudentSet::DCE;
-        }
-        if ($this->sset_flags === StudentSet::ENROLLED) {
-            foreach ($usermatch as $s) {
-                $this->usermatch[] = "*{$s}*";
-            }
-        }
+        $this->usermatch = $usermatch;
         $this->mode = $mode;
-    }
-
-    /** @param string $s
-     * @return bool */
-    function match($s) {
-        foreach ($this->usermatch as $m) {
-            if (fnmatch($m, $s))
-                return true;
-        }
-        return empty($this->usermatch);
-    }
-
-    /** @return bool */
-    function test_user(Contact $user) {
-        if (empty($this->usermatch)) {
-            return true;
-        } else if ($this->match($user->email)
-                   || $this->match($user->github_username)) {
-            $user->set_anonymous(false);
-            return true;
-        } else if ($this->match($user->anon_username)) {
-            $user->set_anonymous(true);
-            return true;
-        } else {
-            return false;
-        }
     }
 
     /** @param PsetView $info
@@ -91,7 +49,7 @@ class RecordedJobs_Batch {
     /** @return int */
     function run_update() {
         $viewer = $this->conf->site_contact();
-        $sset = new StudentSet($viewer, $this->sset_flags, [$this, "test_user"]);
+        $sset = StudentSet::make_globmatch($viewer, $this->usermatch);
         $nu = 0;
         foreach ($this->psets as $pset) {
             $sset->set_pset($pset);
@@ -131,7 +89,7 @@ class RecordedJobs_Batch {
     /** @return int */
     function run_list() {
         $viewer = $this->conf->site_contact();
-        $sset = new StudentSet($viewer, $this->sset_flags, [$this, "test_user"]);
+        $sset = StudentSet::make_globmatch($viewer, $this->usermatch);
         foreach ($this->psets as $pset) {
             $sset->set_pset($pset);
             $runners = $this->all_runners ? array_keys($pset->runners) : $this->runners;

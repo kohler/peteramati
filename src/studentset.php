@@ -1,6 +1,6 @@
 <?php
 // studentset.php -- Peteramati set of students
-// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2025 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class StudentSet implements ArrayAccess, Iterator, Countable {
@@ -117,6 +117,41 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @return StudentSet */
     static function make_all(Conf $conf) {
         return self::$all_set ?? new StudentSet($conf->site_contact(), self::ALL);
+    }
+
+    /** @param list<string> $matchers
+     * @return StudentSet */
+    static function make_globmatch(Contact $viewer, $matchers) {
+        $flags = self::ENROLLED;
+        if (count($matchers) === 1) {
+            if ($matchers[0] === "dropped") {
+                $flags = self::DROPPED;
+            } else if ($matchers[0] === "college") {
+                $flags = self::ENROLLED | self::COLLEGE;
+            } else if ($matchers[0] === "extension") {
+                $flags = self::ENROLLED | self::DCE;
+            }
+        }
+        if (empty($matchers) || $flags !== self::ENROLLED) {
+            return new StudentSet($viewer, $flags);
+        }
+        foreach ($matchers as &$m) {
+            $m = "*{$m}*";
+        }
+        unset($m);
+        return new StudentSet($viewer, $flags, function ($u) use ($matchers) {
+            foreach ($matchers as $m) {
+                if (fnmatch($m, $u->email)
+                    || fnmatch($m, $u->github_username)) {
+                    $u->set_anonymous(false);
+                    return true;
+                } else if (fnmatch($m, $u->anon_username)) {
+                    $u->set_anonymous(true);
+                    return true;
+                }
+            }
+            return false;
+        });
     }
 
     function add_info(PsetView $info) {
@@ -251,9 +286,8 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
             return null;
         } else if ($this->_infos !== null) {
             return $this->_infos["{$cid},{$pset->id}"] ?? null;
-        } else {
-            return PsetView::make_from_set_at($this, $u, $pset);
         }
+        return PsetView::make_from_set_at($this, $u, $pset);
     }
 
     /** @return list<PsetView> */
@@ -271,9 +305,8 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     function info_for(Contact $user, Pset $pset) {
         if ($this->_infos !== null) {
             return $this->_infos["{$user->contactId},{$pset->id}"] ?? null;
-        } else {
-            return PsetView::make_from_set_at($this, $user, $pset);
         }
+        return PsetView::make_from_set_at($this, $user, $pset);
     }
 
     function offsetExists($offset): bool {
@@ -356,60 +389,63 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
 
     /** @return list<CommitPsetInfo> */
     function all_cpi_for(Contact $user, Pset $pset) {
-        $cpis = [];
-        if (!$pset->gitless) {
-            if (!isset($this->_cpi_by_repo)) {
-                $this->_cpi_by_repo = [];
-                foreach ($this->_cpi as $cpi) {
-                    while ($cpi !== null) {
-                        $cpi->sset_repo_next = $this->_cpi_by_repo[$cpi->repoid] ?? null;
-                        $this->_cpi_by_repo[$cpi->repoid] = $cpi;
-                        $cpi = $cpi->sset_next;
-                    }
-                }
-            }
-
-            $this->load_pset($pset);
-            $repoid = $user->link(LINK_REPO, $pset->id);
-            $cpi = $this->_cpi_by_repo[$repoid] ?? null;
-            $any_nullts = false;
-            while ($cpi) {
-                if ($cpi->pset === $pset->id) {
-                    $cpis[] = $cpi;
-                    $any_nullts = $any_nullts || $cpi->commitat === null;
-                }
-                $cpi = $cpi->sset_repo_next;
-            }
-
-            if ($any_nullts) {
-                $this->_update_cpi_commitat($cpis, $repoid);
-            }
-            usort($cpis, function ($a, $b) {
-                if ($a->commitat < $b->commitat) {
-                    return -1;
-                } else if ($a->commitat > $b->commitat) {
-                    return 0;
-                } else {
-                    return strcmp($a->hash, $b->hash);
-                }
-            });
+        if ($pset->gitless) {
+            return [];
         }
+        $cpis = [];
+        if (!isset($this->_cpi_by_repo)) {
+            $this->_cpi_by_repo = [];
+            foreach ($this->_cpi as $cpi) {
+                while ($cpi !== null) {
+                    $cpi->sset_repo_next = $this->_cpi_by_repo[$cpi->repoid] ?? null;
+                    $this->_cpi_by_repo[$cpi->repoid] = $cpi;
+                    $cpi = $cpi->sset_next;
+                }
+            }
+        }
+
+        $this->load_pset($pset);
+        $repoid = $user->link(LINK_REPO, $pset->id);
+        $cpi = $this->_cpi_by_repo[$repoid] ?? null;
+        $any_nullts = false;
+        while ($cpi) {
+            if ($cpi->pset === $pset->id) {
+                $cpis[] = $cpi;
+                $any_nullts = $any_nullts || $cpi->commitat === null;
+            }
+            $cpi = $cpi->sset_repo_next;
+        }
+
+        if ($any_nullts) {
+            $this->_update_cpi_commitat($cpis, $repoid);
+        }
+        usort($cpis, function ($a, $b) {
+            if ($a->commitat < $b->commitat) {
+                return -1;
+            } else if ($a->commitat > $b->commitat) {
+                return 0;
+            } else {
+                return strcmp($a->hash, $b->hash);
+            }
+        });
         return $cpis;
     }
 
     private function _update_cpi_commitat($cpis, $repoid) {
-        if (($repo = $this->_repo[$repoid] ?? null)) {
-            $mqe = Dbl::make_multi_qe_stager($this->conf->dblink);
-            foreach ($cpis as $cpi) {
-                if ($cpi->commitat === null
-                    && ($c = $repo->connected_commit($cpi->hash))) {
-                    $cpi->commitat = $c->commitat;
-                    $mqe("update CommitNotes set commitat=? where pset=? and bhash=?",
-                         $cpi->commitat, $cpi->pset, $cpi->bhash);
-                }
-            }
-            $mqe(null);
+        $repo = $this->_repo[$repoid] ?? null;
+        if (!$repo) {
+            return;
         }
+        $mqe = Dbl::make_multi_qe_stager($this->conf->dblink);
+        foreach ($cpis as $cpi) {
+            if ($cpi->commitat === null
+                && ($c = $repo->connected_commit($cpi->hash))) {
+                $cpi->commitat = $c->commitat;
+                $mqe("update CommitNotes set commitat=? where pset=? and bhash=?",
+                     $cpi->commitat, $cpi->pset, $cpi->bhash);
+            }
+        }
+        $mqe(null);
     }
 
     /** @return \Generator<PsetView> */
@@ -422,17 +458,17 @@ class StudentSet implements ArrayAccess, Iterator, Countable {
     /** @return bool */
     function repo_sharing(Contact $user) {
         assert(!$this->pset->gitless);
-        if (($repoid = $user->link(LINK_REPO, $this->_psetid))) {
-            $branchid = $user->branchid($this->pset);
-            $sharers = array_diff($this->_rb_uids["{$this->_psetid},{$repoid},{$branchid}"],
-                                  [$user->contactId]);
-            if (!empty($sharers)) {
-                $sharers = array_diff($sharers, $user->links(LINK_PARTNER, $this->_psetid));
-            }
-            return !empty($sharers);
-        } else {
+        $repoid = $user->link(LINK_REPO, $this->_psetid);
+        if (!$repoid) {
             return false;
         }
+        $branchid = $user->branchid($this->pset);
+        $sharers = array_diff($this->_rb_uids["{$this->_psetid},{$repoid},{$branchid}"],
+                              [$user->contactId]);
+        if (!empty($sharers)) {
+            $sharers = array_diff($sharers, $user->links(LINK_PARTNER, $this->_psetid));
+        }
+        return !empty($sharers);
     }
 
 
