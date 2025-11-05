@@ -149,10 +149,15 @@ class RepoFetch_Batch {
                 && $m[2] === "{$this->reponame}/{$m[1]}") {
                 $branches[] = $m[1];
             } else {
-                error_log("? {$line}");
+                $this->report_error("? {$line}");
             }
         }
         return $branches;
+    }
+
+    private function report_error($error) {
+        $r = $this->repo ? $this->repo->friendly_url() . ": " : "";
+        error_log($r . $error);
     }
 
     const FRH_ONCE = 1;
@@ -168,7 +173,7 @@ class RepoFetch_Batch {
                 "git", "rev-list", ...$heads, "--not", ...$eliminate
             ]);
             if (!$gi->ok) {
-                error_log("`git rev-list " . join(" ", $heads) . " --not " . join(" ", $eliminate) . "`: {$gi->stderr}");
+                $this->report_error("`git rev-list " . join(" ", $heads) . " --not " . join(" ", $eliminate) . "`: {$gi->stderr}");
             }
             $nosearch = str_starts_with($heads[0], "--no-walk");
             $foundheads = [];
@@ -205,9 +210,8 @@ class RepoFetch_Batch {
         if (!empty($hashes)
             && $hashes[0] !== "0000000000000000000000000000000000000000") {
             return $hashes[0];
-        }  else {
-            return null;
         }
+        return null;
     }
 
     /** @param list<string> $branches */
@@ -220,7 +224,7 @@ class RepoFetch_Batch {
         $branchhashes = explode("\n", $this->gitrun($command));
         if (count($branchhashes) !== count($branches) + 1
             || $branchhashes[count($branches)] !== "") {
-            error_log("`git rev-list --no-walk=unsorted` weird output");
+            $this->report_error("`git rev-list --no-walk=unsorted` weird output");
         }
         array_pop($branchhashes);
 
