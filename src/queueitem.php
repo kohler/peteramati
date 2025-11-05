@@ -1206,13 +1206,18 @@ class QueueItem {
         }
         if (isset($opts["stdout"])) {
             $redirects[1] = $opts["stdout"];
-            $redirects[2] = ["file", $this->_logfile, "a"];
         } else if (($this->flags & self::FLAG_FOREGROUND) === 0) {
             $redirects[1] = ["file", $this->_logfile, "a"];
-            $redirects[2] = PHP_VERSION_ID >= 70400 ? ["redirect", 1] : ["file", $this->_logfile, "a"];
         } else if (PHP_VERSION_ID >= 70400
                    && ($this->flags & self::FLAG_FOREGROUND_VERBOSE) !== 0) {
             $redirects[1] = ["redirect", 2];
+        }
+        if (($this->flags & self::FLAG_FOREGROUND) === 0) {
+            if (PHP_VERSION_ID >= 70400 && !isset($opts["stdout"])) {
+                $redirects[2] = ["redirect", 1];
+            } else {
+                $redirects[2] = ["file", $this->_logfile, "a"];
+            }
         }
         $this->_runpipes = [];
         return proc_open($cmd, $redirects, $this->_runpipes, $cwd, $env);
