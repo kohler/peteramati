@@ -27,9 +27,8 @@ function render_name(s, last_first) {
         return s.first;
     } else if (s.last != null) {
         return s.last;
-    } else {
-        return "";
     }
+    return "";
 }
 
 function grader_name(p) {
@@ -70,9 +69,8 @@ function grader_compare(a, b) {
         bg = (bp && grader_name(bp)) || "~~~";
     if (ag != bg) {
         return ag < bg ? -1 : 1;
-    } else {
-        return 0;
     }
+    return 0;
 }
 
 

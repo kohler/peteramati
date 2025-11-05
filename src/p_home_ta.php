@@ -429,7 +429,7 @@ class Home_TA_Page {
         if ($this->viewer->privChair) {
             echo '<button type="button" class="btn-t small ui js-pset-gconfig ml-2"><span class="filter-gray-if-disabled">⚙️</span></button>';
         }
-        echo '<input type="search" class="uii uikd js-ptable-search ml-2" placeholder="Search">';
+        echo '<input type="search" class="uii uikd js-ptable-search ml-2" placeholder="Search" spellcheck="false">';
         echo '</header>';
         if ($pset->disabled) {
             echo Ht::unstash_script('$pa.pset_table($("#' . $pset->urlkey . '")[0],' . json_encode_browser($jd) . ',null)'),

@@ -164,6 +164,7 @@ export class SearchExpr {
     op;
     child;
     parent;
+    empty;
 
     static make_simple(text, pos1, parent = null) {
         const e = new SearchExpr;
@@ -171,6 +172,7 @@ export class SearchExpr {
         e.kwpos1 = e.pos1 = pos1;
         e.pos2 = pos1 + text.length;
         e.parent = parent;
+        e.empty = text === "";
         return e;
     }
 
@@ -182,6 +184,7 @@ export class SearchExpr {
         e.pos1 = pos1;
         e.pos2 = pos2;
         e.parent = parent;
+        e.empty = e.kword === null && text === "";
         return e;
     }
 
@@ -193,11 +196,13 @@ export class SearchExpr {
             e.pos2 = pos2;
             e.child = [];
             e.parent = reference;
+            e.empty = true;
         } else {
             e.kwpos1 = e.pos1 = reference.pos1;
             e.pos2 = pos2;
             e.child = [reference];
             e.parent = reference.parent;
+            e.empty = reference.empty;
         }
         return e;
     }
@@ -206,6 +211,10 @@ export class SearchExpr {
         const e = new SearchExpr;
         e.op = SearchOperatorSet.simple_operator(opname);
         e.child = child;
+        e.empty = true;
+        for (const ch of child) {
+            e.empty = e.empty && ch.empty;
+        }
         return e;
     }
 
@@ -232,6 +241,7 @@ export class SearchExpr {
         }
         p.child.push(this);
         p.pos2 = this.pos2;
+        p.empty = p.empty && this.empty;
         return p;
     }
 
@@ -259,7 +269,7 @@ export class SearchExpr {
                 && ch.op.type === this.op.type
                 && ch.op.subtype === this.op.subtype) {
                 Array.push.prototype.apply(a, ...ch.flattened_children());
-            } else {
+            } else if (!ch.empty) {
                 a.push(ch);
             }
         }
@@ -310,21 +320,23 @@ export class SearchExpr {
         } else if ((this.op.flags & OP_AND) !== 0) {
             ok = true;
             for (const ch of this.child) {
-                ok = ok && ch.evaluate_simple(f);
+                ok = ok && (ch.empty || ch.evaluate_simple(f));
             }
         } else if ((this.op.flags & OP_OR) !== 0) {
             ok = false;
             for (const ch of this.child) {
-                ok = ok || ch.evaluate_simple(f);
+                ok = ok || (!ch.empty && ch.evaluate_simple(f));
             }
         } else if ((this.op.flags & OP_XOR) !== 0) {
             ok = false;
             for (const ch of this.child) {
-                if (ch.evaluate_simple(f))
+                if (!ch.empty && ch.evaluate_simple(f))
                     ok = !ok;
             }
         } else if ((this.op.flags & OP_NOT) !== 0) {
-            ok = !this.child[0] || !this.child[0].evaluate_simple(f);
+            ok = !this.child[0]
+                || this.child[0].empty
+                || !this.child[0].evaluate_simple(f);
         } else {
             throw new Error("unknown operator");
         }
