@@ -395,6 +395,7 @@ class QueueItem {
      * @return ?QueueItem */
     static function fetch(Conf $conf, $result, $info = null) {
         $qi = $result ? $result->fetch_object("QueueItem", [$conf]) : null;
+        '@phan-var-force ?QueueItem $qi';
         if ($qi) {
             $qi->db_load();
             $info && $qi->associate_info($info);

@@ -3,35 +3,45 @@
 // Copyright (c) 2006-2024 Eddie Kohler; see LICENSE.
 
 class SearchExpr {
-    /** @var ?string */
+    /** @var ?string
+     * @readonly */
     public $kword;
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $text;
-    /** @var ?int */
+    /** @var ?int
+     * @readonly */
     public $kwpos1;
-    /** @var ?int */
+    /** @var ?int
+     * @readonly */
     public $pos1;
     /** @var ?int */
     public $pos2;
-    /** @var ?SearchOperator */
+    /** @var ?SearchOperator
+     * @readonly */
     public $op;
     /** @var ?list<SearchExpr> */
     public $child;
-    /** @var ?SearchExpr */
+    /** @var ?SearchExpr
+     * @readonly */
     public $parent;
     /** @var mixed */
     public $user_data; // reserved for callers
+    /** @var bool */
+    public $empty;
 
     /** @param string $text
      * @param int $pos1
      * @param ?SearchExpr $parent
-     * @return SearchExpr */
+     * @return SearchExpr
+     * @suppress PhanAccessReadOnlyProperty */
     static function make_simple($text, $pos1, $parent = null) {
         $sa = new SearchExpr;
         $sa->text = $text;
         $sa->kwpos1 = $sa->pos1 = $pos1;
         $sa->pos2 = $pos1 + strlen($text);
         $sa->parent = $parent;
+        $sa->empty = $text === "";
         return $sa;
     }
 
@@ -41,7 +51,8 @@ class SearchExpr {
      * @param int $pos1
      * @param int $pos2
      * @param ?SearchExpr $parent
-     * @return SearchExpr */
+     * @return SearchExpr
+     * @suppress PhanAccessReadOnlyProperty */
     static function make_keyword($kword, $text, $kwpos1, $pos1, $pos2, $parent = null) {
         $sa = new SearchExpr;
         $sa->kword = $kword === "" ? null : $kword;
@@ -50,6 +61,7 @@ class SearchExpr {
         $sa->pos1 = $pos1;
         $sa->pos2 = $pos2;
         $sa->parent = $parent;
+        $sa->empty = $sa->kword === null && $text === "";
         return $sa;
     }
 
@@ -57,7 +69,8 @@ class SearchExpr {
      * @param int $pos1
      * @param int $pos2
      * @param ?SearchExpr $reference
-     * @return SearchExpr */
+     * @return SearchExpr
+     * @suppress PhanAccessReadOnlyProperty */
     static function make_op_start($op, $pos1, $pos2, $reference) {
         $sa = new SearchExpr;
         $sa->op = $op;
@@ -66,22 +79,32 @@ class SearchExpr {
             $sa->pos2 = $pos2;
             $sa->child = [];
             $sa->parent = $reference;
+            $sa->empty = true;
         } else {
             $sa->kwpos1 = $sa->pos1 = $reference->pos1;
             $sa->pos2 = $pos2;
             $sa->child = [$reference];
             $sa->parent = $reference->parent;
+            $sa->empty = $reference->empty;
         }
         return $sa;
     }
 
     /** @param 'and'|'or'|'xor'|'not' $opname
      * @param SearchExpr ...$child
-     * @return SearchExpr */
+     * @return SearchExpr
+     * @suppress PhanAccessReadOnlyProperty */
     static function combine($opname, ...$child) {
         $sa = new SearchExpr;
         $sa->op = SearchOperatorSet::simple_operator($opname);
         $sa->child = $child;
+        $sa->empty = true;
+        foreach ($child as $ch) {
+            if (!$ch->empty) {
+                $sa->empty = true;
+                break;
+            }
+        }
         return $sa;
     }
 
@@ -105,6 +128,7 @@ class SearchExpr {
         if (($p = $this->parent)) {
             $p->child[] = $this;
             $p->pos2 = $this->pos2;
+            $p->empty = $p->empty && $this->empty;
             return $p;
         }
         return $this;
@@ -138,7 +162,7 @@ class SearchExpr {
                 && $ch->op->type === $this->op->type
                 && $ch->op->subtype === $this->op->subtype) {
                 array_push($a, ...$ch->flattened_children());
-            } else {
+            } else if (!$ch->empty) {
                 $a[] = $ch;
             }
         }
@@ -199,22 +223,22 @@ class SearchExpr {
         } else if (($this->op->flags & SearchOperator::F_AND) !== 0) {
             $ok = true;
             foreach ($this->child as $ch) {
-                $ok = $ok && $ch->evaluate_simple($f, ...$rest);
+                $ok = $ok && ($ch->empty || $ch->evaluate_simple($f, ...$rest));
             }
         } else if (($this->op->flags & SearchOperator::F_OR) !== 0) {
             $ok = false;
             foreach ($this->child as $ch) {
-                $ok = $ok || $ch->evaluate_simple($f, ...$rest);
+                $ok = $ok || (!$ch->empty && $ch->evaluate_simple($f, ...$rest));
             }
         } else if (($this->op->flags & SearchOperator::F_XOR) !== 0) {
             $ok = false;
             foreach ($this->child as $ch) {
-                if ($ch->evaluate_simple($f, ...$rest))
+                if (!$ch->empty && $ch->evaluate_simple($f, ...$rest))
                     $ok = !$ok;
             }
         } else if (($this->op->flags & SearchOperator::F_NOT) !== 0) {
-            $ok = !$this->child[0]
-                || !$this->child[0]->evaluate_simple($f, ...$rest);
+            $ch = $this->child[0];
+            $ok = !$ch || $ch->empty || !$ch->evaluate_simple($f, ...$rest);
         } else {
             throw new ErrorException("unknown operator");
         }

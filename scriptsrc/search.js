@@ -213,7 +213,10 @@ export class SearchExpr {
         e.child = child;
         e.empty = true;
         for (const ch of child) {
-            e.empty = e.empty && ch.empty;
+            if (!ch.empty) {
+                e.empty = false;
+                break;
+            }
         }
         return e;
     }
@@ -334,9 +337,8 @@ export class SearchExpr {
                     ok = !ok;
             }
         } else if ((this.op.flags & OP_NOT) !== 0) {
-            ok = !this.child[0]
-                || this.child[0].empty
-                || !this.child[0].evaluate_simple(f);
+            const ch = this.child[0];
+            ok = !ch || ch.empty || !ch.evaluate_simple(f);
         } else {
             throw new Error("unknown operator");
         }
