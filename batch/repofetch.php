@@ -156,7 +156,7 @@ class RepoFetch_Batch {
     }
 
     private function report_error($error) {
-        $r = $this->repo ? $this->repo->friendly_url() . ": " : "";
+        $r = $this->repo ? $this->repo->reponame() . ": " : "";
         error_log($r . $error);
     }
 
@@ -221,12 +221,10 @@ class RepoFetch_Batch {
         foreach ($branches as $br) {
             $command[] = "{$this->reponame}/{$br}";
         }
-        $branchhashes = explode("\n", $this->gitrun($command));
-        if (count($branchhashes) !== count($branches) + 1
-            || $branchhashes[count($branches)] !== "") {
-            $this->report_error("`git rev-list --no-walk=unsorted` weird output");
+        $branchhashes = explode("\n", rtrim($this->gitrun($command)));
+        if (count($branchhashes) !== count($branches)) {
+            $this->report_error("`git rev-list --no-walk=unsorted` has " . count($branchhashes) . " hashes, expected " . count($branches));
         }
-        array_pop($branchhashes);
 
         // eliminate already-found and redundant revisions
         $newhashes = $this->filter_redundant_heads($branchhashes, ["--tags={$this->reponame}.snap*"], 0);
