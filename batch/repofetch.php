@@ -37,13 +37,13 @@ class RepoFetch_Batch {
     }
 
     /** @return RepoFetch_Batch */
-    static function make_refresh(Conf $conf) {
+    static function make_refresh(Conf $conf, $force) {
         $self = new RepoFetch_Batch($conf);
         $result = $conf->qe("select * from Repository r
                 where snapcheckat<?
                 and exists (select * from ContactLink where type=? and link=r.repoid)
                 order by snapcheckat asc limit 1",
-            Conf::$now - 900, LINK_REPO);
+            $force ? Conf::$now + 900 : Conf::$now - 900, LINK_REPO);
         $repo = Repository::fetch($result, $conf);
         Dbl::free($result);
         return new RepoFetch_Batch($conf, $repo);
@@ -413,7 +413,7 @@ Usage: php batch/repofetch.php [-r REPOID | -u USER | --refresh]")
             throw new CommandLineException("Mode conflict", $getopt);
         }
         if ($is_refresh) {
-            $self = RepoFetch_Batch::make_refresh($conf);
+            $self = RepoFetch_Batch::make_refresh($conf, isset($arg["f"]));
         } else if ($is_repo) {
             $self = RepoFetch_Batch::make_repo($conf, $arg["r"]);
             if (!$self) {
