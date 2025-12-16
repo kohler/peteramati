@@ -677,6 +677,7 @@ function gradelist_section_button(klass, label) {
     button.setAttribute("aria-label", label);
     button.append(document.createElement("span"));
     button.firstChild.className = "filter-gray";
+    button.tabIndex = -1;
     return button;
 }
 

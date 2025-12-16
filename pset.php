@@ -436,7 +436,7 @@ class PsetRequest {
             || !$this->viewer->can_view_grader($this->pset, $this->user)) {
             return;
         }
-        $gradercid = $this->info->gradercid();
+        $gradercid = $this->info->gradercid() ?? "";
         $pcm = $this->conf->pc_members_and_admins();
         $gpc = $pcm[$gradercid] ?? null;
         $value_post = "";

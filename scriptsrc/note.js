@@ -299,20 +299,21 @@ export class Note {
 
 
 function set_link(tr, next_tr) {
-    let $a = $(tr).find(".pa-note-links a"), t;
-    if (!$a.length) {
-        $a = $('<a></a>');
-        $('<div class="pa-note-links"></div>').append($a).prependTo($(tr).find(".pa-notecontent"));
+    let a = tr.querySelector(".pa-note-links a"), t;
+    if (!a) {
+        const nl = $e("div", "pa-note-links", (a = $e("a", {tabindex: -1}))),
+            nc = tr.querySelector(".pa-notecontent");
+        nc.insertBefore(nl, nc.firstChild);
     }
     if (next_tr) {
-        $a.attr("href", new Linediff(next_tr).hash);
+        a.href = new Linediff(next_tr).hash;
         t = "NEXT >";
     } else {
-        $a.attr("href", "");
+        a.href = "";
         t = "TOP";
     }
-    if ($a.text() !== t) {
-        $a.text(t);
+    if (a.textContent !== t) {
+        a.textContent = t;
     }
 }
 

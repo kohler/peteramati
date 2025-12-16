@@ -339,7 +339,7 @@ function foldarrow($open) {
  * @return string */
 function become_user_link($link, $text = "user") {
     $link = is_object($link) ? $link->email : $link;
-    return "<a class=\"actas\" href=\"" . Conf::$main->selfurl(null, ["actas" => $link]) . "\">"
+    return "<a class=\"actas\" href=\"" . Conf::$main->selfurl(null, ["actas" => $link]) . "\" tabindex=\"-1\">"
         . Conf::$main->cacheableImage("viewas.png", "[Become user]", "Act as " . htmlspecialchars($text)) . "</a>";
 }
 
