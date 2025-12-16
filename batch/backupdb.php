@@ -303,7 +303,7 @@ class BackupDB_Batch {
             }
         }
         if ($output_mode === "file" && is_dir($output)) {
-            if ($this->subcommand !== self::S3_GET) {
+            if ($this->subcommand !== self::BACKUP && $this->subcommand !== self::S3_GET) {
                 $this->throw_error("Refusing to output to directory");
             }
         } else if ($this->count > 1) {
@@ -804,10 +804,19 @@ class BackupDB_Batch {
         if ($this->_output_mode === "file") {
             if (is_dir($output)) {
                 $output .= str_ends_with($output, "/") ? "" : "/";
-                $output .= substr($this->_s3_backup_key, strrpos($this->_s3_backup_key, "/") + 1);
+                if ($this->subcommand === self::S3_GET) {
+                    $output .= substr($this->_s3_backup_key, strrpos($this->_s3_backup_key, "/") + 1);
+                } else {
+                    $output .= $this->connp->name . "-" . date("Ymd-His") . ".sql.gz";
+                }
                 if (!$this->compress) {
                     $output = preg_replace('/(?:\.gz|\.bz2|\.z|\.Z)\z/', "", $output);
                 }
+                $f = @fopen($output, "xb");
+                if (!$f) {
+                    $this->throw_error("Output file `{$output}` exists");
+                }
+                fclose($f);
                 fwrite(STDERR, "{$output}\n");
             }
             $outx = str_starts_with($output, "/") ? $output : "./{$output}";
@@ -955,7 +964,7 @@ class BackupDB_Batch {
             "help::,h:: Print help"
         )->description("Back up Peteramati database or restore from backup.
 Usage: php batch/backupdb.php [-c FILE | -n CONFID] [OPTS...] [-z] -o DUMP
-       php batch/backupdb.php [-c FILE | -n CONFID] [OPTS...] -r DUMP")
+       php batch/backupdb.php [-c FILE | -n CONFID] -r [OPTS...] DUMP")
          ->helpopt("help")
          ->otheropt(true)
          ->interleave(true)
