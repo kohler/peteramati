@@ -11,6 +11,7 @@ import { html_id_encode, html_id_decode } from "./encoders.js";
 
 const BACKWARD = 1;
 const ANYFILE = 2;
+const GRADES = 4;
 const decorators = [];
 
 export class Filediff {
@@ -196,6 +197,9 @@ export class Linediff {
     static closest(e) {
         const el = e.closest(".pa-dl");
         return el ? new Linediff(el) : null;
+    }
+    get nodeName() {
+        return "PA-LINEDIFF";
     }
     get filediff() {
         if (this._filediff === undefined) {
@@ -386,6 +390,9 @@ export class Linediff {
     static get ANYFILE() {
         return ANYFILE;
     }
+    static get GRADES() {
+        return GRADES;
+    }
 
     static* all(t, flags) {
         if (t instanceof Linediff) {
@@ -393,7 +400,8 @@ export class Linediff {
         }
         flags = flags || 0;
         let p = t.parentElement;
-        const direction = flags & BACKWARD ? "previousSibling" : "nextSibling";
+        const direction = flags & BACKWARD ? "previousSibling" : "nextSibling",
+            extreme = flags & BACKWARD ? "lastChild" : "firstChild";
         while (true) {
             while (!t && p) {
                 if (!(flags & ANYFILE) && hasClass(p, "pa-filediff")) {
@@ -403,18 +411,48 @@ export class Linediff {
                 p = p.parentElement;
             }
             if (!t) {
-                break;
+                return;
             } else if (t.nodeType !== Node.ELEMENT_NODE) {
-                t = t[direction];
+                // skip
+            } else if (hasClass(t, "pa-dl")) {
+                yield new Linediff(t);
             } else if (hasClass(t, "pa-dg")) {
                 p = t;
-                t = p[flags & BACKWARD ? "lastChild" : "firstChild"];
-            } else {
-                if (hasClass(t, "pa-dl")) {
-                    yield new Linediff(t);
+                t = p[extreme];
+                continue;
+            } else if (hasClass(t, "pa-grade")) {
+                if (hasClass(t, "pa-ans")
+                    && hasClass(t.lastChild.firstChild, "pa-filediff")) {
+                    p = t.lastChild.firstChild;
+                    t = p[extreme];
+                    continue;
+                } else if (flags & GRADES) {
+                    const inp = t.firstChild.nextSibling.firstChild;
+                    if ((inp.nodeName === "TEXTAREA" && hasClass(inp, "ta1"))
+                        || (inp.nodeName === "INPUT" && inp.type === "text")) {
+                        yield inp;
+                    }
                 }
-                t = t[direction];
+            } else if (hasClass(t, "pa-diffcontext")) {
+                if (!(flags & ANYFILE)) {
+                    return;
+                }
+                const dg = t.querySelectorAll(".pa-dg");
+                if (dg.length !== 0) {
+                    let tt = dg[flags & BACKWARD ? dg.length - 1 : 0];
+                    while (true) {
+                        const ttp = tt.parentElement.closest(".pa-dg");
+                        if (!ttp || !t.contains(ttp)) {
+                            break;
+                        }
+                        tt = ttp;
+                    }
+                    t = tt;
+                    p = t.parentElement;
+                    continue;
+                }
             }
+            t = t[direction];
         }
     }
 

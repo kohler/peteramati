@@ -301,9 +301,11 @@ export class Note {
 function set_link(tr, next_tr) {
     let a = tr.querySelector(".pa-note-links a"), t;
     if (!a) {
-        const nl = $e("div", "pa-note-links", (a = $e("a", {tabindex: -1}))),
-            nc = tr.querySelector(".pa-notecontent");
-        nc.insertBefore(nl, nc.firstChild);
+        const nc = tr.querySelector(".pa-notecontent");
+        if (!nc) {
+            return;
+        }
+        nc.insertBefore($e("div", "pa-note-links", (a = $e("a", {tabindex: -1}))), nc.firstChild);
     }
     if (next_tr) {
         a.href = new Linediff(next_tr).hash;

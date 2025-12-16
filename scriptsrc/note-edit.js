@@ -13,7 +13,7 @@ import { ftext, render_onto } from "./render.js";
 import { tooltip } from "./tooltip.js";
 
 
-let curline, down_event, scrolled_x, scrolled_y, scrolled_at;
+let curline, curgrade, down_event, scrolled_x, scrolled_y, scrolled_at;
 
 function locate(e) {
     while (e && e.tagName !== "TEXTAREA" && e.tagName !== "A") {
@@ -88,7 +88,6 @@ function set_scrolled_at(evt) {
 }
 
 function arrowcapture(evt) {
-    let key, modkey;
     if ((evt.type === "mousemove"
          && scrolled_at
          && (evt.timeStamp - scrolled_at <= 500
@@ -99,45 +98,77 @@ function arrowcapture(evt) {
         return;
     }
 
-    if (evt.type !== "keydown"
-        || ((key = event_key(evt)) !== "ArrowUp"
-            && key !== "ArrowDown"
-            && key !== "Enter")
-        || ((modkey = event_key.modcode(evt))
-            && (modkey !== event_key.META || key !== "Enter"))) {
-        return uncapture();
+    if (evt.type !== "keydown") {
+        uncapture();
+        return;
     }
 
+    const key = event_key(evt), modkey = event_key.modcode(evt);
+    if ((key === "ArrowUp" || key === "ArrowDown") && !modkey) {
+        arrowcapture_arrow(evt, key);
+    } else if (key === "Enter" && (!modkey || modkey === event_key.META)) {
+        arrowcapture_enter(evt);
+    } else if (!curgrade) {
+        uncapture();
+    }
+}
+
+function arrowcapture_focusat(what, evt) {
+    if (what.nodeName === "PA-LINEDIFF") {
+        curline = what;
+        curgrade = null;
+        what = what.element;
+        addClass(what, "live");
+        what.tabIndex = 0;
+    } else {
+        curline = null;
+        curgrade = what;
+        requestAnimationFrame(() => what.select());
+    }
+    what.focus();
+    const wf = what.closest(".pa-with-fixed");
+    $(wf).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
+    evt.preventDefault();
+}
+
+function arrowcapture_arrow(evt, key) {
     let ln = curline && curline.visible_source();
-    if (ln && (key === "ArrowDown" || key === "ArrowUp")) {
-        removeClass(ln.element, "live");
-        ln.element.tabIndex = -1;
-        let start = ln;
-        const flags = Linediff.ANYFILE + (key === "ArrowDown" ? 0 : Linediff.BACKWARD);
+    if (ln || curgrade) {
+        let start = curgrade || ln.element;
+        if (ln) {
+            removeClass(ln.element, "live");
+            ln.element.tabIndex = -1;
+        }
         ln = null;
+        const flags = Linediff.ANYFILE + (key === "ArrowDown" ? 0 : Linediff.BACKWARD) + Linediff.GRADES;
         for (let lnx of Linediff.all(start, flags)) {
-            if (lnx.element !== start.element && lnx.is_visible() && lnx.is_source()) {
+            if (lnx.nodeName !== "PA-LINEDIFF") {
+                arrowcapture_focusat(lnx, evt);
+                return;
+            } else if (lnx.element !== start && lnx.is_visible() && lnx.is_source()) {
                 ln = lnx;
                 break;
             }
         }
     }
+    if (ln) {
+        arrowcapture_focusat(ln, evt);
+    } else {
+        uncapture();
+    }
+}
+
+function arrowcapture_enter(evt) {
+    let ln = curline && curline.visible_source();
     if (!ln) {
-        return uncapture();
+        uncapture();
+        return;
     }
     curline = ln;
+    curgrade = null;
     evt.preventDefault();
     set_scrolled_at(evt);
-    if (key === "Enter") {
-        make_linenote();
-    } else {
-        const lne = ln.element, wf = lne.closest(".pa-with-fixed");
-        addClass(lne, "live");
-        lne.tabIndex = 0;
-        lne.focus();
-        $(lne).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
-    }
-    return true;
+    make_linenote();
 }
 
 function capture(tr, keydown) {
@@ -222,6 +253,7 @@ function pa_linenote(event) {
             // skip
         } else {
             curline = line;
+            curgrade = null;
             down_event = [event.clientX, event.clientY, t, false];
         }
     } else if (event.type === "mouseup" && line) {
@@ -231,14 +263,18 @@ function pa_linenote(event) {
             && nearby(down_event[0] - event.clientX, down_event[1] - event.clientY)
             && !down_event[3]) {
             curline = line;
+            curgrade = null;
             down_event[3] = true;
             make_linenote(event);
         }
     } else if (event.type === "click" && line) {
         curline = line;
+        curgrade = null;
         make_linenote(event);
     } else {
-        curline = down_event = null;
+        curline = null;
+        curgrade = null;
+        down_event = null;
     }
 }
 

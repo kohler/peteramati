@@ -114,15 +114,19 @@ $(document).on("focusout", ".ui-focusout", handle_ui);
 
 
 let in_tab = false;
-$(document).on("keydown keyup", function (event) {
+document.addEventListener("keydown", function (event) {
     if (event.key === "Tab" && !event.metaKey) {
-        in_tab = event.type === "keydown";
+        in_tab = true;
     }
 });
-$(document).on("focus", "textarea.ta1", function () {
-    if (in_tab) {
-        let self = this;
-        setTimeout(function () { self.setSelectionRange(0, self.value.length); }, 0);
+document.addEventListener("keyup", function (event) {
+    if (event.key === "Tab" && !event.metaKey) {
+        in_tab = false;
+    }
+});
+document.addEventListener("focusin", function (event) {
+    if (in_tab && event.target.nodeName === "TEXTAREA" && hasClass(event.target, "ta1")) {
+        requestAnimationFrame(() => event.target.select());
     }
 });
 
