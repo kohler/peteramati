@@ -3292,6 +3292,9 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .live .pa-gi:hover, .pa-dl.live {
 	background-color: #f8eec7;
 }
+.pa-dl.live:focus-visible {
+	outline: none;
+}
 .pa-gx:hover {
 	background-color: #e8e8f8;
 }

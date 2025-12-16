@@ -110,9 +110,8 @@ class GitHub_RepositorySite extends RepositorySite {
             return 2;
         } else if (preg_match('/\A\/*([^\/:@]+\/[^\/:@]+?)(?:\.git|)\z/i', $url, $m)) {
             return 1;
-        } else {
-            return 0;
         }
+        return 0;
     }
     static function home_link($html) {
         return Ht::link($html, self::MAINURL);
@@ -207,7 +206,7 @@ class GitHub_RepositorySite extends RepositorySite {
         $gq .= " } }";
         $gql = self::graphql($user->conf, $gq);
         if (!$gql->rdata) {
-            error_log(json_encode($gql));
+            error_log(json_encode($gql). "!!!!");
             $user->conf->error_msg("<0>Error contacting the GitHub API. Maybe try again?");
             return false;
         } else if (!isset($gql->rdata->user)) {
@@ -286,15 +285,14 @@ class GitHub_RepositorySite extends RepositorySite {
                 "git", "-c", "credential.helper=",
                 "-c", "credential.helper=!f () { echo username={$id}; echo password={$token}; }; f"
             ];
-        } else {
-            return ["false"];
         }
+        return ["false"];
     }
     function owner_name() {
-        if (preg_match('{\A([^/"\\\\]+)/([^/"\\\\]+)\z}', $this->base, $m))
+        if (preg_match('{\A([^/"\\\\]+)/([^/"\\\\]+)\z}', $this->base, $m)) {
             return [$m[1], $m[2]];
-        else
-            return false;
+        }
+        return false;
     }
 
     function message_defs(Contact $user) {
@@ -336,15 +334,14 @@ class GitHub_RepositorySite extends RepositorySite {
             "{ repository(owner:" . json_encode($owner_name[0])
             . ", name:" . json_encode($owner_name[1]) . ") { isPrivate } }");
         if (!$gql->rdata) {
-            error_log(json_encode($gql));
+            error_log(json_encode($gql) . "VALO");
             return -1;
         } else if ($gql->rdata->repository == null) {
             return 1;
         } else if (!$gql->rdata->repository->isPrivate) {
             return 1;
-        } else {
-            return 0;
         }
+        return 0;
     }
 
     /** @return -1|0|1 */
@@ -389,7 +386,7 @@ class GitHub_RepositorySite extends RepositorySite {
             . ") { nodes { login } } } }";
         $gql = self::graphql($this->conf, $gq);
         if (!$gql->rdata) {
-            error_log(json_encode($gql));
+            error_log(json_encode($gql) . "!?");
             return -1;
         } else if ($gql->rdata->repository === null) { // no such repository
             return -1;
@@ -401,8 +398,7 @@ class GitHub_RepositorySite extends RepositorySite {
                             return strcasecmp($node->login, $user->github_username) === 0;
                         })) {
             return 1;
-        } else {
-            return 0;
         }
+        return 0;
     }
 }

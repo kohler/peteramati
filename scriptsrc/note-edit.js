@@ -91,24 +91,27 @@ function arrowcapture(evt) {
     let key, modkey;
     if ((evt.type === "mousemove"
          && scrolled_at
-         && ((Math.abs(evt.screenX - scrolled_x) <= 1 && Math.abs(evt.screenY - scrolled_y) <= 1)
-             || evt.timeStamp - scrolled_at <= 500))
+         && (evt.timeStamp - scrolled_at <= 500
+             || (Math.abs(evt.screenX - scrolled_x) <= 1
+                 && Math.abs(evt.screenY - scrolled_y) <= 1)))
         || ((evt.type === "keydown" || evt.type === "keyup")
             && event_key.is_modifier(evt))) {
         return;
-    } else if (evt.type !== "keydown"
-               || ((key = event_key(evt)) !== "ArrowUp"
-                   && key !== "ArrowDown"
-                   && key !== "Enter")
-               || ((modkey = event_key.modcode(evt))
-                   && (modkey !== event_key.META || key !== "Enter"))
-               || !curline) {
+    }
+
+    if (evt.type !== "keydown"
+        || ((key = event_key(evt)) !== "ArrowUp"
+            && key !== "ArrowDown"
+            && key !== "Enter")
+        || ((modkey = event_key.modcode(evt))
+            && (modkey !== event_key.META || key !== "Enter"))) {
         return uncapture();
     }
 
-    let ln = curline.visible_source();
+    let ln = curline && curline.visible_source();
     if (ln && (key === "ArrowDown" || key === "ArrowUp")) {
         removeClass(ln.element, "live");
+        ln.element.tabIndex = -1;
         let start = ln;
         const flags = Linediff.ANYFILE + (key === "ArrowDown" ? 0 : Linediff.BACKWARD);
         ln = null;
@@ -119,25 +122,29 @@ function arrowcapture(evt) {
             }
         }
     }
-    if (ln) {
-        curline = ln;
-        evt.preventDefault();
-        set_scrolled_at(evt);
-        if (key === "Enter") {
-            make_linenote();
-        } else {
-            const wf = ln.element.closest(".pa-with-fixed");
-            $(ln.element).addClass("live").scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
-        }
-        return true;
-    } else {
+    if (!ln) {
         return uncapture();
     }
+    curline = ln;
+    evt.preventDefault();
+    set_scrolled_at(evt);
+    if (key === "Enter") {
+        make_linenote();
+    } else {
+        const lne = ln.element, wf = lne.closest(".pa-with-fixed");
+        addClass(lne, "live");
+        lne.tabIndex = 0;
+        lne.focus();
+        $(lne).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
+    }
+    return true;
 }
 
 function capture(tr, keydown) {
     if (!hasClass(tr, "pa-gw")) {
         addClass(tr, "live");
+        tr.tabIndex = 0;
+        tr.focus();
     }
     $(".pa-filediff").removeClass("live");
     $(document).off(".pa-linenote");
@@ -145,7 +152,10 @@ function capture(tr, keydown) {
 }
 
 function uncapture() {
-    $(".pa-dl.live").removeClass("live");
+    for (const tr of document.querySelectorAll(".pa-dl.live")) {
+        removeClass(tr, "live");
+        tr.tabIndex = -1;
+    }
     $(".pa-filediff").addClass("live");
     $(document).off(".pa-linenote");
 }
@@ -184,9 +194,8 @@ function textarea_keydown(evt) {
     } else if (event_key(evt) === "Enter" && event_key.modcode(evt) === event_key.META) {
         $(this).closest("form").submit();
         return false;
-    } else {
-        return true;
     }
+    return true;
 }
 
 function nearby(dx, dy) {
@@ -240,16 +249,14 @@ function make_linenote(event) {
         if (unedit(note)) {
             event && event.stopPropagation();
             return true;
-        } else {
-            var $ta = $(tr).find("textarea").focus();
-            $ta[0].setSelectionRange && $ta[0].setSelectionRange(0, $ta.val().length);
-            return false;
         }
-    } else {
-        render_form($(tr), note, true);
-        capture(curline.element, false);
+        const $ta = $(tr).find("textarea").focus();
+        $ta[0].setSelectionRange && $ta[0].setSelectionRange(0, $ta.val().length);
         return false;
     }
+    capture(curline.element, false);
+    render_form($(tr), note, true);
+    return false;
 }
 
 handle_ui.on("pa-editablenotes", pa_linenote);
