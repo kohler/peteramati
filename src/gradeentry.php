@@ -841,7 +841,7 @@ class GradeEntry {
         if ($this->answer)  {
             $gej["answer"] = true;
         }
-        if (($uvf >= VF_TF || $this->answer) && $this->description) {
+        if ($this->description) {
             $gej["description"] = $this->description;
         }
         return $gej;
