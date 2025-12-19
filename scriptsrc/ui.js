@@ -126,7 +126,10 @@ document.addEventListener("keyup", function (event) {
 });
 document.addEventListener("focusin", function (event) {
     if (in_tab && event.target.nodeName === "TEXTAREA" && hasClass(event.target, "ta1")) {
-        requestAnimationFrame(() => event.target.select());
+        requestAnimationFrame(() => {
+            $(event.target).scrollIntoView();
+            event.target.select();
+        });
     }
 });
 

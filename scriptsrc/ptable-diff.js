@@ -172,7 +172,7 @@ function ptable_diffdialog(ptconf, sus) {
                 const ge = gradesheet.entries[gkey],
                     gcl = in_section && ge.type !== "section" ? "checki ml-4" : "checki",
                     ccl = ge.type === "section" ? " pa-gdialog-section" : "";
-                es.push($e("label", gcl, $e("span", "checkc", $e("input", {type: "checkbox", name: ge.key, class: "uic js-rage-click" + ccl, "data-range-type": "mge"})), ge.title_node));
+                es.push($e("label", gcl, $e("span", "checkc", $e("input", {type: "checkbox", name: ge.key, class: "uic js-range-click" + ccl, "data-range-type": "mge"})), ge.title_node));
                 in_section = in_section || ge.type === "section";
             }
             gs.replaceChildren(...es);
