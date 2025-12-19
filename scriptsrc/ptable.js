@@ -307,9 +307,8 @@ class PtableConf {
             return s.email;
         } else if (this.sort.u === "name") {
             return render_name(s, false) || s.email;
-        } else {
-            return s.user;
         }
+        return s.user;
     }
 
     render_checkbox_name(s) {
@@ -414,19 +413,19 @@ class PtableConf {
             sus = [], chsus = [];
         for (let tr = tb.firstChild; tr; tr = tr.nextSibling) {
             const ss = rowmap.users.get(tr);
-            if (ss) {
-                sus.push(ss);
-                if (users && tr.children[cbidx].firstChild.checked)
-                    chsus.push(ss);
+            if (!ss || ss.hidden) {
+                continue;
             }
+            sus.push(ss);
+            if (users && tr.children[cbidx].firstChild.checked)
+                chsus.push(ss);
         }
         if (users === SOME_USERS) {
             return chsus.length > 0 ? chsus : sus;
         } else if (users === CHECKED_USERS) {
             return chsus;
-        } else {
-            return sus;
         }
+        return sus;
     }
 }
 
@@ -1268,9 +1267,8 @@ function pa_render_pset_table(ptconf) {
             return 1 | (ptconf.sort.last ? 2 : 0);
         } else if (ptconf.sort.u === "email") {
             return 4;
-        } else {
-            return 0;
         }
+        return 0;
     }
 
     function initialize() {
