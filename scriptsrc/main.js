@@ -835,7 +835,7 @@ function pa_resolve_gradelist() {
         delete geltmap[k];
 
         // add grade to sidebar
-        if (sidebar && !ge.answer) {
+        if (sidebar && ge.want_sidebar()) {
             if (sidebar.className === "pa-sidebar") {
                 if (sidebar.firstChild === null) {
                     const e = document.createElement("div");
@@ -1380,6 +1380,7 @@ window.$pa = {
     decorate_diff_page: Filediff.decorate_page,
     fold: fold,
     gradeentry_closest: GradeEntry.closest,
+    gradesheet_closest: GradeSheet.closest,
     gradesheet_store: GradeSheet.store,
     grgraph: grgraph,
     hoturl: hoturl,

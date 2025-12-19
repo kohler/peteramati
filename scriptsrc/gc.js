@@ -116,6 +116,7 @@ export const GradeClass = {
         x.type = name;
         x.initialize = x.initialize || (() => null);
         x.type_tabular = x.type_tabular == null ? true : x.type_tabular;
+        x.want_sidebar = x.want_sidebar == null ? true : x.want_sidebar;
         x.text = x.text || GradeClass.basic_text;
         x.simple_text = x.simple_text || x.text;
         x.configure_column = x.configure_column || GradeClass.basic_configure_column;
@@ -188,7 +189,8 @@ GradeClass.add("section", {
     update_edit: function () {
         return false;
     },
-    type_tabular: false
+    type_tabular: false,
+    want_sidebar: false
 });
 
 GradeClass.add("none", {
@@ -202,7 +204,8 @@ GradeClass.add("none", {
     update_edit: function () {
         return false;
     },
-    type_tabular: false
+    type_tabular: false,
+    want_sidebar: false
 });
 
 

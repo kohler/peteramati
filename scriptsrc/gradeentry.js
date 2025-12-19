@@ -152,6 +152,10 @@ export class GradeEntry {
         }
     }
 
+    want_sidebar() {
+        return !this.answer && this.gc.want_sidebar;
+    }
+
     render(gi, mode) {
         if (mode == null) {
             mode = !this.readonly
