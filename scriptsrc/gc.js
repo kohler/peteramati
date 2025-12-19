@@ -199,10 +199,10 @@ GradeClass.add("none", {
     mount_edit: function (/*elt*/) {
     },
     update_show: function () {
-        return false;
+        return true;
     },
     update_edit: function () {
-        return false;
+        return true;
     },
     type_tabular: false,
     want_sidebar: false

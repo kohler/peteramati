@@ -257,7 +257,11 @@ export class GradeEntry {
         const fresh = ve && hasClass(ve, "pa-fresh"),
             reset = opts.reset || fresh;
         if (reset || !ve) {
-            this.gc.update_edit.call(this, pde, v, opts);
+            const hidden = this.gc.update_edit.call(this, pde, v, opts);
+            if (hidden != null) {
+                const clg = pde.closest(".pa-grade");
+                toggleClass(clg, this.description ? "pa-hidden-description" : "hidden", hidden);
+            }
         }
         if (ve) {
             input_set_default_value(ve, vt);
