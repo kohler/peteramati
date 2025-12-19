@@ -3077,7 +3077,7 @@ h3.gdialog-userids {
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
 }
-.pa-dr pre, .pa-dr blockquote, .pa-dr ol, .pa-dr ul {
+.pa-dr pre, .pa-dr blockquote, .pa-dr ol, .pa-dr ul, .pa-dr dl {
 	margin-top: 0;
 }
 .pa-dr pre.partial {
@@ -3085,7 +3085,7 @@ h3.gdialog-userids {
 }
 .pa-dr > p,
 .pa-dr > h1, .pa-dr > h2, .pa-dr > h3, .pa-dr > h4, .pa-dr > h5, .pa-dr > h6,
-.pa-dr > ul, .pa-dr > ol {
+.pa-dr > ul, .pa-dr > ol, .pa-dr > dl {
 	max-width: 800px;
 }
 .pa-dr blockquote {
@@ -3111,6 +3111,17 @@ h3.gdialog-userids {
 .pa-dr td, .pa-dr th {
 	padding: 0.5em;
 	border: 1px solid silver;
+}
+.pa-dr dd {
+	margin-left: 2.5em;
+}
+.pa-dr dd::before {
+	content: "↪︎";
+	display: block;
+	position: absolute;
+	indent: 0;
+	margin-left: -1.25em;
+	width: 1em;
 }
 .pa-dr.pa-note > *:last-child {
 	margin-bottom: 0;

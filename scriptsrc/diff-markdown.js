@@ -6,6 +6,7 @@ import { Filediff } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
 import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
+import { markdownit_deflist } from "./markdown-deflist.js";
 
 let md, mdcontext;
 const nonwsre = /[^ \t\r\n]/;
@@ -180,7 +181,10 @@ function render_landmark_fence(md) {
 
 function make_markdownit() {
     if (!md) {
-        md = markdownit({linkify: true}).use(markdownit_katex).use(markdownit_minihtml);
+        md = markdownit({linkify: true})
+            .use(markdownit_katex)
+            .use(markdownit_minihtml)
+            .use(markdownit_deflist);
         for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "table_open", "blockquote_open",
                        "hr"]) {
