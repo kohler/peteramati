@@ -169,9 +169,11 @@ class RepoFetch_Batch {
     private function filter_redundant_heads($heads, $eliminate, $flags) {
         $newheads = [];
         while (!empty($heads)) {
-            $gi = $this->gitruninfo([
-                "git", "rev-list", ...$heads, "--not", ...$eliminate
-            ]);
+            $cmd = ["git", "rev-list", ...$heads];
+            if (!empty($eliminate)) {
+                array_push($cmd, "--not", ...$eliminate);
+            }
+            $gi = $this->gitruninfo($cmd);
             if (!$gi->ok) {
                 $this->report_error("`git rev-list " . join(" ", $heads) . " --not " . join(" ", $eliminate) . "`: {$gi->stderr}");
             }
