@@ -39,17 +39,17 @@ function make_xterm_write_handler(write) {
                 } else if (key === "Tab" && !mod) {
                     key = "\x09";
                 } else if (key === "ArrowUp" && !mod) {
-                    key = "\x1bOA";
+                    key = "\x1b[A";
                 } else if (key === "ArrowDown" && !mod) {
-                    key = "\x1bOB";
+                    key = "\x1b[B";
                 } else if (key === "ArrowRight" && !mod) {
-                    key = "\x1bOC";
+                    key = "\x1b[C";
                 } else if (key === "Home" && !mod) {
-                    key = "\x1bOH";
+                    key = "\x1b[H";
                 } else if (key === "End" && !mod) {
-                    key = "\x1bOF";
+                    key = "\x1b[F";
                 } else if (key === "ArrowLeft" && !mod) {
-                    key = "\x1bOD";
+                    key = "\x1b[D";
                 } else if (key === "Delete" && !mod) {
                     key = "\x1b[3~";
                 } else if (key === "PageUp" && !mod) {
