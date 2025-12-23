@@ -44,14 +44,14 @@ class Report_Page {
         if (!$this->fields) {
             if ($this->report === "git" && !$pset->gitless) {
                 $this->filename = "git";
-                $this->fields = ["last", "first", "email", "user", "huid", "year", "repo", "hash", "isgrade", "commitat"];
+                $this->fields = ["last", "first", "email", "user", "id", "year", "repo", "hash", "isgrade", "commitat"];
             } else if ($this->report === "githistory" && !$pset->gitless) {
                 $this->filename = "githistory";
                 $this->fields = ["user", "repo", "commitat", "hash", "isgrade", "subject"];
                 $this->want_history = true;
             } else if ($this->report === "default") {
                 $this->filename = "grades";
-                $this->fields = ["last", "first", "email", "user", "huid", "year", "total", "late_hours"];
+                $this->fields = ["last", "first", "email", "user", "id", "year", "total", "late_hours"];
                 foreach ($this->pset->tabular_grades() as $ge) {
                     $this->fields[] = $ge->key;
                 }
@@ -77,7 +77,7 @@ class Report_Page {
                 $x[$f] = $info->user->lastName;
             } else if ($f === "email") {
                 $x[$f] = $info->user->email;
-            } else if ($f === "huid") {
+            } else if ($f === "huid" || $f === "id") {
                 $x[$f] = $info->user->huid;
             } else if ($f === "user") {
                 if ($info->user->is_anonymous) {
@@ -153,7 +153,7 @@ class Report_Page {
         $fobj = [];
         $gfc = new GradeFormulaCompiler($this->conf);
         foreach ($this->fields as $ft) {
-            if (in_array($ft, ["first", "last", "email", "user", "year", "huid", "repo", "hash", "commitat", "isgrade", "subject"])) {
+            if (in_array($ft, ["first", "last", "email", "user", "year", "huid", "id", "repo", "hash", "commitat", "isgrade", "subject"])) {
                 $fobj[] = $ft;
             } else if (($ge = $this->pset->gradelike_by_key($ft))) {
                 $fobj[] = $ge;

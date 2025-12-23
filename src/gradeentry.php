@@ -30,7 +30,7 @@ class GradeEntry {
     public $gtype = 0;
     /** @var int
      * @readonly */
-    public $vtype;
+    public $vtype = 0;
     /** @var bool
      * @readonly */
     public $type_tabular;
@@ -548,9 +548,8 @@ class GradeEntry {
             return false;
         } else if (strcasecmp($v, "auto") === 0) {
             return null;
-        } else {
-            return new GradeError("Invalid letter grade");
         }
+        return new GradeError("Invalid letter grade");
     }
 
     /** @param null|int|float|string $v
@@ -570,9 +569,8 @@ class GradeEntry {
             return false;
         } else if (strcasecmp($v, "auto") === 0) {
             return null;
-        } else {
-            return new GradeError("Number expected");
         }
+        return new GradeError("Number expected");
     }
 
     /** @param null|int|float|string $v
@@ -592,35 +590,34 @@ class GradeEntry {
             return false;
         } else if (strcasecmp($v, "auto") === 0) {
             return null;
-        } else {
-            $d = 0;
-            $lastmul = PHP_INT_MAX;
-            $v = strtolower($v);
-            while ($v !== "") {
-                if (!preg_match('/\A(\d+\.?|\d*\.\d+)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
-                    return new GradeError("Invalid duration");
-                }
-                if ($m[2] === "s") {
-                    $mul = 1;
-                } else if ($m[2] === "m") {
-                    $mul = 60;
-                } else if ($m[2] === "h") {
-                    $mul = 3600;
-                } else if ($m[2] === "d") {
-                    $mul = 86400;
-                } else {
-                    $mul = 86400 * 7;
-                }
-                if ($mul >= $lastmul) {
-                    return new GradeError("Invalid duration");
-                }
-                $d += floatval($m[1]) * $mul;
-                $v = $m[3];
-                $lastmul = $mul;
-            }
-            $di = (int) $d;
-            return (float) $di === $d ? $di : $d;
         }
+        $d = 0;
+        $lastmul = PHP_INT_MAX;
+        $v = strtolower($v);
+        while ($v !== "") {
+            if (!preg_match('/\A(\d+\.?|\d*\.\d+)\s*([hdwms])\s*(?=[\d.]|\z)(.*)\z/', $v, $m)) {
+                return new GradeError("Invalid duration");
+            }
+            if ($m[2] === "s") {
+                $mul = 1;
+            } else if ($m[2] === "m") {
+                $mul = 60;
+            } else if ($m[2] === "h") {
+                $mul = 3600;
+            } else if ($m[2] === "d") {
+                $mul = 86400;
+            } else {
+                $mul = 86400 * 7;
+            }
+            if ($mul >= $lastmul) {
+                return new GradeError("Invalid duration");
+            }
+            $d += floatval($m[1]) * $mul;
+            $v = $m[3];
+            $lastmul = $mul;
+        }
+        $di = (int) $d;
+        return (float) $di === $d ? $di : $d;
     }
 
     /** @param bool $isnew */
@@ -653,16 +650,29 @@ class GradeEntry {
     }
 
     function unparse_value($v) {
-        if ($v === false) {
-            $v = null;
-        }
-        if ($this->type === "letter"
-            && $v !== null
-            && ($k = array_search($v, self::$letter_map))) {
-            return $k;
-        } else {
+        if ($v === false || $v === null) {
+            return null;
+        } else if (!$this->type_numeric) {
             return $v;
         }
+        if ($this->formula !== null && $this->_formula === null) { // need vtype
+            $this->formula();
+        }
+        if ($this->vtype === self::VTNUMBER
+            || $this->vtype === self::VTBOOL) {
+            return $v;
+        }
+        $rv = round($v);
+        if (abs($v - $rv) >= 0.05) {
+            return $v;
+        }
+        if ($this->vtype === self::VTLETTER
+            && $rv >= 50
+            && $rv <= 100
+            && ($k = array_search((int) $rv, self::$letter_map, true)) !== false) {
+            return $k;
+        }
+        return $v;
     }
 
     /** @return bool */
