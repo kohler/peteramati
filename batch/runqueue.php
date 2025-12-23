@@ -79,7 +79,7 @@ class RunQueue_Batch {
             if (isset($qix->tags)) {
                 $rest .= " " . $qix->tags_text();
             }
-            if ($qix->has_response() && $this->verbose) {
+            if ($qix->has_response()) {
                 $rest .= "\n     " . $qix->output_file();
             }
             fwrite(STDOUT, str_pad("{$n}. ", 5)

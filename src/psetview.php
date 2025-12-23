@@ -2762,18 +2762,14 @@ class PsetView {
     }
 
     private function echo_linenote(LineNote $note) {
-        echo '<div class="pa-dl pa-gw'; /* NB script depends on this class exactly */
+        /* NB script depends on this class exactly */
+        echo '<div class="pa-dl pa-gw" data-landmark="', $note->lineid,
+            '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render()));
         if ((string) $note->ftext === "") {
-            echo ' hidden';
-        }
-        echo '" data-landmark="', $note->lineid,
-            '" data-pa-note="', htmlspecialchars(json_encode_browser($note->render())),
-            '"><div class="pa-notebox">';
-        if ((string) $note->ftext === "") {
-            echo '</div></div>'; // pa-notebox, pa-dl
+            echo '" hidden><div class="pa-notebox"></div></div>';
             return;
         }
-        echo '<div class="pa-notecontent">';
+        echo '"><div class="pa-notebox"><div class="pa-notecontent">';
         $links = [];
         $nnote = $this->_diff_lnorder->get_next($note);
         if ($nnote) {
