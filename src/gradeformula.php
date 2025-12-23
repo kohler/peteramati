@@ -168,6 +168,12 @@ class Bin_GradeFormula extends GradeFormula {
             return $v1 != 0 ? $v0 % $v1 : null;
         case "**":
             return $v0 ** $v1;
+        case "&":
+            return $v0 & $v1;
+        case "^":
+            return $v0 ^ $v1;
+        case "|":
+            return $v0 | $v1;
         }
     }
     function evaluate(Contact $student, ?PsetView $info) {
@@ -201,9 +207,8 @@ class Relation_GradeFormula extends GradeFormula {
             return ">=";
         } else if ($op === "<" || $op === "<=" || $op === ">" || $op === ">=") {
             return $op;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param string $op
