@@ -171,6 +171,20 @@ class RepoFetch_Batch {
         return $branches;
     }
 
+    /** @return list<string> */
+    private function all_branches() {
+        $text = $this->gitrun(["git", "for-each-ref", "--format=%(refname:short)",
+                               "refs/remotes/{$this->reponame}"]);
+        $prefix = $this->reponame . "/";
+        $answers = [];
+        foreach (explode("\n", $text) as $line) {
+            if (str_starts_with($line, $prefix)) {
+                $answers[] = substr($line, strlen($prefix));
+            }
+        }
+        return $answers;
+    }
+
     private function report_error($error) {
         $r = $this->repo ? $this->repo->reponame() . ": " : "";
         error_log($r . $error);
@@ -184,6 +198,16 @@ class RepoFetch_Batch {
             return $hashes[0];
         }
         return null;
+    }
+
+    /** @param array<string,mixed> $m */
+    private function finish_verbose($ch, $m) {
+        $a = ["snapcheckat" => Conf::$now];
+        if ($this->repo->snaphash) {
+            $a["snaphash"] = $this->repo->snaphash;
+            $a["heads"] = explode(" ", $this->repo->heads);
+        }
+        fwrite(STDERR, "{$ch} {$this->reponame}: " . json_encode(array_merge($a, $m)) . "\n");
     }
 
     /** @param list<string> $branches */
@@ -206,7 +230,8 @@ class RepoFetch_Batch {
         } else {
             $newheads = $branchheads;
         }
-        if (empty($newheads) && false) {
+        if (empty($newheads)) {
+            $this->handle_fetch_unchanged();
             return;
         }
 
@@ -221,8 +246,10 @@ class RepoFetch_Batch {
         }
 
         // find minimal independent set of heads (before tagging)
-        $tagheads = $this->gitrun_hashes("git", "rev-list", "--no-walk=unsorted", "--tags={$this->reponame}.snap*");
-        $heads = $this->gitrun_hashes("git", "merge-base", "--independent", ...$tagheads);
+        $heads = $this->gitrun_hashes(["git", "rev-list", "--no-walk=unsorted", "--tags={$this->reponame}.snap*"]);
+        if (count($heads) > 1) {
+            $heads = $this->gitrun_hashes(["git", "merge-base", "--independent", ...$heads]);
+        }
 
         // save changes
         $snaphash = self::first_hash($newheads);
@@ -232,11 +259,10 @@ class RepoFetch_Batch {
             Conf::$now, $snaphash ?? $this->repo->snaphash,
             join(" ", $heads), Conf::$now, Conf::$now,
             $this->repo->repoid);
+        $this->repo->snaphash = $snaphash;
+        $this->repo->heads = join(" ", $heads);
         if ($this->verbose) {
-            fwrite(STDERR, "+ {$this->reponame}: " . json_encode([
-                "snapcheckat" => Conf::$now, "snaphash" => $snaphash,
-                "heads" => $heads
-            ]) . "\n");
+            $this->finish_verbose("+", ["changed" => true]);
         }
     }
 
@@ -247,9 +273,7 @@ class RepoFetch_Batch {
             Conf::$now, Conf::$now, Conf::$now,
             $this->repo->repoid);
         if ($this->verbose) {
-            fwrite(STDERR, "+ " . $this->repo->reponame() . ": " . json_encode([
-                "snapcheckat" => Conf::$now, "unchanged" => true
-            ]) . "\n");
+            $this->finish_verbose("+", ["changed" => false]);
         }
     }
 
@@ -257,9 +281,7 @@ class RepoFetch_Batch {
         $this->conf->qe("update Repository set working=0, snapcheckat=? where repoid=?",
             Conf::$now, $this->repo->repoid);
         if ($this->verbose) {
-            fwrite(STDERR, "- " . $this->repo->reponame() . ": " . json_encode([
-                "snapcheckat" => Conf::$now, "working" => false
-            ]) . "\n");
+            $this->finish_verbose("-", ["working" => false]);
         }
     }
 
@@ -281,9 +303,7 @@ class RepoFetch_Batch {
             $snaphash, join(" ", $heads),
             $this->repo->repoid);
         if ($this->verbose) {
-            fwrite(STDERR, "= {$this->reponame} force: " . json_encode([
-                "snaphash" => $snaphash, "heads" => $heads
-            ]) . "\n");
+            $this->finish_verbose("=", ["recompute" => true]);
         }
     }
 
@@ -338,6 +358,8 @@ class RepoFetch_Batch {
             $this->handle_fetch_failed();
         } else if (($nbr = $this->fetched_branches($fetch->stdout . $fetch->stderr))) {
             $this->handle_fetch_changed($nbr);
+        } else if (false && ($abr = $this->all_branches())) {
+            $this->handle_fetch_changed($abr);
         } else {
             $this->handle_fetch_unchanged();
         }
