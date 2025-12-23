@@ -27,6 +27,8 @@ class RecordedJobs_Batch {
     public $mode;
     /** @var bool */
     public $verbose = false;
+    /** @var bool */
+    public $quiet = false;
 
     /** @param list<Pset> $psets
      * @param list<string> $usermatch
@@ -90,14 +92,16 @@ class RecordedJobs_Batch {
     function run_list() {
         $viewer = $this->conf->site_contact();
         $sset = StudentSet::make_globmatch($viewer, $this->usermatch);
+        $m = [];
         foreach ($this->psets as $pset) {
             $sset->set_pset($pset);
             $runners = $this->all_runners ? array_keys($pset->runners) : $this->runners;
             foreach ($sset as $info) {
+                $rl = $info->run_logger();
                 foreach ($runners as $r) {
                     foreach ($info->recorded_jobs($r) as $rt) {
+                        $rr = $rl->job_response($rt);
                         if ($this->tags) {
-                            $rr = $info->run_logger()->job_response($rt);
                             $has = false;
                             foreach ($rr->tags ?? [] as $t) {
                                 if (in_array($t, $this->tags)) {
@@ -108,11 +112,26 @@ class RecordedJobs_Batch {
                                 continue;
                             }
                         }
-                        fwrite(STDOUT, $info->run_logger()->output_file($rt) . "\n");
+                        $t = $rl->output_file($rt);
+                        if (!$this->quiet) {
+                            $tx = ["-p{$pset->key}", "-r{$rr->runner}"];
+                            foreach ($rr->tags ?? [] as $tag) {
+                                $tx[] = "#{$tag}";
+                            }
+                            if (!empty($tx)) {
+                                $t = $t . "   " . join(" ", $tx);
+                            }
+                        }
+                        $m[] = "{$rt}|{$t}\n";
                     }
                 }
             }
         }
+        rsort($m, SORT_NATURAL);
+        foreach ($m as &$l) {
+            $l = substr($l, strpos($l, "|") + 1);
+        }
+        fwrite(STDOUT, join("", $m));
         return 0;
     }
 
@@ -120,9 +139,8 @@ class RecordedJobs_Batch {
     function run() {
         if ($this->mode === "update") {
             return $this->run_update();
-        } else {
-            return $this->run_list();
         }
+        return $this->run_list();
     }
 
     /** @return RecordedJobs_Batch */
@@ -133,6 +151,7 @@ class RecordedJobs_Batch {
             "r[],runner[],run[] Match these runners",
             "t[],tag[] Match these tags",
             "H:,hash:,commit: Use this commit",
+            "q,quiet !list Do not print runner",
             "V,verbose",
             "help"
         )->helpopt("help")
@@ -179,6 +198,9 @@ class RecordedJobs_Batch {
         }
         if (isset($arg["t"])) {
             $self->tags = $arg["t"];
+        }
+        if (isset($arg["q"])) {
+            $self->quiet = true;
         }
 
         return $self;

@@ -1705,8 +1705,11 @@ class PsetView {
     }
 
 
-    /** @return RunLogger */
+    /** @return ?RunLogger */
     function run_logger() {
+        if (!$this->repo) {
+            return null;
+        }
         $this->_run_logger = $this->_run_logger ?? new RunLogger($this->pset, $this->repo);
         return $this->_run_logger;
     }
