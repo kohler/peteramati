@@ -132,6 +132,22 @@ class RepoFetch_Batch {
         return $this->gitruninfo($command)->ok;
     }
 
+    /** @param list<string> $command
+     * @return list<string> */
+    private function gitrun_hashes($cmd) {
+        $text = $this->gitrun($cmd);
+        $hashes = [];
+        foreach (explode("\n", $text) as $line) {
+            if ((strlen($line) === 40 || strlen($line) === 64)
+                && ctype_xdigit($line)) {
+                $hashes[] = $line;
+            } else if ($line !== "") {
+                throw new CommandLineException("`" . self::unparse_command($cmd) . "`: Unexpected output");
+            }
+        }
+        return $hashes;
+    }
+
 
     /** @param string $out
      * @return list<string> */
@@ -160,52 +176,6 @@ class RepoFetch_Batch {
         error_log($r . $error);
     }
 
-    const FRH_ONCE = 1;
-
-    /** @param list<string> $heads
-     * @param list<string> $eliminate
-     * @param int $flags
-     * @return list<string> */
-    private function filter_redundant_heads($heads, $eliminate, $flags) {
-        $newheads = [];
-        while (!empty($heads)) {
-            $cmd = ["git", "rev-list", ...$heads];
-            if (!empty($eliminate)) {
-                array_push($cmd, "--not", ...$eliminate);
-            }
-            $gi = $this->gitruninfo($cmd);
-            if (!$gi->ok) {
-                $this->report_error("`git rev-list " . join(" ", $heads) . " --not " . join(" ", $eliminate) . "`: {$gi->stderr}");
-            }
-            $nosearch = str_starts_with($heads[0], "--no-walk");
-            $foundheads = [];
-            foreach (explode("\n", $gi->stdout) as $hash) {
-                if ($hash === "") {
-                    // never include
-                } else if ($nosearch) {
-                    $foundheads[] = $hash;
-                } else if (($i = array_search($hash, $heads)) !== false) {
-                    $foundheads[] = $hash;
-                    if (count($heads) === 1) {
-                        break;
-                    }
-                    array_splice($heads, $i, 1);
-                }
-            }
-            if (empty($foundheads)) {
-                break;
-            } else if (($flags & self::FRH_ONCE) !== 0) {
-                $newheads = $foundheads;
-                break;
-            }
-            $latesthash = array_shift($foundheads);
-            $newheads[] = $latesthash;
-            $heads = $foundheads;
-            $eliminate = [$latesthash];
-        }
-        return $newheads;
-    }
-
     /** @param list<string> $hashes
      * @return ?string */
     static function first_hash($hashes) {
@@ -223,47 +193,49 @@ class RepoFetch_Batch {
         foreach ($branches as $br) {
             $command[] = "{$this->reponame}/{$br}";
         }
-        $branchhashes = explode("\n", rtrim($this->gitrun($command)));
-        if (count($branchhashes) !== count($branches)) {
-            $this->report_error("`git rev-list --no-walk=unsorted` has " . count($branchhashes) . " hashes, expected " . count($branches));
+        $branchheads = $this->gitrun_hashes($command);
+        if (count($branchheads) !== count($branches)) {
+            $this->report_error("`git rev-list --no-walk=unsorted` has " . count($branchheads) . " hashes, expected " . count($branches));
         }
 
         // eliminate already-found and redundant revisions
-        $newhashes = $this->filter_redundant_heads($branchhashes, ["--tags={$this->reponame}.snap*"], 0);
-        if (empty($newhashes)) {
+        $oldheads = explode(" ", $this->repo->heads ?? "");
+        if (!empty($oldheads)) {
+            $tail = ["--not", ...$oldheads];
+            $newheads = $this->gitrun_hashes(["git", "rev-list", "--no-walk=unsorted", ...$branchheads, ...$tail]);
+        } else {
+            $newheads = $branchheads;
+        }
+        if (empty($newheads) && false) {
             return;
         }
 
         // tag newly-found revisions
         $timestr = null;
-        foreach ($newhashes as $hash) {
+        foreach ($newheads as $hash) {
             $timestr = $timestr ?? gmdate("Ymd\\THis", Conf::$now);
-            $i = array_search($hash, $branchhashes);
+            $i = array_search($hash, $branchheads);
             $this->gitrun([
                 "git", "tag", "{$this->reponame}.snap{$timestr}.{$branches[$i]}", $hash
             ]);
         }
 
-        // eliminate now-redundant heads
-        $oldheads = explode(" ", $this->repo->heads ?? "");
-        if (count($oldheads) > 1) {
-            array_shift($oldheads);
-            $relevant_oldheads = $this->filter_redundant_heads($oldheads, $newhashes, self::FRH_ONCE);
-            array_push($newhashes, ...$relevant_oldheads);
-        }
+        // find minimal independent set of heads (before tagging)
+        $tagheads = $this->gitrun_hashes("git", "rev-list", "--no-walk=unsorted", "--tags={$this->reponame}.snap*");
+        $heads = $this->gitrun_hashes("git", "merge-base", "--independent", ...$tagheads);
 
         // save changes
-        $snaphash = self::first_hash($newhashes);
+        $snaphash = self::first_hash($newheads);
         $this->conf->qe("update Repository set snapat=?, snaphash=?,
             heads=?, working=?, snapcheckat=?
             where repoid=?",
             Conf::$now, $snaphash ?? $this->repo->snaphash,
-            join(" ", $newhashes), Conf::$now, Conf::$now,
+            join(" ", $heads), Conf::$now, Conf::$now,
             $this->repo->repoid);
         if ($this->verbose) {
             fwrite(STDERR, "+ {$this->reponame}: " . json_encode([
                 "snapcheckat" => Conf::$now, "snaphash" => $snaphash,
-                "heads" => $newhashes
+                "heads" => $heads
             ]) . "\n");
         }
     }
@@ -292,15 +264,25 @@ class RepoFetch_Batch {
     }
 
     private function recheck_heads() {
-        $newhashes = $this->filter_redundant_heads(["--no-walk", "--remotes={$this->reponame}/*", "--tags={$this->reponame}.snap*"], [], 0);
-        $snaphash = self::first_hash($newhashes);
+        $all = $this->gitrun_hashes([
+            "git", "rev-list", "--no-walk=unsorted", "--remotes={$this->reponame}/*",
+            "--tags={$this->reponame}.snap*"
+        ]);
+        if (empty($all)) {
+            $heads = [];
+        } else {
+            $heads = $this->gitrun_hashes([
+                "git", "merge-base", "--independent", ...$all
+            ]);
+        }
+        $snaphash = self::first_hash($heads);
         $this->conf->qe("update Repository set snaphash=?, heads=?
             where repoid=?",
-            $snaphash, join(" ", $newhashes),
+            $snaphash, join(" ", $heads),
             $this->repo->repoid);
         if ($this->verbose) {
             fwrite(STDERR, "= {$this->reponame} force: " . json_encode([
-                "snaphash" => $snaphash, "heads" => $newhashes
+                "snaphash" => $snaphash, "heads" => $heads
             ]) . "\n");
         }
     }
