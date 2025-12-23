@@ -319,6 +319,12 @@ class PsetView {
         return $rpi && $rpi->placeholder <= 0 ? $rpi->gradehash : null;
     }
 
+    /** @return ?non-empty-string */
+    function grading_bhash() {
+        $rpi = $this->pset->gitless ? null : $this->rpi();
+        return $rpi && $rpi->placeholder <= 0 ? $rpi->gradebhash : null;
+    }
+
 
     /** @param string $hashpart
      * @return ?CommitRecord */
@@ -475,6 +481,10 @@ class PsetView {
         return str_starts_with($this->hash(), $e->text);
     }
 
+    function test(SearchExpr $expr) {
+        return $expr->evaluate_simple([$this, "_eval_expr"]);
+    }
+
     /** @return bool */
     function select_commit(SearchExpr $expr) {
         $cl = $this->commit_list();
@@ -585,9 +595,8 @@ class PsetView {
             return $c;
         } else if (($c = $this->pset->latest_handout_commit())) {
             return $c;
-        } else {
-            return new CommitRecord(0, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "", CommitRecord::HANDOUTHEAD);
         }
+        return new CommitRecord(0, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "", CommitRecord::HANDOUTHEAD);
     }
 
     /** @param null|int|string $base
@@ -708,9 +717,8 @@ class PsetView {
     private function current_jnotes() {
         if ($this->pset->gitless) {
             return $this->user_jnotes();
-        } else {
-            return $this->commit_jnotes();
         }
+        return $this->commit_jnotes();
     }
 
 
@@ -718,11 +726,10 @@ class PsetView {
     function notesversion() {
         if ($this->pset->gitless) {
             return $this->upi()->notesversion;
-        } else {
-            assert(!$this->pset->gitless_grades);
-            $cpi = $this->cpi();
-            return $cpi ? $cpi->notesversion : null;
         }
+        assert(!$this->pset->gitless_grades);
+        $cpi = $this->cpi();
+        return $cpi ? $cpi->notesversion : null;
     }
 
     /** @return ?int */
@@ -779,9 +786,8 @@ class PsetView {
         if ($this->pset->gitless) {
             $upi = $this->upi();
             return $upi->pinsnv ?? $upi->notesversion;
-        } else {
-            return $this->notesversion();
         }
+        return $this->notesversion();
     }
 
 
@@ -800,9 +806,8 @@ class PsetView {
             && ($n3 = $n2->$file ?? null)
             && ($ln = $n3->$lineid ?? null)) {
             return LineNote::make_json($file, $lineid, $ln);
-        } else {
-            return new LineNote($file, $lineid);
         }
+        return new LineNote($file, $lineid);
     }
 
 
@@ -1228,9 +1233,8 @@ class PsetView {
         $xpi = $this->pset->gitless ? $this->upi() : $this->rpi();
         if ($xpi && $xpi->hidegrade != 0) {
             return $xpi->hidegrade < 0;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @return 0|1|3|4|5|7
@@ -1302,15 +1306,14 @@ class PsetView {
         if (($this->_grades_suppressed & 4) === 0
             && $vf >= VF_TF) {
             return $this->pset->visible_grades(VF_TF);
-        } else {
-            $g = [];
-            foreach ($this->pset->visible_grades(VF_TF) as $i => $ge) {
-                if (($this->_grades_vf[$i] & $vf) !== 0) {
-                    $g[] = $ge;
-                }
-            }
-            return $g;
         }
+        $g = [];
+        foreach ($this->pset->visible_grades(VF_TF) as $i => $ge) {
+            if (($this->_grades_vf[$i] & $vf) !== 0) {
+                $g[] = $ge;
+            }
+        }
+        return $g;
     }
 
     private function set_gvf() {
@@ -1336,9 +1339,8 @@ class PsetView {
         $f = $this->pc_view ? VF_TF : $this->vf();
         if ((($this->grades_vf())[$ge->pcview_index] & $f) !== 0) {
             return $ge;
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @return bool */
@@ -1502,32 +1504,29 @@ class PsetView {
 
     /** @return bool */
     function needs_answers()  {
-        if ($this->pset->has_answers && $this->can_view_some_grade()) {
-            foreach ($this->nonempty_visible_grades() as $ge) {
-                if ($ge->answer) {
-                    return false;
-                }
-            }
-            return true;
-        } else {
+        if (!$this->pset->has_answers || !$this->can_view_some_grade()) {
             return false;
         }
+        foreach ($this->nonempty_visible_grades() as $ge) {
+            if ($ge->answer) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** @return int */
     function gradercid() {
         if ($this->pset->gitless_grades) {
             return $this->upi()->gradercid;
-        } else {
-            $rpi = $this->rpi();
-            if ((!$rpi || $this->_hash !== $rpi->gradehash)
-                && ($cn = $this->commit_jnotes())
-                && ($cn->gradercid ?? 0) > 0) {
-                return $cn->gradercid;
-            } else {
-                return $rpi ? $rpi->gradercid ?? 0 : 0;
-            }
         }
+        $rpi = $this->rpi();
+        if ((!$rpi || $this->_hash !== $rpi->gradehash)
+            && ($cn = $this->commit_jnotes())
+            && ($cn->gradercid ?? 0) > 0) {
+            return $cn->gradercid;
+        }
+        return $rpi ? $rpi->gradercid ?? 0 : 0;
     }
 
     /** @return bool */
@@ -2455,9 +2454,8 @@ class PsetView {
         if ($this->repo->truncated_psetdir($this->pset)
             && str_starts_with($file, $this->pset->directory_slash)) {
             return substr($file, strlen($this->pset->directory_slash));
-        } else {
-            return $file;
         }
+        return $file;
     }
 
     /** @param string $file
@@ -2513,9 +2511,8 @@ class PsetView {
                 uasort($rangeg, function ($a, $b) {
                     if ($a->landmark_range_first < $b->landmark_range_last) {
                         return -1;
-                    } else {
-                        return $a->landmark_range_first == $b->landmark_range_last ? 0 : 1;
                     }
+                    return $a->landmark_range_first == $b->landmark_range_last ? 0 : 1;
                 });
                 for ($i = 0; $i !== count($rangeg); ) {
                     $first = $rangeg[$i]->landmark_range_first;

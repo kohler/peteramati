@@ -1,13 +1,13 @@
 <?php
-// gradingcommit.php -- Peteramati script for setting grading commits
-// HotCRP and Peteramati are Copyright (c) 2006-2024 Eddie Kohler and others
+// gradereport.php -- Peteramati script for generating grade CSV
+// HotCRP and Peteramati are Copyright (c) 2006-2025 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
     require_once(dirname(__DIR__) . "/src/init.php");
 }
 
-class GradingCommit_Batch {
+class GradeReport_Batch {
     /** @var Conf */
     public $conf;
     /** @var Pset */
@@ -16,20 +16,14 @@ class GradingCommit_Batch {
     public $quiet = false;
     /** @var bool */
     public $verbose = false;
-    /** @var bool */
-    public $force = false;
-    /** @var bool */
-    public $lock = false;
-    /** @var bool */
-    public $clear = false;
-    /** @var bool */
-    public $nograde = false;
     /** @var list<string> */
     public $usermatch = [];
-    /** @var ?string */
-    public $hash;
     /** @var ?SearchExpr */
     public $commitq;
+    /** @var bool */
+    public $all = false;
+    /** @var list<GradeEntry> */
+    public $ge = [];
     /** @var int */
     public $sset_flags;
 
@@ -90,9 +84,8 @@ class GradingCommit_Batch {
         } else if ($this->match($user->anon_username)) {
             $user->set_anonymous(true);
             return true;
-        } else {
-            return false;
         }
+        return false;
     }
 
     /** @param PsetView $info
@@ -109,63 +102,110 @@ class GradingCommit_Batch {
         return "~{$info->user->username}/{$info->pset->urlkey}/{$hash}";
     }
 
+    /** @return \Generator<?string> */
+    function relevant_commits(PsetView $info, $bhashes) {
+        if ($this->pset->gitless_grades) {
+            yield null;
+            return;
+        }
+        if (!$this->all && !$this->commitq) {
+            $ghash = $info->grading_bhash();
+            $bhashes = $ghash ? [$ghash] : [$bhashes[0]];
+        }
+        foreach ($bhashes as $bhash) {
+            $hash = bin2hex($bhash);
+            if (!$info->set_hash($hash)) {
+                if ($this->verbose) {
+                    fwrite(STDERR, $this->unparse_key($info, $hash) . ": Commit not found\n");
+                }
+                continue;
+            }
+            if ($this->commitq && !$info->test($this->commitq)) {
+                if ($this->verbose) {
+                    fwrite(STDERR, $this->unparse_key($info, $hash) . ": Commit does not match\n");
+                }
+                continue;
+            }
+            yield $hash;
+            if (!$this->all) {
+                return;
+            }
+        }
+    }
+
     /** @return int */
     function run() {
+        // list all possible commits
+        $repo_bhashes = [];
+        if (!$this->pset->gitless_grades) {
+            $result = $this->conf->qe("select repoid, bhash from CommitNotes where pset=? order by repoid asc, commitat desc", $this->pset->id);
+            while (($row = $result->fetch_row())) {
+                $repo_bhashes[(int) $row[0]][] = $row[1];
+            }
+            $result->close();
+        }
+
+        if (empty($this->ge)) {
+            $this->ge = iterator_to_array($this->pset->grades());
+        }
+
+        $header = ["email"];
+        if (!$this->pset->gitless_grades) {
+            $header[] = "hash";
+            $header[] = "timestamp";
+            $header[] = "grading";
+        }
+        foreach ($this->ge as $ge) {
+            $header[] = $ge->key;
+        }
+
+        $csv = (new CsvGenerator)->set_stream(STDOUT)->select($header);
+
         $viewer = $this->conf->site_contact();
         $sset = new StudentSet($viewer, $this->sset_flags, [$this, "test_user"]);
         $sset->set_pset($this->pset);
 
-        $nadded = $nscheduled = 0;
         foreach ($sset as $info) {
-            if (!$info->repo) {
+            $bhashes = $info->repo ? $repo_bhashes[$info->repo->repoid] ?? [] : [];
+            if (!$this->pset->gitless_grades && empty($bhashes)) {
                 continue;
             }
-            if (!$this->force && $info->rpi()->placeholder === 0) {
-                continue;
-            }
-            if (($this->hash && !$info->set_hash($this->hash, true))
-                || ($this->commitq && !$info->select_commit($this->commitq))) {
-                if ($this->verbose) {
-                    $key = $this->hash ? $this->unparse_key($info, $this->hash) : $this->unparse_hashless_key($info);
-                    fwrite(STDERR, "{$key}: no such commit on {$info->branch}\n");
+            foreach ($this->relevant_commits($info, $bhashes) as $hash) {
+                $row = ["email" => $info->user->email];
+                if (!$this->pset->gitless_grades) {
+                    $row["hash"] = $hash;
+                    $row["timestamp"] = $info->commit()->commitat;
+                    $row["grading"] = $info->is_grading_commit() ? "yes" : "";
                 }
-                continue;
+                foreach ($info->visible_grades(VF_TF) as $ge) {
+                    if (!in_array($ge, $this->ge, true)) {
+                        continue;
+                    }
+                    $row[$ge->key] = $info->grade_value($ge);
+                }
+                $csv->add_row($row);
             }
-            if ($this->clear || $this->nograde) {
-                $placeholder = $this->nograde ? RepositoryPsetInfo::PL_DONOTGRADE : RepositoryPsetInfo::PL_NONE;
-            } else if ($info->hash()) {
-                $placeholder = $this->lock ? RepositoryPsetInfo::PL_LOCKED : RepositoryPsetInfo::PL_USER;
-            } else {
-                continue;
-            }
-            $info->change_grading_commit($placeholder, RepositoryPsetInfo::UTYPE_ADMIN);
-            ++$nadded;
         }
-        return $nadded > 0 ? 0 : 1;
+
+        $csv->flush();
+        return 0;
     }
 
-    /** @return GradingCommit_Batch */
+    /** @return GradeReport_Batch */
     static function make_args(Conf $conf, $argv) {
         $arg = (new Getopt)->long(
             "p:,pset: Problem set",
             "u[]+,user[]+ Match these users",
-            "H:,hash:,commit: Use this commit",
-            "commit-query:,cq:,commitq: Use the commit matching this search",
-            "clear Clear grading commit",
-            "do-not-grade,no-grade Mark as do-not-grade",
-            "f,force Override commit locks",
-            "lock Set commit locks",
+            "all,a Report all commits",
+            "commit-query:,cq:,commitq: Use commits matching this search",
+            "g[]+,grade[]+ Include these grades",
             "q,quiet",
             "V,verbose",
             "help"
         )->helpopt("help")
-         ->description("Usage: php batch/gradingcommit.php -p PSET [-u USERS...] [--cq C]")
+         ->description("Usage: php batch/gradereport.php -p PSET [-u USERS...] [--cq C]")
          ->otheropt(false)
          ->parse($argv);
-
-        if (($mode = $arg["_subcommand"] ?? null) === null) {
-            $mode = isset($arg["p"]) || isset($arg["r"]) ? "add" : "list";
-        }
 
         $pset_arg = $arg["p"] ?? "";
         $pset = $conf->pset_by_key($pset_arg);
@@ -173,31 +213,23 @@ class GradingCommit_Batch {
             $pset_keys = array_values(array_map(function ($p) { return $p->key; }, $conf->psets()));
             throw (new CommandLineException($pset_arg === "" ? "`--pset` required" : "Pset `{$pset_arg}` not found"))->add_context("(Options are " . join(", ", $pset_keys) . ".)");
         }
-        $self = new GradingCommit_Batch($pset, $arg["u"] ?? []);
+        $self = new GradeReport_Batch($pset, $arg["u"] ?? []);
         $self->quiet = isset($arg["q"]);
         $self->verbose = isset($arg["V"]);
-        $self->force = isset($arg["f"]);
-        $self->lock = isset($arg["lock"]);
-        $self->clear = isset($arg["clear"]);
-        $self->nograde = isset($arg["do-not-grade"]);
-        if (isset($arg["H"])) {
-            if ($arg["H"] === "" || $arg["H"] === "none") {
-                $self->clear = true;
-            } else if ($arg["H"] === "no-grade" || $arg["H"] === "nograde") {
-                $self->nograde = true;
-            } else if (($hp = CommitRecord::parse_hashpart($arg["H"]))) {
-                $self->hash = $hp;
-            } else {
-                throw new CommandLineException("bad `--commit`");
-            }
-        }
+        $self->all = isset($arg["all"]);
         if (isset($arg["commit-query"])) {
             $self->commitq = PsetView::parse_commit_query($arg["commit-query"]);
+        }
+        foreach ($arg["g"] ?? [] as $gradename) {
+            if (!($ge = $pset->gradelike_by_key($gradename))) {
+                throw new CommandLineException("Grade `{$gradename}` not found in pset `{$pset->key}`");
+            }
+            $self->ge[] = $ge;
         }
         return $self;
     }
 }
 
 if (realpath($_SERVER["PHP_SELF"]) === __FILE__) {
-    exit(GradingCommit_Batch::make_args(Conf::$main, $argv)->run());
+    exit(GradeReport_Batch::make_args(Conf::$main, $argv)->run());
 }

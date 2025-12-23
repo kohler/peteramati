@@ -487,7 +487,7 @@ class RunQueue_Batch {
         "u[]+,user[]+ !add Match these users",
         "U:,url:,key: !add Add by URL or key",
         "H:,hash:,commit: !add Use this commit",
-        "commit-query:,commitq: !add Use the commit matching this search",
+        "commit-query:,cq:,commitq: !add Use the commit matching this search",
         "C:,c:,chain: !add Set chain ID",
         "at-end,last !add Schedule after all previous jobs",
         "t[],tag[] !add Add tag",
