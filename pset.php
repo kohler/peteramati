@@ -780,10 +780,10 @@ class PsetRequest {
                 Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade" . ($this->info->is_grading_commit() ? " active" : "")]),
                 Ht::button("🔒", ["class" => "ui pa-flagger-gradelock" . ($this->info->is_grading_commit() && $gradelock ? " active" : "")]),
                 '</div>';
-        } else if (!$gradelock && !$this->pset->frozen && !$this->pset->gitless_grades) {
+        } else if (!$this->pset->gitless_grades && !$this->info->frozen()) {
             echo Ht::button("Grade this commit", ["class" => "ui pa-flagger-grade mr-3" . ($this->info->is_grading_commit() ? " active" : "")]);
         }
-        if ($admin || (!$gradelock && !$this->pset->frozen)) {
+        if ($admin || !$this->info->frozen()) {
             echo Ht::button("DO NOT GRADE", ["class" => "ui pa-flagger-nograde mr-4" . ($this->info->is_do_not_grade() ? " active" : "")]);
         }
         echo Ht::button("Flag this commit", ["class" => "ui pa-flagger" . ($all_resolved ? "" : " hidden"), "name" => "flag"]),

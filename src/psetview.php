@@ -1228,6 +1228,31 @@ class PsetView {
     }
 
 
+    /** @return bool */
+    function frozen() {
+        if ($this->pinned_frozen() ?? $this->pset->frozen) {
+            return true;
+        }
+        if (!$this->pset->gitless_grades
+            && ($rpi = $this->rpi())
+            && $rpi->placeholder === 0) {
+            return true;
+        }
+        if (!$this->pset->gitless) {
+            return false;
+        }
+        return $this->has_pinned_answers() || $this->has_newer_answers();
+    }
+
+    /** @return ?bool */
+    function pinned_frozen() {
+        $xpi = $this->pset->gitless ? $this->upi() : $this->rpi();
+        if ($xpi && $xpi->freeze != 0) {
+            return $xpi->freeze > 0;
+        }
+        return null;
+    }
+
     /** @return ?bool */
     function pinned_scores_visible() {
         $xpi = $this->pset->gitless ? $this->upi() : $this->rpi();
@@ -1413,11 +1438,16 @@ class PsetView {
     }
 
     /** @return bool */
+    function answers_editable_student() {
+        return $this->pset->visible_student()
+            && $this->pset->has_answers
+            && !$this->frozen();
+    }
+
+    /** @return bool */
     function can_edit_grade() {
         return $this->can_view_some_grade()
-            && ($this->pc_view
-                || ($this->pset->answers_editable_student()
-                    && !$this->has_pinned_answers()));
+            && ($this->pc_view || $this->answers_editable_student());
     }
 
     /** @return bool */
@@ -1673,27 +1703,42 @@ class PsetView {
         $this->clear_can_view_grade();
     }
 
+    /** @param 'hidegrade'|'freeze' $key
+     * @param -1|0|1 $value
+     * @return bool */
+    private function set_xpi_pin($key, $value) {
+        if ($this->pset->gitless_grades) {
+            $xpi = $this->upi();
+            if ($xpi->$key === $value) {
+                return false;
+            }
+            $xpi->materialize($this->conf);
+            $this->conf->qe("update ContactGrade set {$key}=? where cid=? and pset=?",
+                $value, $xpi->cid, $xpi->pset);
+        } else if ($this->repo) {
+            $xpi = $this->rpi();
+            if ($xpi->$key === $value) {
+                return false;
+            }
+            $xpi->materialize($this->conf);
+            $this->conf->qe("update RepositoryGrade set {$key}=? where repoid=? and branchid=? and pset=?",
+                $value, $xpi->repoid, $xpi->branchid, $xpi->pset);
+        } else {
+            return false;
+        }
+        $xpi->$key = $value;
+        return true;
+    }
+
+    /** @param ?bool $freeze */
+    function set_pinned_frozen($freeze) {
+        $this->set_xpi_pin("freeze", $freeze === null ? 0 : ($freeze ? 1 : -1));
+    }
+
     /** @param ?bool $vso */
     function set_pinned_scores_visible($vso) {
-        $hidegrade = $vso === null ? 0 : ($vso ? -1 : 1);
-        if ($this->pset->gitless_grades) {
-            $upi = $this->upi();
-            if ($upi->hidegrade !== $hidegrade) {
-                $upi->materialize($this->conf);
-                $this->conf->qe("update ContactGrade set hidegrade=? where cid=? and pset=?",
-                    $hidegrade, $upi->cid, $upi->pset);
-                $upi->hidegrade = $hidegrade;
-                $this->clear_can_view_grade();
-            }
-        } else if ($this->repo) {
-            $rpi = $this->rpi();
-            if ($rpi->hidegrade !== $hidegrade) {
-                $rpi->materialize($this->conf);
-                $this->conf->qe("update RepositoryGrade set hidegrade=? where repoid=? and branchid=? and pset=?",
-                    $hidegrade, $rpi->repoid, $rpi->branchid, $rpi->pset);
-                $rpi->hidegrade = $hidegrade;
-                $this->clear_can_view_grade();
-            }
+        if ($this->set_xpi_pin("hidegrade", $vso === null ? 0 : ($vso ? -1 : 1))) {
+            $this->clear_can_view_grade();
         }
     }
 
@@ -2056,21 +2101,12 @@ class PsetView {
         }
         if ($this->pset->gitless_grades) {
             if ($this->pset->gitless) {
-                $upi = $this->upi();
-                $gexp->version = $upi->notesversion;
-                if (!$gexp->scores_editable) {
-                    $gexp->answers_editable = !$this->pset->frozen
-                        && !$this->has_newer_answers()
-                        && !$this->has_pinned_answers();
-                }
-            } else {
-                $rpi = $this->rpi();
-                if ($rpi) {
-                    $gexp->version = $rpi->rpnotesversion;
-                }
-                if (!$gexp->scores_editable) {
-                    $gexp->answers_editable = !$this->pset->frozen;
-                }
+                $gexp->version = $this->upi()->notesversion;
+            } else if (($rpi = $this->rpi())) {
+                $gexp->version = $rpi->rpnotesversion;
+            }
+            if (!$gexp->scores_editable) {
+                $gexp->answers_editable = $this->answers_editable_student();
             }
         }
         if (($ts = $this->student_timestamp(false))) {

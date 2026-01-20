@@ -332,6 +332,10 @@ class Grade_API {
      * @param ?StudentSet $sset */
     static private function gradesettings1($ug, $info, &$old_pset, $sset) {
         $pset = $info->pset;
+        if (property_exists($ug, "frozen")
+            && ($pset->gitless_grades || $info->repo)) {
+            $info->set_pinned_frozen($ug->frozen);
+        }
         if (property_exists($ug, "scores_visible")
             && ($pset->gitless_grades || $info->repo)) {
             $info->set_pinned_scores_visible($ug->scores_visible);
@@ -396,6 +400,9 @@ class Grade_API {
         if ($qreq->is_post()) {
             foreach ($sset as $uid => $info) {
                 $ug = $ugs[$uid];
+                if (isset($ug->frozen) && !is_bool($ug->frozen)) {
+                    return ["ok" => false, "error" => "Invalid `frozen` request"];
+                }
                 if (isset($ug->scores_visible) && !is_bool($ug->scores_visible)) {
                     return ["ok" => false, "error" => "Invalid `scores_visible` request"];
                 }
@@ -429,6 +436,7 @@ class Grade_API {
             } else {
                 $j["us"][] = [
                     "uid" => $uid,
+                    "frozen" => $info->pinned_frozen(),
                     "scores_visible" => $info->pinned_scores_visible(),
                     "gradercid" => $info->gradercid(),
                     "dropped" => $info->user->dropped > 0

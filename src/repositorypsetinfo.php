@@ -17,6 +17,8 @@ class RepositoryPsetInfo {
     /** @var ?int */
     public $gradercid;
     /** @var int */
+    public $freeze = 0;
+    /** @var int */
     public $hidegrade = 0;
     /** @var int */
     public $placeholder = 1;
@@ -89,6 +91,7 @@ class RepositoryPsetInfo {
         $this->gradebhash = $x->gradebhash;
         $this->commitat = isset($x->commitat) ? (int) $x->commitat : null;
         $this->gradercid = isset($x->gradercid) ? (int) $x->gradercid : null;
+        $this->freeze = (int) $x->freeze;
         $this->hidegrade = (int) $x->hidegrade;
         $this->placeholder = (int) $x->placeholder;
         $this->placeholder_at = isset($x->placeholder_at) ? (int) $x->placeholder_at : null;

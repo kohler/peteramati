@@ -21,6 +21,8 @@ class UserPsetInfo {
     /** @var ?string */
     public $notes;
     /** @var int */
+    public $freeze = 0;
+    /** @var int */
     public $hidegrade = 0;
     /** @var int */
     public $hasactiveflags = 0;
@@ -85,6 +87,7 @@ class UserPsetInfo {
         $this->studentupdateat = isset($x->studentupdateat) ? (int) $x->studentupdateat : null;
         $this->gradercid = isset($x->gradercid) ? (int) $x->gradercid : null;
         $this->notes = $x->notesOverflow ?? $x->notes;
+        $this->freeze = (int) $x->freeze;
         $this->hidegrade = (int) $x->hidegrade;
         $this->hasactiveflags = (int) $x->hasactiveflags;
         $this->xnotes = $x->xnotesOverflow ?? $x->xnotes;

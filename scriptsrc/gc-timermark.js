@@ -48,17 +48,15 @@ GradeClass.add("timermark", {
     text: function (v) {
         if (v == null || v === 0) {
             return "–";
-        } else {
-            return strftime(timefmt, v);
         }
+        return strftime(timefmt, v);
     },
     simple_text: GradeClass.basic_text,
     tcell: function (v) {
         if (v == null || v === 0) {
             return "";
-        } else {
-            return strftime(timefmt, v);
         }
+        return strftime(timefmt, v);
     },
     tcell_width: 10,
     make_compare: function (col) {
@@ -84,29 +82,27 @@ GradeClass.add("timermark", {
         elt.id = id;
         addClass(elt, "pa-gradevalue");
     },
-    update_show: function (elt, v, opts) {
-        const gi = opts.gradesheet;
+    update_show: function (ve, v, opts) {
         if (v == null || v === 0) {
-            elt.textContent = "";
-        } else {
-            let ch = [strftime(timefmt, v)];
-            if (gi && (gi.student_timestamp || 0) > v) {
-                const sts = strftime(timefmt, gi.student_timestamp),
-                    delta = gi.student_timestamp - v,
-                    timeout = timeout_value(this, gi);
-                if (timeout && delta > timeout + 120) {
-                    ch[0] = ch[0].concat(" → ", sts, " ");
-                    const strong = document.createElement("strong");
-                    strong.className = "overdue";
-                    strong.textContent = "(" + sec2text(delta) + " later)";
-                    ch.push(strong);
-                } else {
-                    ch[0] = ch[0].concat(" → ", sts, " (", sec2text(delta), " later)");
-                }
-            }
-            elt.replaceChildren(...ch);
+            ve.replaceChildren();
+            return true;
         }
-        return false;
+        const gi = opts.gradesheet, ch = [strftime(timefmt, v)];
+        if (gi && (gi.student_timestamp || 0) > v) {
+            const sts = strftime(timefmt, gi.student_timestamp),
+                delta = gi.student_timestamp - v,
+                timeout = timeout_value(this, gi);
+            if (timeout && delta > timeout + 120) {
+                ch[0] = ch[0].concat(" → ", sts, " ");
+                const strong = document.createElement("strong");
+                strong.className = "overdue";
+                strong.textContent = "(" + sec2text(delta) + " later)";
+                ch.push(strong);
+            } else {
+                ch[0] = ch[0].concat(" → ", sts, " (", sec2text(delta), " later)");
+            }
+        }
+        ve.replaceChildren(...ch);
     },
     mount_edit: function (elt) {
         removeClass(elt, "pa-gradevalue");

@@ -555,6 +555,17 @@ export class GradeSheet {
         if (x.autogrades) {
             this.autogrades = this.merge_grades(this.autogrades, x.autogrades, x);
         }
+        if ("frozen" in x) {
+            if (this.parent) {
+                if ((this.frozen_pinned = x.frozen != null)) {
+                    this.frozen = x.frozen;
+                } else {
+                    this.frozen = this.parent.frozen;
+                }
+            } else {
+                this.frozen = x.frozen;
+            }
+        }
         if ("scores_visible" in x) {
             if (this.parent) {
                 if ((this.scores_visible_pinned = x.scores_visible != null)) {

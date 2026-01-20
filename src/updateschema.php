@@ -1091,6 +1091,11 @@ class UpdateSchema {
             && $this->v177_readme_md_out_of_range()) {
             $conf->update_schema_version(178);
         }
+        if ($conf->sversion === 178
+            && $conf->ql_ok("alter table ContactGrade add `freeze` tinyint(1) NOT NULL DEFAULT 0")
+            && $conf->ql_ok("alter table RepositoryGrade add `freeze` tinyint(1) NOT NULL DEFAULT 0")) {
+            $conf->update_schema_version(179);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

@@ -226,6 +226,9 @@ class Home_TA_Page {
         if (($gcid = $info->gradercid())) {
             $j["gradercid"] = $gcid;
         }
+        if (($f = $info->pinned_frozen()) !== null) {
+            $j["frozen"] = $f;
+        }
         if (($svh = $info->pinned_scores_visible()) !== null) {
             $j["scores_visible"] = $svh;
         }

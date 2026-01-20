@@ -286,6 +286,15 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
             for (let su of gdialog_su) {
                 us[su.uid].scores_visible = gvisarg;
             }
+        } else if (this.name === "save-frozen") {
+            let frozenarg;
+            $(gs).find(".pa-frozen").each(function () {
+                if (this.checked && !this.indeterminate)
+                    frozenarg = JSON.parse(this.value);
+            });
+            for (let su of gdialog_su) {
+                us[su.uid].frozen = frozenarg;
+            }
         } else if (this.name === "save-grader"
                    && form.elements.gradertype.value === "clear") {
             for (let su of gdialog_su) {
@@ -373,6 +382,11 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
         }
         more();
     }
+    function gdialog_settings_frozen_click() {
+        const gs = $gdialog.find(".pa-gdialog-settings")[0];
+        $(gs).find(".pa-frozen").prop("checked", false).prop("indeterminate", false);
+        this.checked = true;
+    }
     function gdialog_settings_gvis_click() {
         const gs = $gdialog.find(".pa-gdialog-settings")[0];
         $(gs).find(".pa-gvis").prop("checked", false).prop("indeterminate", false);
@@ -404,6 +418,14 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
     function gdialog_fill_settings(gs) {
         const itype = gdialog_su.length === 1 ? "radio" : "checkbox";
         gs.append($e("fieldset", null,
+            $e("legend", null, "Submission updates"),
+            $e("div", "multicol-3",
+                $checkbox({name: "frozen", value: "false", type: itype, "class": "uic pa-frozen"}, "Editable"),
+                $checkbox({name: "frozen", value: "true", type: itype, "class": "uic pa-frozen"}, "Frozen"),
+                $checkbox({name: "frozen", value: "null", type: itype, "class": "uic pa-frozen"}, "Default (" + (ptconf.frozen ? "frozen" : "editable") + ")")),
+            $save_action("save-frozen")));
+
+        gs.append($e("fieldset", "mt-3",
             $e("legend", null, "Grade visibility"),
             $e("div", "multicol-3",
                 $checkbox({name: "gvis", value: "true", type: itype, "class": "uic pa-gvis"}, "Visible"),
@@ -442,6 +464,7 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
 
         $(gs).on("click", "button", gdialog_settings_submit);
         $(gs).on("click", ".pa-grader", gdialog_settings_grader_click);
+        $(gs).on("click", ".pa-frozen", gdialog_settings_frozen_click);
         $(gs).on("click", ".pa-gvis", gdialog_settings_gvis_click);
         $(gs).on("click", ".pa-dropped", gdialog_settings_dropped_click);
     }
@@ -449,8 +472,15 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
         const gs = $gdialog.find(".pa-gdialog-settings")[0], f = gs.closest("form");
         gs.firstChild || gdialog_fill_settings(gs);
 
-        const gvis = {}, ggr = {}, ggra = {}, gdropped = {};
+        const frozen = {}, gvis = {}, ggr = {}, ggra = {}, gdropped = {};
         for (let su of gdialog_su) {
+            if (!su.frozen_pinned) {
+                frozen["null"] = (frozen["null"] || 0) + 1;
+            } else if (su.frozen) {
+                frozen["true"] = (frozen["true"] || 0) + 1;
+            } else {
+                frozen["false"] = (frozen["false"] || 0) + 1;
+            }
             if (!su.scores_visible_pinned) {
                 gvis["null"] = (gvis["null"] || 0) + 1;
             } else if (su.scores_visible) {
@@ -470,6 +500,9 @@ export function ptable_gdialog(ptconf, checked_spos, table, hlgrade) {
             }
         }
         $(gs).find("input").prop("checked", false).prop("indeterminate", false);
+        for (let x in frozen) {
+            $(gs).find(".pa-frozen[value=" + x + "]").prop("checked", !!frozen[x]).prop("indeterminate", frozen[x] && frozen[x] !== gdialog_su.length);
+        }
         for (let x in gvis) {
             $(gs).find(".pa-gvis[value=" + x + "]").prop("checked", !!gvis[x]).prop("indeterminate", gvis[x] && gvis[x] !== gdialog_su.length);
         }

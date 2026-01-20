@@ -715,7 +715,7 @@ class GradeEntry {
         if (!$info->pc_view) {
             if ($this->visible === false || !$this->answer) {
                 return new GradeError("Cannot modify");
-            } else if ($this->pset->frozen || $info->has_pinned_answers()) {
+            } else if (!$info->answers_editable_student()) {
                 return new GradeError("You can’t edit your answers further");
             } else if ($this->type === "timermark" && $oldv) {
                 return new GradeError("Time already started");
