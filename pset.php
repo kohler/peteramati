@@ -103,7 +103,7 @@ class PsetRequest {
     }
 
     function handle_setcommit() {
-        $this->conf->redirect($this->info->hoturl("pset"));
+        $this->conf->redirect($this->info->hoturl_raw("pset"));
     }
 
     function handle_download() {
@@ -180,7 +180,7 @@ class PsetRequest {
             && $this->viewer !== $this->user
             && $this->pset->gitless) {
             $this->info->set_pinned_answer_version();
-            $this->conf->redirect($this->info->hoturl("pset"));
+            $this->conf->redirect($this->info->hoturl_raw("pset"));
         }
     }
 
@@ -329,8 +329,7 @@ class PsetRequest {
         } else {
             return "";
         }
-        return '<a href="' . $this->conf->hoturl("pset", $x) . '" class="track">'
-            . ($isprev ? "« " : "") . $t . ($isprev ? "" : " »") . '</a>';
+        return $this->conf->hotlink($isprev ? "« {$t}" : "{$t} »", "pset", $x, ["class" => "track nw"]);
     }
 
     private function echo_session_list_links() {
@@ -367,18 +366,18 @@ class PsetRequest {
         $b = [];
         if ($newer || $older) {
             if ($older !== null) {
-                $b[] = Ht::link("←", $this->info->hoturl("pset", ["snv" => $older]), ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
+                $b[] = $this->info->hotlink("←", "pset", ["snv" => $older], ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
             } else {
                 $b[] = Ht::button("←", ["type" => "button", "disabled" => true]);
             }
         }
         if ($this->info->pc_view) {
             $cl = $match === $this->info->pinsnv() ? " btn-primary" : "";
-            $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading"]);
+            $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl_raw("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading"]);
         }
         if ($newer || $older) {
             if ($newer !== null) {
-                $b[] = Ht::link("→", $this->info->hoturl("pset", ["snv" => $newer === $newest ? "latest" : $newer]), ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
+                $b[] = $this->info->hotlink("→", "pset", ["snv" => $newer === $newest ? "latest" : $newer], ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
             } else {
                 $b[] = Ht::button("→", ["type" => "button", "disabled" => true]);
             }
@@ -401,7 +400,7 @@ class PsetRequest {
         ContactView::echo_downloads_group($this->info);
         if ($this->pset->gitless_grades && $this->info->can_edit_scores()) {
             echo '<div id="upload" class="hidden"><hr/>',
-                Ht::form($this->info->hoturl("=pset", ["uploadgrades" => 1])),
+                $this->info->hotform("=pset", ["uploadgrades" => 1]),
                 '<div class="f-contain">',
                 '<input type="file" name="file">',
                 Ht::submit("Upload"),
@@ -459,7 +458,7 @@ class PsetRequest {
                 }
             }
 
-            $value = Ht::form($this->info->hoturl("=pset", ["setgrader" => 1]))
+            $value = $this->info->hotform("=pset", ["setgrader" => 1])
                 . "<div>" . Ht::select("grader", $sel, $gpc ? $gpc->email : "none", ["class" => "uich js-pset-setgrader"]);
             $value_post = "<span class=\"ajaxsave61\"></span></div></form>";
         } else {
@@ -643,18 +642,18 @@ class PsetRequest {
                     ? ["commit" => $gc->hash, "commit1" => $tc->hash]
                     : ["commit" => $tc->hash, "commit1" => $gc->hash];
                 $remarks[] = [true, "This is not "
-                    . "<a class=\"qh\" href=\"" . $this->info->hoturl("pset", ["commit" => $gc->hash])
-                    . "\">the commit currently marked for grading</a>"
-                    . " <span class=\"n\">(<a class=\"qh\" href=\"" . $this->info->hoturl("diff", $args)
-                    . "\">see diff</a>)</span>."
+                    . $this->info->hotlink("the commit currently marked for grading", "pset", ["commit" => $gc->hash], ["class" => "qh"])
+                    . " <span class=\"n\">("
+                    . $this->info->hotlink("see diff", "diff", $args, ["class" => "qh"])
+                    . ")</span>."
                 ];
             }
         }
         if (!$this->info->is_lateish_commit()) {
             $remarks[] = [true, "This is not "
-                . Ht::link("the latest commit", $this->info->hoturl("pset", ["commit" => $this->info->latest_hash()]), ["class" => "qh"])
+                . $this->info->hotlink("the latest commit", "pset", ["commit" => $this->info->latest_hash()], ["class" => "qh"])
                 . " <span class=\"n\">("
-                . Ht::link("see diff", $this->info->hoturl("diff", ["commit1" => $this->info->latest_hash()]), ["class" => "qh"])
+                . $this->info->hotlink("see diff", "diff", ["commit1" => $this->info->latest_hash()], ["class" => "qh"])
                 . ")</span>."];
         }
         if ($rc->suspicious_directory) {
@@ -701,7 +700,7 @@ class PsetRequest {
                     } else {
                         $cmd .= " " . htmlspecialchars($pset->handout_branch);
                     }
-                    $remarks[] = [true, "Updates are available for this problem set <span style=\"font-weight:normal\">(<a href=\"" . $this->info->hoturl("diff", array("commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash)) . "\">see diff</a>)</span>. Run <code>" . $cmd . "</code> to merge these updates."];
+                    $remarks[] = [true, "Updates are available for this problem set <span style=\"font-weight:normal\">(" . $this->info->hotlink("see diff", "diff", ["commit" => $last_myhandout, "commit1" => $need_handout_hash ? : $last_handout->hash]) . ")</span>. Run <code>" . $cmd . "</code> to merge these updates."];
                 }
             } else if ($last_handout && $pset->handout_warn_merge !== false) {
                 $remarks[] = [true, "Please create your repository by cloning our repository, and update psets by merging rather than rebasing.<br>Otherwise, we can’t tell whether your pset is fully up to date.<br>This command will mark your repository as merged with the handout, without changing its contents:<br><pre>git pull --allow-unrelated-histories --no-edit -s ours \"" . htmlspecialchars($pset->handout_repo_url) . "\" &amp;&amp; git push</pre>"];
@@ -724,7 +723,7 @@ class PsetRequest {
         $remarks[] = join(", ", $xnotes);
 
         // actually print
-        echo Ht::form($this->info->hoturl("=pset", ["commit" => null, "setcommit" => 1]),
+        echo $this->info->hotform("=pset", ["commit" => null, "setcommit" => 1],
                 ["class" => "pa-commitcontainer", "data-pa-pset" => $this->pset->urlkey, "data-pa-checkhash" => $this->info->latest_hash()]);
         ContactView::echo_group($key, $value, $remarks);
         echo "</form>\n";
@@ -813,7 +812,7 @@ class PsetRequest {
         if (!empty($rbrunners)) {
             $want_plus = $viewer->isPC && $viewer !== $user;
             echo '<div class="pa-p no-print"><div class="pa-pt"></div><div class="pa-pv">',
-                Ht::form($this->info->hoturl("=run"));
+                $this->info->hotform("=run");
             $nrunners = count($rbrunners);
             for ($i = 0; $i !== $nrunners; ++$i) {
                 $r = $rbrunners[$i];
@@ -830,7 +829,7 @@ class PsetRequest {
         }
 
         if ($viewer->isPC && $viewer !== $user) {
-            echo Ht::form($this->info->hoturl("=pset", ["saverunsettings" => 1, "ajax" => 1])),
+            echo $this->info->hotform("=pset", ["saverunsettings" => 1, "ajax" => 1]),
                 "<div id=\"pa-runsettings\"></div></form>\n";
             // XXX always using grading commit's settings?
             if (($runsettings = $this->info->commit_jnote("runsettings"))) {

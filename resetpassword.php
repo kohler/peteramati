@@ -101,7 +101,7 @@ class ResetPassword_Page {
         echo "</div>
         <hr class='home' />
         <div class='homegrp' id='homereset'>\n",
-            Ht::form($this->conf->hoturl("=resetpassword")),
+            $this->conf->hotform("=resetpassword"),
             '<div class="f-contain">',
             Ht::hidden("resetcap", $resetcap),
             Ht::hidden("autopassword", $_POST["autopassword"]),

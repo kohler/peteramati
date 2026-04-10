@@ -47,15 +47,15 @@ class Face_Page {
     function face_output($user) {
         $u = $this->viewer->user_linkpart($user);
         if ($this->pset) {
-            $link = $this->conf->hoturl("pset", ["u" => $u, "pset" => $this->pset->urlkey]);
+            $link = $this->conf->hoturl_raw("pset", ["u" => $u, "pset" => $this->pset->urlkey]);
         } else {
-            $link = $this->conf->hoturl("index", ["u" => $u]);
+            $link = $this->conf->hoturl_raw("index", ["u" => $u]);
         }
         echo '<div class="pa-facebook-entry">',
-            '<a href="', $link, '">',
-            '<img class="pa-face" src="' . $this->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId ? : 0]) . '" border="0" />',
+            '<a href="', Ht::escape_attr($link), '">',
+            '<img class="pa-face" src="' . Ht::escape_attr($this->conf->hoturl_raw("face", ["u" => $u, "imageid" => $user->contactImageId ? : 0])) . '" border="0" />',
             '</a>',
-            '<h2><a class="q" href="', $link, '">', htmlspecialchars($u), '</a>';
+            '<h2><a class="q" href="', Ht::escape_attr($link), '">', Ht::escape_text($u), '</a>';
         if ($this->viewer->privChair) {
             echo "&nbsp;", become_user_link($user);
         }

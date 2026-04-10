@@ -26,13 +26,13 @@ function admin_home_messages($conf) {
     }
     // Conference names
     if ($conf->opt["shortNameDefaulted"] ?? false) {
-        $m[] = "<a href=\"" . $conf->hoturl("settings", ["group" => "msg"]) . "\">Set the conference abbreviation</a> to a short name for your conference, such as “OSDI ’14”.";
+        $m[] = $conf->hotlink("Set the conference abbreviation", "settings", ["group" => "msg"]) . " to a short name for your conference, such as “OSDI ’14”.";
     } else if (simplify_whitespace($conf->opt["shortName"] ?? "") !== ($conf->opt["shortName"] ?? "")) {
-        $m[] = "The <a href=\"" . $conf->hoturl("settings", ["group" => "msg"]) . "\">conference abbreviation</a> setting has a funny value. To fix it, remove leading and trailing spaces, use only space characters (no tabs or newlines), and make sure words are separated by single spaces (never two or more).";
+        $m[] = "The " . $conf->hotlink("conference abbreviation", "settings", ["group" => "msg"]) . " setting has a funny value. To fix it, remove leading and trailing spaces, use only space characters (no tabs or newlines), and make sure words are separated by single spaces (never two or more).";
     }
     $site_contact = $conf->site_contact();
     if (!$site_contact->email || $site_contact->email == "you@example.com") {
-        $m[] = "<a href=\"" . $conf->hoturl("settings", ["group" => "msg"]) . "\">Set the conference contact’s name and email</a> so submitters can reach someone if things go wrong.";
+        $m[] = $conf->hotlink("Set the conference contact’s name and email", "settings", ["group" => "msg"]) . " so submitters can reach someone if things go wrong.";
     }
     // Weird URLs?
     foreach (array("conferenceSite", "paperSite") as $k) {
@@ -42,7 +42,7 @@ function admin_home_messages($conf) {
     }
     // Double-encoding bugs found?
     if ($conf->setting("bug_doubleencoding")) {
-        $m[] = "Double-encoded URLs have been detected. Incorrect uses of Apache’s <code>mod_rewrite</code>, and other middleware, can encode URL parameters twice. This can cause problems, for instance when users log in via links in email. (“<code>a@b.com</code>” should be encoded as “<code>a%40b.com</code>”; a double encoding will produce “<code>a%2540b.com</code>”.) HotCRP has tried to compensate, but you really should fix the problem. For <code>mod_rewrite</code> add <a href='http://httpd.apache.org/docs/current/mod/mod_rewrite.html'>the <code>[NE]</code> option</a> to the relevant RewriteRule. <a href=\"" . $conf->hoturl("=index", ["clearbug" => "doubleencoding"]) . "\">(Clear&nbsp;this&nbsp;message)</a>";
+        $m[] = "Double-encoded URLs have been detected. Incorrect uses of Apache’s <code>mod_rewrite</code>, and other middleware, can encode URL parameters twice. This can cause problems, for instance when users log in via links in email. (“<code>a@b.com</code>” should be encoded as “<code>a%40b.com</code>”; a double encoding will produce “<code>a%2540b.com</code>”.) HotCRP has tried to compensate, but you really should fix the problem. For <code>mod_rewrite</code> add <a href='http://httpd.apache.org/docs/current/mod/mod_rewrite.html'>the <code>[NE]</code> option</a> to the relevant RewriteRule. " . $conf->hotlink("(Clear this message)", "=index", ["clearbug" => "doubleencoding"], ["class" => "nw"]);
     }
 
     if (count($m)) {

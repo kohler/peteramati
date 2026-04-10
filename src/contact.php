@@ -1175,7 +1175,7 @@ class Contact {
         if ($acct->save_json($cj, null, $send)) {
             if ($Me && $Me->privChair) {
                 $type = $acct->disabled ? "disabled " : "";
-                $conf->success_msg("Created {$type}account for <a href=\"" . $conf->hoturl("profile", ["u" => $acct->email]) . "\">" . Text::user_html_nolink($acct) . "</a>.");
+                $conf->success_msg("Created {$type}account for " . $conf->hotlink(Text::user_html_nolink($acct), "profile", ["u" => $acct->email]) . ".");
             }
             return $acct;
         } else {
@@ -1187,7 +1187,7 @@ class Contact {
     function mark_create($send_email, $message_chair) {
         global $Me;
         if ($Me && $Me->privChair && $message_chair) {
-            $this->conf->success_msg("Created account for <a href=\"" . $this->conf->hoturl("profile", ["u" => $this->email]) . "\">" . Text::user_html_nolink($this) . "</a>.");
+            $this->conf->success_msg("Created account for " . $this->conf->hotlink(Text::user_html_nolink($this), "profile", ["u" => $this->email]) . ".");
         }
         if ($send_email) {
             $this->sendAccountInfo("create", false);

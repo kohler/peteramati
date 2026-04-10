@@ -1836,7 +1836,7 @@ class Conf {
     }
 
     /** @param string $page
-     * @param null|string|array $param
+     * @param ?array $param
      * @param int $flags
      * @return string */
     function hoturl_raw($page, $param = null, $flags = 0) {
@@ -1857,10 +1857,21 @@ class Conf {
         return $this->hoturl($page, $param, self::HOTURL_SITE_RELATIVE | self::HOTURL_RAW);
     }
 
-    /** @param ?array<string,mixed> $param
+    /** @param string $html
+     * @param string $page
+     * @param ?array<string,mixed> $param
+     * @param ?array $js
      * @return string */
     function hotlink($html, $page, $param = null, $js = null) {
-        return Ht::link($html, $this->hoturl($page, $param), $js);
+        return Ht::link($html, $this->hoturl_raw($page, $param), $js);
+    }
+
+    /** @param string $page
+     * @param ?array $param
+     * @param ?array $js
+     * @return string */
+    function hotform($page, $param = null, $js = null) {
+        return Ht::form($this->hoturl_raw($page, $param), $js, self::HOTURL_RAW);
     }
 
 
@@ -1904,7 +1915,7 @@ class Conf {
             $qreq->set_csession("msgs", $this->_save_msgs);
         }
         $qreq->qsession()->commit();
-        Navigation::redirect_absolute($qreq->navigation()->resolve($url ?? $this->hoturl("index")));
+        Navigation::redirect_absolute($qreq->navigation()->resolve($url ?? $this->hoturl_raw("index")));
     }
 
     /** @param string $page
@@ -2195,9 +2206,9 @@ class Conf {
 
         echo "<div id='header'>\n<div id='header_left_conf'><h1>";
         if ($title === "" || $title === "Sign in") {
-            echo "<a class='noq ulh' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a>";
+            echo $this->hotlink(htmlspecialchars($this->short_name), "index", null, ["class" => "noq ulh", "title" => "Home"]);
         } else {
-            echo "<a class='qh' href='", $this->hoturl("index"), "' title='Home'>", htmlspecialchars($this->short_name), "</a></h1></div><div id='header_left_page'><h1>", $title;
+            echo $this->hotlink(htmlspecialchars($this->short_name), "index", null, ["class" => "wh", "title" => "Home"]), "</h1></div><div id=\"header_left_page\"><h1>", $title;
         }
         echo "</h1></div><div id='header_right'>";
         if ($Me && !$Me->is_empty()) {
@@ -2232,9 +2243,9 @@ class Conf {
             // help, sign out
             $x = ($id == "search" ? "t=$id" : ($id == "settings" ? "t=chair" : ""));
             if (!$Me->has_email() && !isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . $this->hoturl("index", ["signin" => 1]) . '">Sign&nbsp;in</a>';
+                $profile_parts[] = $this->hotlink("Sign in", "index", ["signin" => 1], ["class" => "nw"]);
             if (!$Me->is_empty() || isset($this->opt["httpAuthLogin"]))
-                $profile_parts[] = '<a href="' . $this->hoturl("=index", ["signout" => 1]) . '">Sign&nbsp;out</a>';
+                $profile_parts[] = $this->hotlink("Sign out", "=index", ["signout" => 1], ["class" => "nw"]);
 
             if (!empty($profile_parts))
                 echo join(' <span class="barsep">·</span> ', $profile_parts);

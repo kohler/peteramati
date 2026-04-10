@@ -105,11 +105,10 @@ class DiffMany_Page {
         echo '" data-pa-gradeinfo=\'', json_escape_browser_sqattr($gj), '\'>';
 
         if ($user !== $this->viewer && !$user->is_anonymous && $user->contactImageId) {
-            echo '<img class="pa-smallface" src="' . $info->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
+            echo '<img class="pa-smallface" src="' . Ht::escape_attr($info->conf->hoturl_raw("face", ["u" => $u, "imageid" => $user->contactImageId])) . '" />';
         }
 
-        echo '<h2 class="homeemail"><a href="',
-            $info->conf->hoturl("pset", ["u" => $u, "pset" => $pset->urlkey]), '">', htmlspecialchars($u), '</a>';
+        echo '<h2 class="homeemail">', $info->conf->hotlink(Ht::escape_text($u), "pset", ["u" => $u, "pset" => $pset->urlkey]);
         if ($user->extension) {
             echo " (X)";
         }

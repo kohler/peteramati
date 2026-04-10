@@ -189,7 +189,7 @@ class Home_TA_Page {
 
     /** @param Pset $pset */
     function render_pset_actions($pset) {
-        echo Ht::form($this->conf->hoturl("=index", ["pset" => $pset->urlkey, "reconfig" => 1]), ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
+        echo $this->conf->hotform("=index", ["pset" => $pset->urlkey, "reconfig" => 1], ["divstyle" => "margin-bottom:1em", "class" => "need-pa-pset-actions"]);
         $options = array("disabled" => "Disabled",
                          "invisible" => "Hidden",
                          "visible" => "Visible without grades",
@@ -462,12 +462,8 @@ class Home_TA_Page {
             $jx[] = $j;
             if ($s->user->incomplete) {
                 $u = $this->viewer->user_linkpart($s->user);
-                $t = '<a href="' . $sset->conf->hoturl("pset", ["pset" => $pset->urlkey, "u" => $u]) . '">'
-                    . htmlspecialchars($u);
-                if ($s->user->incomplete !== true) {
-                    $t .= " (" . $s->user->incomplete . ")";
-                }
-                $incomplete[] = $t . '</a>';
+                $t = Ht::escape_text($u) . ($s->user->incomplete !== true ? " ({$s->user->incomplete})" : "");
+                $incomplete[] = $sset->conf->hotlink($t, "pset", ["pset" => $pset->urlkey, "u" => $u], ["class" => "nw"]);
                 $incompleteu[] = "~" . urlencode($u);
             }
         }
@@ -481,7 +477,7 @@ class Home_TA_Page {
         }
 
         if ($this->viewer->isPC) {
-            echo Ht::form($sset->conf->hoturl("=index", ["pset" => $pset->urlkey, "save" => 1, "college" => $this->qreq->college, "extension" => $this->qreq->extension]));
+            echo $sset->conf->hotform("=index", ["pset" => $pset->urlkey, "save" => 1, "college" => $this->qreq->college, "extension" => $this->qreq->extension]);
             if ($pset->anonymous) {
                 echo Ht::hidden("anonymous", 1);
             }

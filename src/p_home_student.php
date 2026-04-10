@@ -25,9 +25,8 @@ class Home_Student_Page {
         if (!$user_can_view) {
             echo '<div class="pa-grp-hidden">';
         }
-        $pseturl = $info->hoturl("pset", ["commit" => null]);
-        echo "<h2><a class=\"btn pset-title\" style=\"font-size:inherit\" href=\"", $pseturl, "\">",
-            htmlspecialchars($info->pset->title), "</a>";
+        $pseturl = Ht::escape_attr($info->hoturl_raw("pset", ["commit" => null]));
+        echo "<h2><a class=\"btn pset-title\" style=\"font-size:inherit\" href=\"", $pseturl, "\">", Ht::escape_text($info->pset->title), "</a>";
         $x = [];
         $c = null;
         if ($info->is_do_not_grade()) {
@@ -160,15 +159,15 @@ class Home_Student_Page {
         if ($this->user->isPC) {
             echo "<div style='margin-top:5em'></div>\n";
             if ($this->user->dropped) {
-                echo Ht::form($this->conf->hoturl("=index", ["set_undrop" => 1, "u" => $linkpart])),
+                echo $this->conf->hotform("=index", ["set_undrop" => 1, "u" => $linkpart]),
                     Ht::submit("Undrop"), "</form>";
             } else {
-                echo Ht::form($this->conf->hoturl("=index", ["set_drop" => 1, "u" => $linkpart])),
+                echo $this->conf->hotform("=index", ["set_drop" => 1, "u" => $linkpart]),
                     Ht::submit("Drop"), "</form>";
             }
         }
         if ($this->viewer->privChair && $this->user->can_enable()) {
-            echo Ht::form($this->conf->hoturl("=index", ["enable_user" => 1, "u" => $linkpart])),
+            echo $this->conf->hotform("=index", ["enable_user" => 1, "u" => $linkpart]),
                 Ht::submit("Enable"), "</form>";
         }
     }

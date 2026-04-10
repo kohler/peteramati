@@ -168,9 +168,9 @@ if ($Me->privChair && !$User) {
     echo "<div id='homeadmin'>
   <h3>administration</h3>
   <ul>
-    <!-- <li><a href='", $Conf->hoturl("settings"), "'>Settings</a></li>
-    <li><a href='", $Conf->hoturl("users", ["t" => "all"]), "'>Users</a></li> -->
-    <li><a href='", $Conf->hoturl("mail"), "'>Send mail</a></li>\n";
+    <!-- <li>", $Conf->hotlink("Settings", "settings"), "</li>
+    <li>", $Conf->hotlink("Users", "users", ["t" => "all"]), "</li> -->
+    <li>", $Conf->hotlink("Send mail", "mail"), "</li>\n";
 
     $pclike = Contact::ROLE_PCLIKE;
     $result = $Conf->qe("select exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and college=1), exists (select * from ContactInfo where password='' and disabled=0 and (roles=0 or (roles&$pclike)=0) and extension=1), exists (select * from ContactInfo where password='' and disabled=0 and roles!=0 and (roles&$pclike)!=0), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and college=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and (roles=0 or (roles&$pclike)=0) and lastLogin=0 and extension=1), exists (select * from ContactInfo where password!='' and disabled=0 and dropped=0 and roles!=0 and (roles&$pclike)!=0 and lastLogin=0)");
@@ -180,13 +180,13 @@ if ($Me->privChair && !$User) {
 
     $m = [];
     if ($row[0]) {
-        $m[] = '<a href="' . $Conf->hoturl("=index", ["enable_user" => "college-empty"]) . '">college users</a>';
+        $m[] = $Conf->hotlink("college users", "=index", ["enable_user" => "college-empty"]);
     }
     if ($row[1]) {
-        $m[] = '<a href="' . $Conf->hoturl("=index", ["enable_user" => "extension-empty"]) . '">extension users</a>';
+        $m[] = $Conf->hotlink("extension users", "=index", ["enable_user" => "extension-empty"]);
     }
     if ($row[2]) {
-        $m[] = '<a href="' . $Conf->hoturl("=index", ["enable_user" => "ta-empty"]) . '">TAs</a>';
+        $m[] = $Conf->hotlink("TAs", "=index", ["enable_user" => "ta-empty"]);
     }
     if (!empty($m)) {
         echo '    <li>Enable ', join(", ", $m), "</li>\n";
@@ -194,16 +194,16 @@ if ($Me->privChair && !$User) {
 
     $m = [];
     if ($row[3])
-        $m[] = '<a href="' . $Conf->hoturl("=index", ["send_account_info" => "college-nologin"]) . '">college users</a>';
+        $m[] = $Conf->hotlink("college users", "=index", ["send_account_info" => "college-nologin"]);
     if ($row[4])
-        $m[] = '<a href="' . $Conf->hoturl("=index", ["send_account_info" => "extension-nologin"]) . '">extension users</a>';
+        $m[] = $Conf->hotlink("extension users", "=index", ["send_account_info" => "extension-nologin"]);
     if ($row[5])
-        $m[] = '<a href="' . $Conf->hoturl("=index", ["send_account_info" => "ta-nologin"]) . '">TAs</a>';
+        $m[] = $Conf->hotlink("TAs", "=index", ["send_account_info" => "ta-nologin"]);
     if (!empty($m))
         echo '    <li>Send account info to ', join(", ", $m), "</li>\n";
 
-    echo "    <li><a href='", $Conf->hoturl("=index", ["report" => "nonanonymous"]), "'>Overall grade report</a> (<a href='", $Conf->hoturl("=index", ["report" => "nonanonymous college"]), "'>college</a>, <a href='", $Conf->hoturl("=index", ["report" => "nonanonymous extension"]), "'>extension</a>)</li>
-    <!-- <li><a href='", $Conf->hoturl("log"), "'>Action log</a></li> -->
+    echo "    <li>", $Conf->hotlink("Overall grade report", "=index", ["report" => "nonanonymous"]), " (", $Conf->hotlink("college", "=index", ["report" => "nonanonymous college"]), ", ", $Conf->hotlink("extension", "=index", ["report" => "nonanonymous extension"]), ")</li>
+    <!-- <li>", $Conf->hotlink("Action log", "log"), "</li> -->
   </ul>
 </div>\n";
 }
@@ -244,7 +244,7 @@ Sign in to tell us about your code.';
     echo "</div>
 <hr class='home' />
 <div class='homegrp' id='homeaccount'>\n",
-        Ht::form($Conf->hoturl("=index")),
+        $Conf->hotform("=index"),
         '<div class="f-contain foldo fold2o" id="logingroup">',
         Ht::hidden("cookie", 1),
         '<div class="', Ht::control_class("email", "f-i"), '">',
@@ -287,11 +287,10 @@ if (!$Me->is_empty() && $User) {
     echo "<div id='homeinfo'>";
     $u = $Me->user_linkpart($User);
     if ($User !== $Me && !$User->is_anonymous && $User->contactImageId) {
-        echo '<img class="pa-face float-left" src="' . $Conf->hoturl("face", ["u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId]) . '" />';
+        echo '<img class="pa-face float-left" src="' . Ht::escape_attr($Conf->hoturl_raw("face", ["u" => $Me->user_linkpart($User), "imageid" => $User->contactImageId])) . '" />';
     }
     if ($u) {
-        echo '<h2 class="homeemail"><a class="q" href="',
-            $Conf->hoturl("index", ["u" => $u]), '">', htmlspecialchars($u), '</a>';
+        echo '<h2 class="homeemail">', $Conf->hotlink(Ht::escape_text($u), "index", ["u" => $u], ["class" => "q"]);
     }
     if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);

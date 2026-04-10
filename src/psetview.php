@@ -1999,29 +1999,53 @@ class PsetView {
 
     /** @param ?array<string,null|int|string> $args
      * @return array<string,null|int|string> */
-    function hoturl_args($args = null) {
+    function hoturl_param($param = null) {
         $xargs = ["pset" => $this->pset->urlkey, "u" => $this->user_linkpart()];
         if ($this->_hash) {
             $xargs["commit"] = $this->commit_hash();
         }
         if ($this->pset->gitless
-            && !isset($args["snv"])) {
+            && !isset($param["snv"])) {
             $snv = $this->answer_version();
             if ($snv !== $this->notesversion() || $this->has_pinned_answers()) {
                 $xargs["snv"] = $snv;
             }
         }
-        foreach ($args ?? [] as $k => $v) {
+        foreach ($param ?? [] as $k => $v) {
             $xargs[$k] = $v;
         }
         return $xargs;
     }
 
-    /** @param string $base
-     * @param ?array<string,null|int|string> $args
+    /** @param string $page
+     * @param ?array<string,null|int|string> $param
      * @return string */
-    function hoturl($base, $args = null) {
-        return $this->conf->hoturl($base, $this->hoturl_args($args));
+    function hoturl($page, $param = null, $flags = 0) {
+        return $this->conf->hoturl($page, $this->hoturl_param($param), $flags);
+    }
+
+    /** @param string $page
+     * @param ?array<string,null|int|string> $param
+     * @return string */
+    function hoturl_raw($page, $param = null, $flags = 0) {
+        return $this->conf->hoturl($page, $this->hoturl_param($param), Conf::HOTURL_RAW | $flags);
+    }
+
+    /** @param string $html
+     * @param string $page
+     * @param ?array<string,null|int|string> $param
+     * @param ?array $js
+     * @return string */
+    function hotlink($html, $page, $param = null, $js = null) {
+        return $this->conf->hotlink($html, $page, $this->hoturl_param($param), $js);
+    }
+
+    /** @param string $page
+     * @param ?array<string,null|int|string> $param
+     * @param ?array $js
+     * @return string */
+    function hotform($page, $param = null, $js = null) {
+        return $this->conf->hotform($page, $this->hoturl_param($param), $js);
     }
 
     /** @param string $commit_html
@@ -2611,7 +2635,7 @@ class PsetView {
                     . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
             }
             if (!$dinfo->removed && !$dinfo->fileless) {
-                $bts[] = '<a href="' . $this->hoturl("raw", ["file" => $this->rawfile($file)]) . '" class="btn need-tooltip" aria-label="Download">' . Icons::download() . '</a>';
+                $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $this->rawfile($file)], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
             }
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';
@@ -2669,7 +2693,7 @@ class PsetView {
             echo '</div></div>'; // end div.pa-dg div.pa-dg.pa-with-sidebar
         }
         if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
-            echo '<img src="', $this->hoturl("raw", ["file" => $this->rawfile($file)]), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
+            echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $this->rawfile($file)])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
         }
         echo '</div>'; // end div.pa-filediff#F_...
         if (!$no_heading) {

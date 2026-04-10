@@ -53,7 +53,7 @@ $xsep = " <span class='barsep'>&nbsp;|&nbsp;</span> ";
 echo "<div id='homeinfo'>";
 echo "<h2 class='homeemail'>", Text::user_html($User), "</h2>";
 if ($User->username || $User->huid) {
-    echo '<h3><a href="', $Conf->hoturl("index", array("u" => $Me->user_linkpart($User))), '">', htmlspecialchars($User->username ? : $User->huid), '</a>';
+    echo '<h3>', $Conf->hotlink(Ht::escape_text($User->username ? : $User->huid), "index", ["u" => $Me->user_linkpart($User)]);
     if ($Me->privChair) {
         echo "&nbsp;", become_user_link($User);
     }
@@ -63,7 +63,7 @@ if ($User->dropped)
     ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
 
 
-echo Ht::form($Conf->hoturl("=profile", array("u" => $User->email))), "<div>";
+echo $Conf->hotform("=profile", ["u" => $User->email]), "<div>";
 if ($User->is_disabled() || $User->password == "") {
     echo Ht::submit("enable", "Enable user", array("value" => 1));
 } else {

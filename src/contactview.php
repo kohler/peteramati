@@ -128,12 +128,11 @@ class ContactView {
         $u = $viewer->user_linkpart($user);
 
         if ($user !== $viewer && !$user->is_anonymous && $user->contactImageId) {
-            echo '<img class="pa-smallface float-left" src="' . $user->conf->hoturl("face", ["u" => $u, "imageid" => $user->contactImageId]) . '" />';
+            echo '<img class="pa-smallface float-left" src="' . Ht::escape_attr($user->conf->hoturl_raw("face", ["u" => $u, "imageid" => $user->contactImageId])) . '" />';
         }
 
         if ($u !== null) {
-            echo '<h2 class="homeemail"><a href="',
-                $user->conf->hoturl("index", array("u" => $u)), '">', htmlspecialchars($u), '</a>';
+            echo '<h2 class="homeemail">', $user->conf->hotlink(Ht::escape_text($u), "index", ["u" => $u]);
             if ($user->extension)
                 echo " (X)";
             /*if ($viewer->privChair && $user->is_anonymous)
@@ -212,7 +211,7 @@ class ContactView {
 
         $title = "partner";
         if ($info->viewer->isPC && $partner) {
-            $title = '<a href="' . $info->conf->hoturl("pset", ["u" => $info->viewer->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->hash()]) . '">' . $title . '</a>';
+            $title = $info->conf->hotlink($title, "pset", ["u" => $info->viewer->user_linkpart($partner), "pset" => $pset->id, "commit" => $info->hash()]);
         }
 
         if ($editable) {
@@ -241,9 +240,9 @@ class ContactView {
             $p = array();
             while (($row = $result->fetch_row())) {
                 if ($info->viewer->isPC) {
-                    $p[] = '<a href="' . $info->conf->hoturl("pset", array("pset" => $pset->urlkey, "u" => $row[0])) . '">' . htmlspecialchars($row[0]) . '</a>';
+                    $p[] = $info->conf->hotlink(Ht::escape_text($row[0]), "pset", ["pset" => $pset->urlkey, "u" => $row[0]]);
                 } else {
-                    $p[] = htmlspecialchars($row[0]);
+                    $p[] = Ht::escape_text($row[0]);
                 }
             }
             $notes[] = array(true, "ERROR: These users have listed you as a partner for this pset: " . commajoin($p));
@@ -338,7 +337,7 @@ class ContactView {
                 }
                 $your_partner = "your partner’s";
                 if ($info->viewer->isPC) {
-                    $your_partner = '<a href="' . $info->conf->hoturl("pset", array("pset" => $pset->urlkey, "u" => $info->viewer->user_linkpart($partner))) . '">' . $your_partner . '</a>';
+                    $your_partner = $info->conf->hotlink($your_partner, "pset", ["pset" => $pset->urlkey, "u" => $info->viewer->user_linkpart($partner)]);
                 }
                 $ms->error_at("partner", "<5>This repository differs from {$your_partner}{$prepo_url}.");
             }
@@ -461,7 +460,7 @@ class ContactView {
                 }
             }
             echo '"><div class="pa-pt">', htmlspecialchars($dl->title), '</div><div class="pa-pv">';
-            echo '<a href="', $info->conf->hoturl("=pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "download" => $dl->key]), '">', htmlspecialchars($dl->filename), '</a>';
+            echo $info->conf->hotlink(Ht::escape_text($dl->filename), "=pset", ["pset" => $info->pset->urlkey, "u" => $info->viewer->user_linkpart($info->user), "download" => $dl->key]);
             if ($timer_start)
                 echo '<span class="pa-download-timer" style="padding-left:1em"></span>';
             echo '</span></div></div>';

@@ -252,7 +252,7 @@ class RunRequest {
         $this->conf->header(htmlspecialchars($t), "home");
 
         echo '<h2 id="pa-runmany-who"></h2>',
-            Ht::form($this->conf->hoturl("=run"), ["id" => "pa-runmany-form"]),
+            $this->conf->hotform("=run", null, ["id" => "pa-runmany-form"]),
             '<div class="f-contain">',
             Ht::hidden("u", ""),
             Ht::hidden("pset", $this->pset->urlkey),

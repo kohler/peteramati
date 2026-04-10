@@ -205,11 +205,6 @@ function hoturl_add_raw($url, $component) {
     return $url . (strpos($url, "?") === false ? "?" : "&") . $component;
 }
 
-/** @deprecated */
-function hoturl($page, $param = null) {
-    return Conf::$main->hoturl($page, $param);
-}
-
 
 function file_uploaded(&$var) {
     global $Conf;
