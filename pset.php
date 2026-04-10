@@ -618,13 +618,13 @@ class PsetRequest {
             . 'options</button><span style="padding-left:1em"'
             . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
-            $value .= '&nbsp;<a href="' . $this->conf->selfurl($this->qreq, ["tab" => $i]) . '"'
+            $value .= '&nbsp;<a href="' . Ht::escape_attr($this->conf->selfurl($this->qreq, ["tab" => $i], Conf::HOTURL_RAW)) . '"'
                 . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
                 . '</a>';
         }
         $value .= '<span style="padding-left:1em">wdiff:';
         foreach (["no", "yes"] as $i => $t) {
-            $value .= '&nbsp;<a href="' . $this->conf->selfurl($this->qreq, ["wdiff" => $i]) . '"'
+            $value .= '&nbsp;<a href="' . Ht::escape_attr($this->conf->selfurl($this->qreq, ["wdiff" => $i], Conf::HOTURL_RAW)) . '"'
                 . (!$WDIFF == !$i ? " class=\"q\"><strong>$t</strong>" : '>' . $t)
                 . '</a>';
         }

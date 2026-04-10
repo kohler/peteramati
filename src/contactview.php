@@ -249,7 +249,7 @@ class ContactView {
         }
 
         if ($editable) {
-            echo Ht::form($info->conf->selfurl(null, ["set_partner" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST)),
+            echo Ht::form($info->conf->selfurl(null, ["set_partner" => 1, "pset" => $pset->urlkey], Conf::HOTURL_POST | Conf::HOTURL_RAW), [], Conf::HOTURL_RAW),
                 "<div class='f-contain'>";
         }
         self::echo_group($title, $value, $notes);

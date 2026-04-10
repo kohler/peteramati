@@ -2208,7 +2208,7 @@ class Conf {
         if ($title === "" || $title === "Sign in") {
             echo $this->hotlink(htmlspecialchars($this->short_name), "index", null, ["class" => "noq ulh", "title" => "Home"]);
         } else {
-            echo $this->hotlink(htmlspecialchars($this->short_name), "index", null, ["class" => "wh", "title" => "Home"]), "</h1></div><div id=\"header_left_page\"><h1>", $title;
+            echo $this->hotlink(htmlspecialchars($this->short_name), "index", null, ["class" => "qh", "title" => "Home"]), "</h1></div><div id=\"header_left_page\"><h1>", $title;
         }
         echo "</h1></div><div id='header_right'>";
         if ($Me && !$Me->is_empty()) {
@@ -2234,7 +2234,7 @@ class Conf {
                     $arg = ["actas" => $actas];
                 }
                 $profile_parts[] = "<a href=\""
-                    . $this->selfurl(null, $arg) . "\">"
+                    . Ht::escape_attr($this->selfurl(null, $arg, self::HOTURL_RAW)) . "\">"
                     . (Contact::$base_auth_user ? "Admin" : htmlspecialchars($actas))
                     . "&nbsp;" . Ht::img("viewas.png", "Act as " . htmlspecialchars($actas))
                     . "</a>";
