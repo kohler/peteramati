@@ -564,8 +564,8 @@ class Ht {
         }
         if (self::$img_base
             && !str_starts_with($src, "/")
-            && !substr_compare($src, "http:", 0, 5, true)
-            && !substr_compare($src, "https:", 0, 6, true)) {
+            && substr_compare($src, "http:", 0, 5, true) !== 0
+            && substr_compare($src, "https:", 0, 6, true) !== 0) {
             $src = self::$img_base . $src;
         }
         $src = self::escape_attr($src);
