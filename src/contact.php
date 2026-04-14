@@ -1672,9 +1672,8 @@ class Contact {
             return false;
         } else if ($this->isPC) {
             return true;
-        } else {
-            return $runner->visible && $this->show_setting_on($runner->visible, $pset);
         }
+        return $runner->visible && $this->show_setting_on($runner->visible, $pset);
     }
 
     function can_view_run(Pset $pset, RunnerConfig $runner, $user = null) {
@@ -1682,10 +1681,9 @@ class Contact {
             return false;
         } else if ($this->isPC) {
             return true;
-        } else {
-            return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
-                || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset));
         }
+        return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
+            || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset));
     }
 
     function can_view_transferred_warnings(Pset $pset, RunnerConfig $runner, $user = null) {
@@ -1693,11 +1691,10 @@ class Contact {
             return false;
         } else if ($this->isPC) {
             return true;
-        } else {
-            return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
-                || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset))
-                || ($runner->transfer_warnings === "grades" && $this->show_setting_on($runner->transfer_warnings, $pset));
         }
+        return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
+            || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset))
+            || ($runner->transfer_warnings === "grades" && $this->show_setting_on($runner->transfer_warnings, $pset));
     }
 
     function user_linkpart(?Contact $user = null, $is_anonymous = false) {
@@ -1706,17 +1703,15 @@ class Contact {
             return $user->anon_username;
         } else if ($this->isPC) {
             return $user->username ? : $user->email;
-        } else {
-            return null;
         }
+        return null;
     }
 
     function user_idpart(?Contact $user = null) {
         $user = $user ?? $this;
         if ($this->isPC) {
             return $user->github_username ? : $user->huid;
-        } else {
-            return null;
         }
+        return null;
     }
 }

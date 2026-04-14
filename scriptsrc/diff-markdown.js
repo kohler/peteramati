@@ -64,28 +64,34 @@ function fix_landmark_html(html, token) {
 function modify_landmark(base) {
     if (!base) {
         return add_landmark;
-    } else {
-        return function (tokens, idx, options, env, self) {
-            var token = tokens[idx];
-            return fix_landmark_html(base(tokens, idx, options, env, self), token);
-        };
     }
+    return function (tokens, idx, options, env, self) {
+        var token = tokens[idx];
+        return fix_landmark_html(base(tokens, idx, options, env, self), token);
+    };
 }
 
 function modify_landmark_image(base) {
-    function fix(pi, file) {
-        return siteinfo.site_relative + "~" + encodeURIComponent(siteinfo.uservalue) + "/raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-commit") + "/" + file;
+    function fix(user, pi, file) {
+        let t = siteinfo.site_relative;
+        if (user) {
+            t += "~" + encodeURIComponent(user) + "/";
+        }
+        t += "raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-commit") + "/" + file;
+        if (siteinfo.defaults) {
+            t += "?" + (new URLSearchParams(siteinfo.defaults)).toString();
+        }
+        return t;
     }
     return function (tokens, idx, options, env, self) {
-        var token = tokens[idx],
+        let token = tokens[idx],
             srci = token.attrIndex("src"),
             src = token.attrs[srci][1],
             pi, m, m2;
-        if (siteinfo.uservalue
-            && mdcontext
-            && (pi = mdcontext.closest(".pa-psetinfo"))) {
+        if (mdcontext && (pi = mdcontext.closest(".pa-psetinfo"))) {
+            const user = pi.getAttribute("data-pa-user") || siteinfo.uservalue;
             if (!/\/\//.test(src)) {
-                var fd = Filediff.closest(mdcontext),
+                let fd = Filediff.closest(mdcontext),
                     dir = fd ? fd.file.replace(/^(.*)\/[^/]*$/, '$1') : "";
                 while (true) {
                     if (src.startsWith("./")) {
@@ -103,7 +109,7 @@ function modify_landmark_image(base) {
                     }
                 }
                 if (src) {
-                    token.attrs[srci][1] = fix(pi, dir ? dir + "/" + src : src);
+                    token.attrs[srci][1] = fix(user, pi, dir ? dir + "/" + src : src);
                 } else {
                     token.attrs[srci][1] = "data:image/jpg,";
                 }
@@ -111,7 +117,7 @@ function modify_landmark_image(base) {
                   && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
                   && m2[1] == m[1]
                   && pi.getAttribute("data-pa-branch") == m[2]) {
-                token.attrs[srci][1] = fix(pi, m[3]);
+                token.attrs[srci][1] = fix(user, pi, m[3]);
             }
         }
         return fix_landmark_html(base(tokens, idx, options, env, self), token);

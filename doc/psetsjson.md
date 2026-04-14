@@ -218,7 +218,7 @@ lines in the grading rubric.
 The `grades` setting comprises a collection of entries. Each entry follows
 this format.
 
-* `name`: string (REQUIRED but defaults to the key in `grades`)
+* `key`: string (REQUIRED but defaults to the key in `grades`)
 
     The internal name for the grade entry. This name is used in the database,
     so don’t change it after grades are assigned. Every entry for a problem
@@ -231,6 +231,8 @@ this format.
 * `type`: string
 
     null, `"number"`, `"text"`, `"checkbox"`, `"letter"`, `"select"`, or `"formula"`
+
+* `options`: array of strings
 
 * `round`: string
 

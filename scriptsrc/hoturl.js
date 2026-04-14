@@ -9,17 +9,16 @@ function encodeURIComponentPlus(s) {
 function serialize_object(x) {
     if (typeof x === "string") {
         return x;
-    } else if (x) {
-        var k, v, a = [""];
-        for (k in x) {
-            if ((v = x[k]) != null)
-                a.push(encodeURIComponent(k), "=", encodeURIComponentPlus(v), "&");
-        }
-        a[a.length - 1] = "";
-        return a.join("");
-    } else {
+    } else if (!x) {
         return "";
     }
+    let k, v, a = [""];
+    for (k in x) {
+        if ((v = x[k]) != null)
+            a.push(encodeURIComponent(k), "=", encodeURIComponentPlus(v), "&");
+    }
+    a[a.length - 1] = "";
+    return a.join("");
 }
 
 function hoturl_clean_before(x, page_component, prefix) {
