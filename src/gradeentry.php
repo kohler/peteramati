@@ -442,9 +442,8 @@ class GradeEntry {
             return VF_TF | VF_STUDENT_ALWAYS;
         } else if ($visible === null) {
             return VF_TF | VF_STUDENT_ALLOWED;
-        } else {
-            return VF_TF;
         }
+        return VF_TF;
     }
 
     /** @return bool */
@@ -479,9 +478,8 @@ class GradeEntry {
             return false;
         } else if ($l === $d) {
             return $v;
-        } else {
-            return substr($v, 0, $l);
         }
+        return substr($v, 0, $l);
     }
 
     /** @param string $v
