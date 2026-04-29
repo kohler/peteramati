@@ -4,6 +4,7 @@
 
 import { escape_entities } from "./encoders.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
+import { markdownit_katex } from "./markdown-katex.js";
 import { markdownit_attributes } from "./markdown-attributes.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
 import { hasClass, addClass, removeClass, $e } from "./ui.js";
@@ -108,7 +109,9 @@ add_format({
     format: 1,
     render: function (text) {
         if (!md) {
-            md = window.markdownit({highlight: try_highlight, linkify: true}).use(markdownit_katex).use(markdownit_minihtml);
+            md = window.markdownit('hotcrp', {highlight: try_highlight, linkify: true})
+                .use(markdownit_katex)
+                .use(markdownit_minihtml);
         }
         return md.render(text);
     }
@@ -126,7 +129,7 @@ add_format({
     format: 3,
     render: function (text) {
         if (!md2) {
-            md2 = window.markdownit({highlight: try_highlight, linkify: true, html: true, attributes: true})
+            md2 = window.markdownit('hotcrp', {highlight: try_highlight, linkify: true, html: true, attributes: true})
                 .use(markdownit_katex)
                 .use(markdownit_attributes)
                 .use(markdownit_deflist);

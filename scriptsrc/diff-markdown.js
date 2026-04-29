@@ -6,6 +6,7 @@ import { Filediff } from "./diff.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
 import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
+import { markdownit_katex } from "./markdown-katex.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
 
 let md, mdcontext;
@@ -187,7 +188,7 @@ function render_landmark_fence(md) {
 
 function make_markdownit() {
     if (!md) {
-        md = markdownit({linkify: true})
+        md = markdownit('hotcrp', {linkify: true})
             .use(markdownit_katex)
             .use(markdownit_minihtml)
             .use(markdownit_deflist);
