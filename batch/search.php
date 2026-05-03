@@ -16,9 +16,11 @@ class Search_Batch {
     /** @var ?Pset */
     public $pset;
     /** @var bool */
-    public $dry_run = false;
+    public $dry_run;
     /** @var bool */
-    public $verbose = false;
+    public $verbose;
+    /** @var bool */
+    public $no_header;
     /** @var list<string|GradeFormula> */
     public $columns = [];
     /** @var CsvGenerator */
@@ -28,12 +30,9 @@ class Search_Batch {
     function __construct(Conf $conf, $arg) {
         $this->conf = $conf;
         $this->q = join(" ", $arg["_"]);
-        if (isset($arg["dry-run"])) {
-            $this->dry_run = true;
-        }
-        if (isset($arg["V"])) {
-            $this->verbose = true;
-        }
+        $this->dry_run = isset($arg["dry-run"]);
+        $this->verbose = isset($arg["V"]);
+        $this->no_header = isset($arg["no-header"]);
         if (isset($arg["p"])) {
             $this->pset = $this->conf->pset_by_key_or_title($arg["p"]);
             if (!$this->pset) {
@@ -54,7 +53,10 @@ class Search_Batch {
                 throw new CommandLineException("Column `{$c}` not found");
             }
         }
-        $this->csvg = (new CsvGenerator())->set_header($hdr)->set_stream(STDOUT);
+        $this->csvg = (new CsvGenerator)->set_stream(STDOUT);
+        if (!$this->no_header) {
+            $this->csvg->set_header($hdr);
+        }
     }
 
     /** @return int */
@@ -107,6 +109,7 @@ class Search_Batch {
             "V,verbose Be verbose",
             "p:,pset: Set problem set context",
             "c[],column[] Set output columns",
+            "no-header Do not output CSV header",
             "help !"
         )->description("Fix permissions in peteramati repo directories.
 Usage: php batch/search.php [OPTIONS]")

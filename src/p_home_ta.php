@@ -268,7 +268,7 @@ class Home_TA_Page {
             }
         }
         if ($pset->has_timermark) {
-            $j["student_timestamp"] = $info->student_timestamp(false);
+            $j["student_timestamp"] = $info->student_timestamp();
         }
 
         if ($gexp->value_entries()) {

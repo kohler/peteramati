@@ -22,6 +22,8 @@ class GradeReport_Batch {
     public $commitq;
     /** @var bool */
     public $all = false;
+    /** @var bool */
+    public $history = false;
     /** @var list<GradeEntry> */
     public $ge = [];
     /** @var int */
@@ -133,6 +135,25 @@ class GradeReport_Batch {
         }
     }
 
+    private function add_row(CsvGenerator $csv, PsetView $info, $hash) {
+        $row = ["email" => $info->user->email];
+        if (!$this->pset->gitless_grades) {
+            $row["hash"] = $hash;
+            $row["timestamp"] = $info->commit()->commitat;
+            $row["grading"] = $info->is_grading_commit() ? "yes" : "";
+        }
+        if ($this->history) {
+            $row["modification_time"] = $info->student_timestamp();
+        }
+        foreach ($info->visible_grades(VF_TF) as $ge) {
+            if (!in_array($ge, $this->ge, true)) {
+                continue;
+            }
+            $row[$ge->key] = $info->grade_value($ge);
+        }
+        $csv->add_row($row);
+    }
+
     /** @return int */
     function run() {
         // list all possible commits
@@ -155,6 +176,9 @@ class GradeReport_Batch {
             $header[] = "timestamp";
             $header[] = "grading";
         }
+        if ($this->history) {
+            $header[] = "modification_time";
+        }
         foreach ($this->ge as $ge) {
             $header[] = $ge->key;
         }
@@ -171,19 +195,18 @@ class GradeReport_Batch {
                 continue;
             }
             foreach ($this->relevant_commits($info, $bhashes) as $hash) {
-                $row = ["email" => $info->user->email];
-                if (!$this->pset->gitless_grades) {
-                    $row["hash"] = $hash;
-                    $row["timestamp"] = $info->commit()->commitat;
-                    $row["grading"] = $info->is_grading_commit() ? "yes" : "";
-                }
-                foreach ($info->visible_grades(VF_TF) as $ge) {
-                    if (!in_array($ge, $this->ge, true)) {
-                        continue;
+                if ($this->history) {
+                    $this->add_row($csv, $info, $hash);
+                    $snv1 = $info->answer_version();
+                    foreach ($info->answer_versions() as $snv) {
+                        if ($snv !== $snv1) {
+                            $info->set_answer_version($snv);
+                            $this->add_row($csv, $info, $hash);
+                        }
                     }
-                    $row[$ge->key] = $info->grade_value($ge);
+                } else {
+                    $this->add_row($csv, $info, $hash);
                 }
-                $csv->add_row($row);
             }
         }
 
@@ -199,6 +222,7 @@ class GradeReport_Batch {
             "all,a Report all commits",
             "commit-query:,cq:,commitq: Use commits matching this search",
             "g[]+,grade[]+ Include these grades",
+            "history Report all versions",
             "q,quiet",
             "V,verbose",
             "help"
@@ -217,6 +241,10 @@ class GradeReport_Batch {
         $self->quiet = isset($arg["q"]);
         $self->verbose = isset($arg["V"]);
         $self->all = isset($arg["all"]);
+        $self->history = isset($arg["history"]);
+        if ($self->history && !$pset->grades_history) {
+            throw new CommandLineException("Pset `{$pset->key}` does not support `--history`");
+        }
         if (isset($arg["commit-query"])) {
             $self->commitq = PsetView::parse_commit_query($arg["commit-query"]);
         }

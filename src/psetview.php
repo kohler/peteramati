@@ -193,6 +193,8 @@ class PsetView {
     function set_answer_version($snv) {
         $this->_vupi = null;
         $this->_snv = $snv;
+        $this->clear_can_view_grade();
+        $this->_gtime = null;
     }
 
     /** @return ?RepositoryPsetInfo */
@@ -1014,7 +1016,7 @@ class PsetView {
             if ($ge->gtype === GradeEntry::GTYPE_LATE_HOURS) {
                 return $this->late_hours();
             } else if ($ge->gtype === GradeEntry::GTYPE_STUDENT_TIMESTAMP) {
-                return $this->student_timestamp(true);
+                return $this->student_timestamp();
             }
             return null;
         }
@@ -1576,9 +1578,8 @@ class PsetView {
         return $this->pset->deadline;
     }
 
-    /** @param bool $force
-     * @return ?int */
-    function student_timestamp($force) {
+    /** @return ?int */
+    function student_timestamp() {
         if ($this->pset->gitless) {
             return $this->vupi()->studentupdateat;
         } else if ($this->_hash
@@ -1612,7 +1613,7 @@ class PsetView {
 
         $cn = $this->grade_jnotes();
         $ts = $cn ? $cn->timestamp ?? null : null;
-        $ts = $ts ?? $this->student_timestamp(true);
+        $ts = $ts ?? $this->student_timestamp();
         $autohours = self::auto_late_hours($deadline, $ts);
 
         $ld = new LateHoursData;
@@ -2133,7 +2134,7 @@ class PsetView {
                 $gexp->answers_editable = $this->answers_editable_student();
             }
         }
-        if (($ts = $this->student_timestamp(false))) {
+        if (($ts = $this->student_timestamp())) {
             $gexp->student_timestamp = $ts;
         }
         if (($psv = $this->pinned_scores_visible()) !== null) {
