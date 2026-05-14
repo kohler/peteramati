@@ -108,8 +108,6 @@ function arrowcapture(evt) {
         arrowcapture_arrow(evt, key);
     } else if (key === "Enter" && (!modkey || modkey === event_key.META)) {
         arrowcapture_enter(evt);
-    } else if (!curgrade) {
-        uncapture();
     }
 }
 
