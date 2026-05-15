@@ -757,7 +757,7 @@ class Repository {
         }
 
         // restrict to directory
-        $test_file = $pset->test_file;
+        $test_file = $pset ? $pset->test_file : null;
         assert(strpos($directory, "//") === false);
         $key = ".d/{$directory}//";
         if (($flags & self::CL_HASH) !== 0) {
@@ -775,8 +775,8 @@ class Repository {
         foreach ($this->commit_list(null, $branch, ".", $flags) as $cr) {
             if ($cr->__contains($directory)) {
                 $list->commits[$cr->hash] = $cr;
-            } else if (empty($list->commits)
-                       && $test_file !== null
+            } else if ($test_file !== null
+                       && empty($list->commits)
                        && !$list->suspicious_directory
                        && $cr->__contains($test_file)) {
                 $list->suspicious_directory = true;
