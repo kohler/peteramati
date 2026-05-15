@@ -2835,8 +2835,6 @@ class Conf {
             return 0;
         } else if ($branch === "main") {
             return 1;
-        } else if (!Repository::validate_branch($branch)) {
-            return null;
         }
         $key = array_search($branch, $this->branch_map(), true);
         if ($key === false) {

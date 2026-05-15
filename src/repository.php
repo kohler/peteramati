@@ -935,7 +935,9 @@ class Repository {
                 $command[] = preg_replace('/\/+\z/', "", $f);
             }
         }
+        self::$verbose = true;
         $gr = $this->gitruninfo($command);
+        self::$verbose = false;
         $gtl = new GitTreeListInfo;
         $gtl->stderr = $gr->stderr;
         $gtl->status = $gr->status;

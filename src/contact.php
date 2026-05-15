@@ -948,8 +948,10 @@ class Contact {
         if ($repo
             && !$pset->no_branch
             && $pset->main_branch !== "master"
-            && !$this->has_branch($pset)) {
-            $this->set_link(LINK_BRANCH, $pset->id, $this->conf->ensure_branch($pset->main_branch));
+            && !$this->has_branch($pset)
+            && Repository::validate_branch($pset->main_branch)
+            && ($branchid = $this->conf->ensure_branch($pset->main_branch))) {
+            $this->set_link(LINK_BRANCH, $pset->id, $branchid);
         }
         return true;
     }
