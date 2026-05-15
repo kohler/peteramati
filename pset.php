@@ -705,10 +705,11 @@ class PsetRequest {
             } else if ($last_handout && $pset->handout_warn_merge !== false) {
                 $remarks[] = [true, "Please create your repository by cloning our repository, and update psets by merging rather than rebasing.<br>Otherwise, we can’t tell whether your pset is fully up to date.<br>This command will mark your repository as merged with the handout, without changing its contents:<br><pre>git pull --allow-unrelated-histories --no-edit -s ours \"" . htmlspecialchars($pset->handout_repo_url) . "\" &amp;&amp; git push</pre>"];
             } else if (!$last_handout && $this->viewer->isPC) {
-                $handout_files = $pset->handout_repo()->ls_files($pset->handout_branch);
+                $hrepo = $pset->handout_repo();
+                $handout_files = $hrepo->ls_files($hrepo->repobranchname($pset->handout_branch));
                 if (!count($handout_files)) {
                     $remarks[] = [true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", contains no files; perhaps handout_repo_url is misconfigured."];
-                } else {
+                } else if (!$this->user->has_directory_override($pset)) {
                     $remarks[] = [true, "The handout repository, " . htmlspecialchars($pset->handout_repo_url) . ", does not contain problem set code yet."];
                 }
             }
