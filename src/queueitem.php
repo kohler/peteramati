@@ -1,6 +1,6 @@
 <?php
 // queueitem.php -- Peteramati execution queue entry
-// HotCRP and Peteramati are Copyright (c) 2006-2022 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2026 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class QueueItem {
@@ -1263,7 +1263,7 @@ class QueueItem {
         $hash = $this->hash();
 
         $checkoutdir = $clonedir = $this->_jailhomedir . "/repo";
-        if ($repo->truncated_psetdir($pset)
+        if ($repo->bare_directory($pset)
             && $pset->directory_noslash !== "") {
             $clonedir .= "/{$pset->directory_noslash}";
         }

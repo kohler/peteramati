@@ -4,22 +4,18 @@
 // See LICENSE for open-source distribution terms
 
 class DiffContext {
-    /** @var Repository */
+    /** @var Repository
+     * @readonly */
     public $repo;
-    /** @var Pset */
+    /** @var Pset
+     * @readonly */
     public $pset;
-    /** @var CommitRecord */
+    /** @var CommitRecord
+     * @readonly */
     public $commita;
-    /** @var CommitRecord */
+    /** @var CommitRecord
+     * @readonly */
     public $commitb;
-    /** @var string */
-    public $hasha;
-    /** @var string */
-    public $hashb;
-    /** @var string */
-    public $repodir = "";
-    /** @var string */
-    public $truncpfx = "";
     /** @var bool */
     public $wdiff = false;
     /** @var bool */
@@ -32,54 +28,94 @@ class DiffContext {
     public $only_files;
     /** @var ?LineNotesOrder */
     public $lnorder;
+    /** @var int */
+    private $_flags = 0;
 
+    const F_BARE_DIRECTORY = 1;
+    const F_HANDOUTA = 2;
+    const F_HANDOUTB = 4;
+    const F_UNDIRECTORIED = 8;
+    const FM_BARE_HANDOUT = 7;
+    const FM_BARE_HANDOUTA = 3;
+    const FM_BARE_HANDOUTB = 5;
 
-    function __construct(Repository $repo, Pset $pset,
-                         CommitRecord $commita, CommitRecord $commitb) {
-        $this->repo = $repo;
-        $this->pset = $pset;
-        if ($pset->directory_noslash !== "") {
-            if ($repo->truncated_psetdir($pset)) {
-                $this->truncpfx = $pset->directory_noslash . "/";
-            } else {
-                $this->repodir = $pset->directory_noslash . "/";
-            }
+    function __construct(PsetView $info, CommitRecord $commita, CommitRecord $commitb) {
+        $this->repo = $info->repo;
+        $this->pset = $info->pset;
+        if ($pset->directory_noslash !== ""
+            && $this->repo->bare_directory($this->pset)) {
+            $this->_flags |= self::F_BARE_DIRECTORY;
         }
         $this->set_commita($commita);
         $this->set_commitb($commitb);
     }
 
     /** @param CommitRecord $cr
-     * @return $this */
+     * @return $this
+     * @suppress PhanAccessReadOnlyProperty */
     function set_commita($cr) {
         $this->commita = $cr;
-        $this->hasha = $cr->hash;
-        if ($this->commita && $this->commitb && $this->truncpfx) {
-            $this->set_truncated_hashes();
-        }
+        $this->_set_flags(self::F_HANDOUTA, $cr->is_handout($this->pset) ? self::F_HANDOUTA : 0);
         return $this;
     }
 
     /** @param CommitRecord $cr
-     * @return $this */
+     * @return $this
+     * @suppress PhanAccessReadOnlyProperty */
     function set_commitb($cr) {
         $this->commitb = $cr;
-        $this->hashb = $cr->hash;
-        if ($this->commita && $this->commitb && $this->truncpfx) {
-            $this->set_truncated_hashes();
-        }
+        $this->_set_flags(self::F_HANDOUTB, $cr->is_handout($this->pset) ? self::F_HANDOUTB : 0);
         return $this;
     }
 
-    private function set_truncated_hashes() {
-        $ha = $this->commita->is_handout($this->pset);
-        $hb = $this->commitb->is_handout($this->pset);
-        if ($ha && !$hb) {
-            $this->hasha = $this->repo->truncated_hash($this->pset, $this->commita->hash);
-        } else if (!$ha && $hb) {
-            $this->hashb = $this->repo->truncated_hash($this->pset, $this->commitb->hash);
+    private function _set_flags($clearf, $setf) {
+        $this->_flags = ($this->_flags & ~$clearf & ~self::F_UNDIRECTORIED) | $setf;
+        if (($this->_flags & self::FM_BARE_HANDOUT) === self::FM_BARE_HANDOUTA
+            || ($this->_flags & self::FM_BARE_HANDOUT) === self::FM_BARE_HANDOUTB) {
+            $this->_flags |= self::F_UNDIRECTORIED;
         }
     }
+
+    /** @return string */
+    function repo_hasha() {
+        if (($this->_flags & self::FM_BARE_HANDOUT) === self::FM_BARE_HANDOUTA) {
+            return $this->repo->undirectoried_hash($this->pset, $this->commita->hash);
+        }
+        return $this->commita->hash;
+    }
+
+    /** @return string */
+    function repo_hashb() {
+        if (($this->_flags & self::FM_BARE_HANDOUT) === self::FM_BARE_HANDOUTB) {
+            return $this->repo->undirectoried_hash($this->pset, $this->commitb->hash);
+        }
+        return $this->commitb->hash;
+    }
+
+    /** @return string */
+    function repo_directory() {
+        if ($this->_flags & self::F_UNDIRECTORIED) {
+            return "";
+        }
+        return $this->pset->directory_noslash;
+    }
+
+    /** @return string */
+    function pset_to_repo_file($file) {
+        if ($this->_flags & self::F_UNDIRECTORIED) {
+            return substr($file, strlen($this->pset->directory_slash));
+        }
+        return $file;
+    }
+
+    /** @return string */
+    function repo_to_pset_file($file) {
+        if ($this->_flags & self::F_UNDIRECTORIED) {
+            return $this->pset->directory_slash . $file;
+        }
+        return $file;
+    }
+
 
     /** @param null|string|list<string>|array<string,true> $files
      * @return $this */

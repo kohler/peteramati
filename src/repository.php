@@ -47,9 +47,9 @@ class Repository {
     /** @var array<int,bool> */
     public $viewable_by = [];
     /** @var array<string,string> */
-    public $_truncated_hashes = [];
+    public $_undirectoried_hashes = [];
     /** @var array<int,bool> */
-    public $_truncated_psetdir = [];
+    public $_bare_directory = [];
     /** @var array<string,CommitRecord> */
     private $_commits = [];
     /** @var array<string,CommitList> */
@@ -361,8 +361,8 @@ class Repository {
     }
 
     /** @return bool */
-    function truncated_psetdir(Pset $pset) {
-        return $this->_truncated_psetdir[$pset->id] ?? false;
+    function bare_directory(Pset $pset) {
+        return $this->_bare_directory[$pset->id] ?? false;
     }
 
 
@@ -736,7 +736,7 @@ class Repository {
         // simple cases first
         if (!$pset
             || $pset->directory_noslash === ""
-            || ($this->_truncated_psetdir[$pset->psetid] ?? false)) {
+            || ($this->_bare_directory[$pset->psetid] ?? false)) {
             // simplest case: just this branch
             if (($flags & self::CL_HASH) !== 0) {
                 return $this->head_commit_list(".h/{$branch}", $branch);
@@ -778,7 +778,7 @@ class Repository {
         }
 
         if (empty($list->commits) && $list->suspicious_directory) {
-            $this->_truncated_psetdir[$pset->psetid] = true;
+            $this->_bare_directory[$pset->psetid] = true;
             return $this->commit_list(null, $branch, $flags);
         }
 
@@ -996,7 +996,7 @@ class Repository {
 
     /** @param string $hash
      * @return ?string */
-    private function prepare_truncated_hash(Pset $pset, $hash) {
+    private function prepare_undirectoried_hash(Pset $pset, $hash) {
         $tmpdir = self::_temp_repodir($this->conf);
         if (!$tmpdir) {
             return null;
@@ -1047,7 +1047,7 @@ class Repository {
 
     /** @param string $refname
      * @return ?string */
-    function truncated_hash(Pset $pset, $refname) {
+    function undirectoried_hash(Pset $pset, $refname) {
         $hash = $refname;
         if (!git_refname_is_full_hash($hash)) {
             $hash = $this->resolve_commit($hash);
@@ -1055,11 +1055,11 @@ class Repository {
         if ($hash === null) {
             return null;
         }
-        if (!array_key_exists($hash, $this->_truncated_hashes)) {
-            $this->_truncated_hashes[$hash] = $this->resolve_commit("trunc{$pset->key}_{$hash}")
-                ?? $this->prepare_truncated_hash($pset, $hash);
+        if (!array_key_exists($hash, $this->_undirectoried_hashes)) {
+            $this->_undirectoried_hashes[$hash] = $this->resolve_commit("trunc{$pset->key}_{$hash}")
+                ?? $this->prepare_undirectoried_hash($pset, $hash);
         }
-        return $this->_truncated_hashes[$hash];
+        return $this->_undirectoried_hashes[$hash];
     }
 
 
@@ -1080,13 +1080,25 @@ class Repository {
         return $files;
     }
 
-    /** @param array<string,DiffInfo> $diffargs
+    /** @param list<DiffInfo> $xdiffs
+     * @param int $first
+     * @param int $last
      * @param list<string> $diffoptions */
-    private function parse_diff($diffargs, Pset $pset, $hasha, $hashb, $diffoptions) {
-        $command = array_merge(["git", "diff"], $diffoptions, [$hasha, $hashb, "--"]);
-        foreach ($diffargs as $fn => $dix) {
+    private function parse_diff($xdiffs, $first, $last, DiffContext $dctx) {
+        $command = ["git", "diff"];
+        if ($dctx->wdiff) {
+            $command[] = "-w";
+        }
+        array_push($command, $dctx->repo_hasha(), $dctx->repo_hashb(), "--");
+
+        $diffargs = [];
+        for ($i = $first; $i !== $last; ++$i) {
+            $di = $xdiffs[$i];
+            $fn = $dctx->pset_to_repo_file($di->filename);
+            $diffargs[$fn] = $di;
             $command[] = $fn;
         }
+
         $result = $this->gitrun($command);
         $alineno = $blineno = null;
         $di = null;
@@ -1158,10 +1170,10 @@ class Repository {
                 if ($dctx->file_allowed($fname)
                     && ($diffconfig = $pset->find_diffconfig($fname))
                     && $diffconfig->full) {
-                    $command = ["git", "show", "{$dctx->hashb}:{$dctx->repodir}" . substr($fname, strlen($pset->directory_slash))];
+                    $command = ["git", "show", $dctx->repo_hashb() . ":" . $dctx->pset_to_repo_file($fname)];
                     $result = $this->gitrun($command);
                     $di = new DiffInfo($fname, $diffconfig);
-                    $di->set_contentb(new RepositoryFileContent($dctx->hashb, $fname, $result));
+                    $di->set_contentb(new RepositoryFileContent($dctx->repo_hashb(), $fname, $result));
                     $diffs[$di->filename] = $di;
                     $di->finish();
                 }
@@ -1169,9 +1181,9 @@ class Repository {
         }
 
         // fetch names of changed files
-        $command = ["git", "diff", "--name-only", $dctx->hasha, $dctx->hashb];
-        if ($pset && !$dctx->truncpfx && $pset->directory_noslash) {
-            array_push($command, "--", $pset->directory_noslash);
+        $command = ["git", "diff", "--name-only", $dctx->repo_hasha(), $dctx->repo_hashb()];
+        if (($dir = $dctx->repo_directory())) {
+            array_push($command, "--", $dir);
         }
         $result = $this->gitrun($command);
 
@@ -1180,7 +1192,7 @@ class Repository {
             if ($line == "") {
                 continue;
             }
-            $file = $dctx->truncpfx . $line;
+            $file = $dctx->repo_to_pset_file($line);
             $diffconfig = $pset->find_diffconfig($file);
             // skip files presented in their entirety
             if ($diffconfig
@@ -1191,7 +1203,7 @@ class Repository {
                 continue;
             }
             // skip files that aren't allowed
-            if (!$dctx->file_allowed($dctx->truncpfx . $line)) {
+            if (!$dctx->file_allowed($file)) {
                 continue;
             }
             // create diff record
@@ -1230,20 +1242,12 @@ class Repository {
         }
 
         // actually read diffs
-        if (!empty($xdiffs)) {
-            $nd = count($xdiffs);
-            $darg = [];
-            for ($i = 0; $i < $nd; ++$i) {
-                $darg[substr($xdiffs[$i]->filename, strlen($dctx->truncpfx))] = $xdiffs[$i];
-                if (count($darg) >= 200 || $i == $nd - 1) {
-                    $this->parse_diff($darg, $pset, $dctx->hasha, $dctx->hashb, $dctx->wdiff ? ["-w"] : []);
-                    $darg = [];
-                }
-            }
-            foreach ($xdiffs as $di) {
-                if (!$di->is_empty())
-                    $diffs[$di->filename] = $di;
-            }
+        for ($i = 0; $i < count($xdiffs); $i += 200) {
+            $this->parse_diff($xdiffs, $i, min($i + 200, count($xdiffs)), $dctx);
+        }
+        foreach ($xdiffs as $di) {
+            if (!$di->is_empty())
+                $diffs[$di->filename] = $di;
         }
 
         // ensure a diff for every landmarked file, even if empty

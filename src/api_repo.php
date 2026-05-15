@@ -229,7 +229,7 @@ class Repo_API {
         }
         $info->set_commit($api->commit);
         $lnorder = $info->visible_line_notes();
-        $dctx = new DiffContext($info->repo, $api->pset, $base_commit, $info->commit());
+        $dctx = new DiffContext($info, $base_commit, $info->commit());
         $dctx->add_allowed_file($qreq->file);
         $dctx->add_required_file($qreq->file);
         $dctx->wdiff = !!friendly_boolean($qreq->wdiff);

@@ -1,10 +1,11 @@
 <?php
 // diffinfo.php -- Peteramati class encapsulating diffs for a file
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2026 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 class DiffInfo implements Iterator {
-    /** @var string */
+    /** @var string
+     * @readonly */
     public $filename;
     /** @var bool */
     public $binary = false;
@@ -93,9 +94,9 @@ class DiffInfo implements Iterator {
         if ($dctx) {
             $this->_repoa = $dctx->repo;
             $this->_pset = $dctx->pset;
-            $this->_hasha = $dctx->hasha;
+            $this->_hasha = $dctx->repo_hasha();
             $this->_hasha_hrepo = $dctx->commita->is_handout($this->_pset);
-            $this->_filenamea = substr($filename, strlen($dctx->truncpfx));
+            $this->_filenamea = $dctx->pset_to_repo_file($filename);
             $this->wdiff = $dctx->wdiff;
         }
     }
@@ -119,6 +120,11 @@ class DiffInfo implements Iterator {
         if (($rfc->flags & self::LINE_NONL) !== 0) {
             $this->set_ends_without_newline();
         }
+    }
+
+    /** @return string */
+    function repo_filename() {
+        return $this->_filenamea ?? $this->filename;
     }
 
     /** @return list<null|string|int> $diff */

@@ -1605,7 +1605,7 @@ class RunOverlayConfig {
     }
 }
 
-class DiffConfig {
+final class DiffConfig {
     /** @var string
      * @readonly */
     public $match;

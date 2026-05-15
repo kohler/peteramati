@@ -2317,7 +2317,7 @@ class PsetView {
             }
         }
 
-        $dctx = new DiffContext($this->repo, $this->pset, $commita, $commitb);
+        $dctx = new DiffContext($this, $commita, $commitb);
         if ($lnorder) {
             $dctx->lnorder = $lnorder;
             foreach ($lnorder->fileorder() as $fn => $x) {
@@ -2460,7 +2460,7 @@ class PsetView {
 
         // collect bases that differ from pset-wide base
         $bases = $cbyhash = $fbyhash = [];
-        foreach ($this->repo->ls_files($dctx->hashb) as $fn) {
+        foreach ($this->repo->ls_files($dctx->diff_hashb()) as $fn) {
             if (!$dctx->file_allowed($fn)) {
                 continue;
             }
@@ -2510,16 +2510,6 @@ class PsetView {
                 . substr($t, $p + 1);
         }
         return htmlspecialchars($t);
-    }
-
-    /** @param string $file
-     * @return string */
-    function rawfile($file) {
-        if ($this->repo->truncated_psetdir($this->pset)
-            && str_starts_with($file, $this->pset->directory_slash)) {
-            return substr($file, strlen($this->pset->directory_slash));
-        }
-        return $file;
     }
 
     /** @param string $file
@@ -2636,7 +2626,7 @@ class PsetView {
                     . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
             }
             if (!$dinfo->removed && !$dinfo->fileless) {
-                $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $this->rawfile($file)], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
+                $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $dinfo->repo_filename()], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
             }
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';
@@ -2694,7 +2684,7 @@ class PsetView {
             echo '</div></div>'; // end div.pa-dg div.pa-dg.pa-with-sidebar
         }
         if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
-            echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $this->rawfile($file)])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
+            echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $dinfo->repo_filename()])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
         }
         echo '</div>'; // end div.pa-filediff#F_...
         if (!$no_heading) {

@@ -122,7 +122,7 @@ class LineNoteSuggest_API {
         if (($err = $api->prepare_commit($info))) {
             return $err;
         }
-        $dctx = new DiffContext($info->repo, $api->pset, $info->derived_handout_commit(), $info->commit());
+        $dctx = new DiffContext($info, $info->derived_handout_commit(), $info->commit());
         $dctx->add_allowed_file($file);
         $dctx->add_required_file($file);
         $diff = $info->repo->diff($dctx);

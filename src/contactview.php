@@ -354,7 +354,7 @@ class ContactView {
         }
         if ($repo
             && $pset->handout_warn_merge !== false
-            && $repo->truncated_psetdir($pset)) {
+            && $repo->bare_directory($pset)) {
             $notes[] = [true, "Please create your repository by cloning our repository. Creating your repository from scratch makes it harder for us to grade and harder for you to get pset updates."];
         }
         if (!$repo) {
