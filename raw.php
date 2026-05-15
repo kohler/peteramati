@@ -1,6 +1,6 @@
 <?php
 // raw.php -- Peteramati file download page
-// HotCRP and Peteramati are Copyright (c) 2006-2019 Eddie Kohler and others
+// HotCRP and Peteramati are Copyright (c) 2006-2026 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 require_once("src/initweb.php");
@@ -72,6 +72,11 @@ if ($ext === "txt" || strcasecmp($filename, "README") === 0) {
 header("Content-Type: " . Mimetype::type_with_charset($mimetype));
 if (zlib_get_coding_type() === false) {
     header("Content-Length: " . strlen($result));
+}
+if (friendly_boolean($Qreq->download) || !Mimetype::disposition_inline($mimetype)) {
+    header("Content-Disposition: attachment; filename=" . mime_quote_string($filename));
+} else {
+    header("Content-Disposition: inline");
 }
 
 // Accept header checking

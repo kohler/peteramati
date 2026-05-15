@@ -2643,7 +2643,7 @@ class PsetView {
                     . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
             }
             if (!$dinfo->removed && !$dinfo->fileless) {
-                $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $dinfo->repo_filename()], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
+                $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $dinfo->repo_filename(), "download" => 1], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
             }
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';
