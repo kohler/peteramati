@@ -533,7 +533,7 @@ class PsetRequest {
             $x .= "...";
         }
         $t = date("Y-m-d H:i", $k->commitat);
-        return substr($k->hash, 0, 7) . " [{$t}] " . htmlspecialchars($x);
+        return substr($k->hash, 0, 7) . " [{$t}] " . $x;
     }
 
     private function echo_commit() {

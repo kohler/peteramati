@@ -589,7 +589,7 @@ class Ht {
     static function maybe_link($html, $href, $js = null) {
         return $href === null ? $html : self::link($html, $href, $js);
     }
- 
+
     /** @return string */
     static function wrap($tag, $html, $js = null) {
         $jst = self::extra($js);
