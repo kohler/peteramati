@@ -75,6 +75,7 @@ class APIRequest {
         if ($api->pset && !$api->pset->gitless && !$this->viewer->is_empty()) {
             $api->repo = $api->user->repo($api->pset);
             $api->branch = $api->user->branch($api->pset);
+            $api->directory = $api->user->pset_directory($api->pset);
         }
         if ($api->repo && $this->qreq->commit) {
             $api->hash = $this->qreq->commit;

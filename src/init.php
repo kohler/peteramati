@@ -14,6 +14,7 @@ const LINK_BACKPARTNER = 2;
 const LINK_REPO = 3;         // see also gitfetch
 const LINK_REPOVIEW = 4;
 const LINK_BRANCH = 5;
+const LINK_DIRECTORY = 6;
 
 const HASNOTES_GRADE = 1;
 const HASNOTES_COMMENT = 2;

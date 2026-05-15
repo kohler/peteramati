@@ -84,7 +84,7 @@ class Repo_API {
             $ans->error = "No repository configured";
         } else if (!$user->can_view_repo_contents($repo, $api->branch)) {
             $ans->error = "Unconfirmed repository";
-        } else if (!($c = $repo->latest_commit($api->pset, $api->branch))) {
+        } else if (!($c = $repo->latest_commit($api->pset, $api->branch, $api->directory))) {
             $ans->repoid = "repo{$repo->repoid}";
             $ans->error = "No commits";
         } else {

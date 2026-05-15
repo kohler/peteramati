@@ -12,7 +12,7 @@ class CommitRecord implements JsonSerializable {
     public $subject;
     /** @var ?string */
     public $fromhead;
-    /** @var null|string|list<string> */
+    /** @var ?list<string> */
     public $directory;
     /** @var ?CommitRecordFile */
     public $file_list;
@@ -53,7 +53,7 @@ class CommitRecord implements JsonSerializable {
         }
         $want_directory = ($this->_flags & self::CRF_HAS_DIRECTORY) === 0;
         $want_file_list = ($wantflags & self::CRF_HAS_FILE_LIST) !== 0;
-        $dir = $tail = null;
+        $dir = $tail = $lastdir = null;
         foreach (explode("\n", $s) as $ln) {
             if ($want_file_list) {
                 if (($tab1 = strpos($ln, "\t")) !== false
@@ -79,8 +79,14 @@ class CommitRecord implements JsonSerializable {
             if ($ln === "" || !$want_directory) {
                 continue;
             }
-            $d = substr($ln, 0, strlpos($ln, "/"));
-            if ($dir === null) {
+            if (($sl = strrpos($ln, "/")) === false) {
+                $d = $ln;
+            } else {
+                $d = substr($ln, 0, $sl);
+            }
+            if ($d === $lastdir) {
+                // do nothing
+            } else if ($dir === null) {
                 $dir = $d;
             } else if (is_string($dir)) {
                 if ($dir !== $d) {
@@ -89,6 +95,7 @@ class CommitRecord implements JsonSerializable {
             } else if (!in_array($d, $dir)) {
                 $dir[] = $d;
             }
+            $lastdir = $d;
         }
         if ($want_directory) {
             $this->directory = $dir;
@@ -96,26 +103,21 @@ class CommitRecord implements JsonSerializable {
         $this->_flags |= $wantflags;
     }
 
-    /** @param string $dir
+    /** @param string $file
      * @return bool */
-    function touches_directory($dir) {
-        if (str_ends_with($dir, "/")) {
-            $dir = substr($dir, 0, -1);
-        }
-        if ($dir === "") {
-            return true;
-        } else if ($this->directory === null) {
+    function __contains($dir_noslash) {
+        if ($this->directory === null) {
             return false;
-        } else if (is_string($this->directory)) {
-            return $this->directory === $dir;
         }
-        return in_array($dir, $this->directory);
-    }
-    /** @param string $dir_noslash
-     * @return bool */
-    function __touches_directory($dir_noslash) {
-        return $this->directory === $dir_noslash
-            || (is_array($this->directory) && in_array($dir_noslash, $this->directory));
+        $d = is_string($this->directory) ? [$this->directory] : $this->directory;
+        $l = strlen($dir_noslash);
+        foreach ($d as $fn) {
+            if (str_starts_with($fn, $dir_noslash)
+                && (strlen($fn) === $l || $fn[$l] === "/")) {
+                return true;
+            }
+        }
+        return false;
     }
     /** @return bool */
     function is_merge() {

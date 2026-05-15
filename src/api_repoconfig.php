@@ -96,7 +96,7 @@ class RepoConfig_API {
             return MessageItem::error("<0>Problem set does not use git branches")->make_json();
         }
         if ($qreq->valid_post()) {
-            if (!$qreq->branch) {
+            if (!isset($qreq->branch)) {
                 return MessageItem::error("<0>Invalid request")->make_json();
                 return ["ok" => false, "error" => "Invalid request"];
             } else if (!$viewer->can_set_repo($api->pset, $user)) {
@@ -128,6 +128,50 @@ class RepoConfig_API {
         } else {
             $user->set_link(LINK_BRANCH, $pset->id, $branchid);
         }
+        return null;
+    }
+
+    static function directory(Contact $viewer, Qrequest $qreq, APIData $api) {
+        $user = $api->user;
+        if (!$viewer->has_account_here()
+            || (!$viewer->isPC && $user !== $viewer)) {
+            return MessageItem::error("<0>Permission denied")->make_json();
+        } else if ($api->pset->gitless) {
+            return MessageItem::error("<0>Problem set does not use git")->make_json();
+        }
+        if ($qreq->valid_post()) {
+            if (!isset($qreq->directory)) {
+                return MessageItem::error("<0>Invalid request")->make_json();
+                return ["ok" => false, "error" => "Invalid request"];
+            } else if (!$viewer->can_set_repo($api->pset, $user)) {
+                return MessageItem::error("<0>Permission denied")->make_json();
+            } else if (($em = self::post_directory($viewer, $api->pset, $api->user, $qreq->directory))) {
+                return $em;
+            }
+        }
+        return [
+            "ok" => true,
+            "directory" => $user->pset_directory($api->pset)
+        ];
+    }
+
+    static private function post_directory(Contact $viewer, Pset $pset, Contact $user, $directory) {
+        $directory = trim($directory);
+        while (str_ends_with($directory, "/")) {
+            $directory = substr($directory, 0, -1);
+        }
+        while (str_starts_with($directory, "./")) {
+            $directory = substr($directory, 2);
+        }
+        if (preg_match('/(?:\A|\/)(?:\.\.|\.git)(?:\/|\z)|[\\000-\\037\\177]|\\A\/|\/\//i', $directory)
+            || !is_valid_utf8($directory)) {
+            return MessageItem::error_at("directory", "<0>Invalid characters in directory name")->make_json();
+        }
+        if ($directory === ""
+            || $directory === $pset->directory_noslash) {
+            $user->clear_links(LINK_DIRECTORY, $pset->id);
+        }
+        $user->set_link(LINK_DIRECTORY, $pset->id, $user->conf->ensure_branch($directory));
         return null;
     }
 

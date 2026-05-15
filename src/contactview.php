@@ -378,6 +378,10 @@ class ContactView {
             self::echo_branch_group($info);
         }
 
+        if ($pset->allow_directory_override) {
+            self::echo_directory_group($info);
+        }
+
         return $repo;
     }
 
@@ -416,6 +420,46 @@ class ContactView {
             echo '<form data-pa-pset="', $pset->urlkey, '" class="ui-submit pa-setbranch">';
         }
         self::echo_group("branch", $value, [], $id);
+        if ($editable) {
+            echo '</form>';
+        }
+    }
+
+    static function echo_directory_group(PsetView $info) {
+        global $Qreq;
+        $editable = $info->viewer->can_set_repo($info->pset, $info->user)
+            && !$info->user->is_anonymous;
+        $directory = $info->user->pset_directory($info->pset);
+        if (!$editable
+            && $info->pset->directory_noslash === $directory) {
+            return;
+        }
+        $id = null;
+
+        if ($editable) {
+            $id = "directory-u{$info->user->contactId}p{$info->pset->id}";
+            if (!$info->user->has_directory_override($info->pset)
+                || $directory === $info->pset->directory_noslash) {
+                $xvalue = null;
+            } else {
+                $xvalue = $directory;
+            }
+            $js = [
+                "style" => "width:32em",
+                "id" => $id,
+                "placeholder" => $info->pset->directory_noslash,
+                "data-pa-repoid" => $info->repo ? "repo{$info->repo->repoid}" : null
+            ];
+            $value = Ht::entry("directory", $xvalue, $js) . " " . Ht::submit("Save");
+        } else {
+            $value = htmlspecialchars($directory);
+        }
+
+        // edit
+        if ($editable) {
+            echo '<form data-pa-pset="', $info->pset->urlkey, '" class="ui-submit pa-setdirectory">';
+        }
+        self::echo_group("directory", $value, [], $id);
         if ($editable) {
             echo '</form>';
         }
@@ -545,8 +589,8 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
                 $title = "latest commit";
                 if (!$repo->snapat) {
                     $value = "(checking)";
-                } else if ($pset->directory_noslash !== ""
-                           && $repo->latest_commit(null, $info->branch)) {
+                } else if ($info->directory !== ""
+                           && $repo->latest_commit(null, $info->branch, $info->directory)) {
                     $value = "(no commits yet for this pset)";
                 } else {
                     $value = "(no such branch)";

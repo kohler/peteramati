@@ -569,7 +569,7 @@ class Repository {
 
     /** @param string $branch */
     private function check_merges($branch) {
-        $list = $this->commit_list(null, $branch);
+        $list = $this->commit_list(null, $branch, ".");
         if ($list->merges_checked) {
             return;
         }
@@ -724,19 +724,26 @@ class Repository {
 
     /** @param ?Pset $pset
      * @param ?string $branch
+     * @param ?string $directory
      * @param int $flags
      * @return CommitList */
-    function commit_list($pset, $branch, $flags = 0) {
+    function commit_list($pset, $branch, $directory, $flags = 0) {
         if (($flags & self::CL_HASH) !== 0) {
             assert(git_refname_is_full_hash($branch ?? ""));
         } else {
             $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
         }
+        if ($directory === null) {
+            $directory = $pset ? $pset->directory_noslash : "";
+        }
+        if ($pset
+            && $directory === $pset->directory_noslash
+            && ($this->_bare_directory[$pset->psetid] ?? false)) {
+            $directory = ".";
+        }
 
         // simple cases first
-        if (!$pset
-            || $pset->directory_noslash === ""
-            || ($this->_bare_directory[$pset->psetid] ?? false)) {
+        if ($directory === "" || $directory === ".") {
             // simplest case: just this branch
             if (($flags & self::CL_HASH) !== 0) {
                 return $this->head_commit_list(".h/{$branch}", $branch);
@@ -750,10 +757,9 @@ class Repository {
         }
 
         // restrict to directory
-        $dir = $pset->directory_noslash;
         $test_file = $pset->test_file;
-        assert(strpos($dir, "/") === false);
-        $key = ".d/{$dir}/";
+        assert(strpos($directory, "//") === false);
+        $key = ".d/{$directory}//";
         if (($flags & self::CL_HASH) !== 0) {
             $key .= ".h/{$branch}";
         } else if (($flags & self::CL_EXPAND) !== 0) {
@@ -766,20 +772,20 @@ class Repository {
             return $list;
         }
 
-        foreach ($this->commit_list(null, $branch, $flags) as $cr) {
-            if ($cr->__touches_directory($dir)) {
+        foreach ($this->commit_list(null, $branch, ".", $flags) as $cr) {
+            if ($cr->__contains($directory)) {
                 $list->commits[$cr->hash] = $cr;
             } else if (empty($list->commits)
                        && $test_file !== null
                        && !$list->suspicious_directory
-                       && $cr->__touches_directory($test_file)) {
+                       && $cr->__contains($test_file)) {
                 $list->suspicious_directory = true;
             }
         }
 
         if (empty($list->commits) && $list->suspicious_directory) {
             $this->_bare_directory[$pset->psetid] = true;
-            return $this->commit_list(null, $branch, $flags);
+            return $this->commit_list(null, $branch, ".", $flags);
         }
 
         return $this->install_list($list, $key);
@@ -787,25 +793,26 @@ class Repository {
 
     /** @param ?Pset $pset
      * @param ?string $branch
+     * @param ?string $directory
      * @param int $flags
      * @return array<string,CommitRecord> */
-    function commits($pset, $branch, $flags = 0) {
-        return $this->commit_list($pset, $branch, $flags)->commits;
+    function commits($pset, $branch, $directory, $flags = 0) {
+        return $this->commit_list($pset, $branch, $directory, $flags)->commits;
     }
 
     /** @param ?string $branch
      * @return ?CommitRecord */
-    function latest_commit(?Pset $pset = null, $branch = null) {
-        return $this->commit_list($pset, $branch)->latest();
+    function latest_commit(?Pset $pset = null, $branch = null, $directory = null) {
+        return $this->commit_list($pset, $branch, $directory)->latest();
     }
 
     /** @param ?string $branch
      * @return ?CommitRecord */
-    function latest_nontrivial_commit(?Pset $pset = null, $branch = null) {
+    function latest_nontrivial_commit(?Pset $pset = null, $branch = null, $directory = null) {
         $branch = $branch ?? ($pset ? $pset->main_branch : $this->conf->default_main_branch);
         $checked_merges = false;
 
-        foreach ($this->commit_list($pset, $branch) as $c) {
+        foreach ($this->commit_list($pset, $branch, $directory) as $c) {
             if ($c->is_merge() && !$checked_merges) {
                 $this->check_merges($branch);
                 $checked_merges = true;
@@ -849,7 +856,7 @@ class Repository {
     function connected_commit($hashpart, ?Pset $pset = null, $branch = null) {
         // ensure there's some commits
         if (empty($this->_commits)) {
-            $this->commit_list($pset, $branch);
+            $this->commit_list($pset, $branch, ".");
         }
         // exact commits don’t need access to full commit lists
         $exact = strlen($hashpart) >= 40;
@@ -1158,14 +1165,20 @@ class Repository {
     function diff(DiffContext $dctx) {
         assert($dctx->repo === $this);
         $pset = $dctx->pset;
-        $ignore_diffconfig = $dctx->commita->is_handout($pset) && $dctx->commitb->is_handout($pset);
+        $dir = $dctx->repo_directory();
+        $ignore_diffconfig = $dctx->commita_is_handout() && $dctx->commitb_is_handout();
         $diffs = [];
 
         // read "full" files
         if (!$ignore_diffconfig && !$dctx->no_full) {
+            $psetdir = $dctx->undirectoried() ? $pset->directory : $dir;
+            $psetdirlen = strlen($psetdir);
             foreach ($pset->potential_diffconfig_full() as $fname) {
-                if (!str_starts_with($fname, $pset->directory_slash)) {
-                    $fname = $pset->directory_slash . $fname;
+                if ($psetdir !== ""
+                    && (strlen($fname) <= $psetdirlen
+                        || $fname[$psetdirlen] !== "/"
+                        || !str_starts_with($fname, $psetdir))) {
+                    $fname = "{$psetdir}/{$fname}";
                 }
                 if ($dctx->file_allowed($fname)
                     && ($diffconfig = $pset->find_diffconfig($fname))
@@ -1182,7 +1195,7 @@ class Repository {
 
         // fetch names of changed files
         $command = ["git", "diff", "--name-only", $dctx->repo_hasha(), $dctx->repo_hashb()];
-        if (($dir = $dctx->repo_directory())) {
+        if ($dir) {
             array_push($command, "--", $dir);
         }
         $result = $this->gitrun($command);

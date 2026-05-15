@@ -16,6 +16,9 @@ class DiffContext {
     /** @var CommitRecord
      * @readonly */
     public $commitb;
+    /** @var string
+     * @readonly */
+    private $directory;
     /** @var bool */
     public $wdiff = false;
     /** @var bool */
@@ -42,7 +45,8 @@ class DiffContext {
     function __construct(PsetView $info, CommitRecord $commita, CommitRecord $commitb) {
         $this->repo = $info->repo;
         $this->pset = $info->pset;
-        if ($pset->directory_noslash !== ""
+        $this->directory = $info->directory;
+        if ($this->directory !== ""
             && $this->repo->bare_directory($this->pset)) {
             $this->_flags |= self::F_BARE_DIRECTORY;
         }
@@ -97,7 +101,7 @@ class DiffContext {
         if ($this->_flags & self::F_UNDIRECTORIED) {
             return "";
         }
-        return $this->pset->directory_noslash;
+        return $this->directory;
     }
 
     /** @return string */
@@ -114,6 +118,21 @@ class DiffContext {
             return $this->pset->directory_slash . $file;
         }
         return $file;
+    }
+
+    /** @return bool */
+    function undirectoried() {
+        return ($this->_flags & self::F_UNDIRECTORIED) !== 0;
+    }
+
+    /** @return bool */
+    function commita_is_handout() {
+        return ($this->_flags & self::F_HANDOUTA) !== 0;
+    }
+
+    /** @return bool */
+    function commitb_is_handout() {
+        return ($this->_flags & self::F_HANDOUTB) !== 0;
     }
 
 

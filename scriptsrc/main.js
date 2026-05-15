@@ -1286,6 +1286,30 @@ handle_ui.on("focusin.pa-branch-datalist", function () {
     }
 });
 
+handle_ui.on("submit.pa-setdirectory", function (evt) {
+    let f = this;
+    this.classList.remove("has-error", "has-warning");
+    if (hasClass(this.firstChild, "feedback-list")) {
+        this.removeChild(this.firstChild);
+    }
+    this.querySelector("button[type=submit]").disabled = true;
+    $.ajax(hoturl("=api/directory", {
+        pset: this.getAttribute("data-pa-pset"),
+        u: siteinfo.uservalue
+    }), {
+        type: "POST", cache: false, data: $(this).serialize(),
+        success: function (data) {
+            f.querySelector("button[type=submit]").disabled = false;
+            if (data.message_list) {
+                f.insertBefore(feedback.render_list(data.message_list), f.firstChild);
+            } else {
+                location.reload();
+            }
+        }
+    })
+    evt.preventDefault();
+});
+
 function pa_checklatest(pset) {
     var start = (new Date).getTime(), timeout;
 

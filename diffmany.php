@@ -92,8 +92,8 @@ class DiffMany_Page {
         if (!$pset->gitless && $info->hash()) {
             echo '" data-pa-commit="', htmlspecialchars($info->hash());
         }
-        if (!$pset->gitless && $pset->directory) {
-            echo '" data-pa-directory="', htmlspecialchars($pset->directory_slash);
+        if (!$pset->gitless && $info->directory) {
+            echo '" data-pa-directory="', htmlspecialchars($info->directory_slash());
         }
         if ($info->can_edit_scores()
             || ($info->can_view_any_grade() && $info->is_grading_commit())) {
@@ -184,7 +184,7 @@ class DiffMany_Page {
             return $this->files;
         }
         $result = [];
-        foreach ($info->repo->ls_files($info->hash(), $info->pset->directory) as $f) {
+        foreach ($info->repo->ls_files($info->hash(), $info->directory) as $f) {
             foreach ($this->files as $pat) {
                 if (fnmatch($pat, $f, FNM_PATHNAME | FNM_PERIOD)) {
                     $result[] = $f;

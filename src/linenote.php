@@ -86,10 +86,15 @@ class LineNote implements JsonIsReplacement, JsonSerializable {
 
 
     /** @return string */
-    function render_line_link_html(?Pset $pset = null) {
+    function render_line_link_html(?PsetView $info = null) {
         $f = $this->file;
-        if ($pset && str_starts_with($f, $pset->directory_slash)) {
-            $f = substr($f, strlen($pset->directory_slash));
+        if ($info && $info->directory) {
+            $l = strlen($info->directory);
+            if (strlen($f) > $l
+                && $f[$l] === "/"
+                && str_starts_with($f, $info->directory)) {
+                $f = substr($f, $l + 1);
+            }
         }
         $fileid = html_id_encode($this->file); // XXX only works on single-user pages
         $f = htmlspecialchars($f);

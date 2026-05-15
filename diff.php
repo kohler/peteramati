@@ -231,8 +231,8 @@ class Diff_Page {
             '" data-pa-base-commit="', htmlspecialchars($this->commit->hash),
             '" data-pa-commit="', htmlspecialchars($this->commit1->hash),
             '" data-pa-gradeinfo=\'', json_escape_browser_sqattr($infoj), '\'';
-        if ($this->pset->directory) {
-            echo ' data-pa-directory="', htmlspecialchars($this->pset->directory_slash), '"';
+        if ($this->info1->directory) {
+            echo ' data-pa-directory="', htmlspecialchars($this->info1->directory_slash()), '"';
         }
         if ($this->user1->extension) {
             echo ' data-pa-user-extension="yes"';
@@ -253,7 +253,7 @@ class Diff_Page {
         $notelinks = [];
         foreach ($lnorder->seq() as $note) {
             if (!$note->is_empty()) {
-                $notelinks[] = $note->render_line_link_html($this->pset);
+                $notelinks[] = $note->render_line_link_html($this->info1);
             }
         }
         if (!empty($notelinks)) {

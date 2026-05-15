@@ -95,7 +95,7 @@ class DiffInfo implements Iterator {
             $this->_repoa = $dctx->repo;
             $this->_pset = $dctx->pset;
             $this->_hasha = $dctx->repo_hasha();
-            $this->_hasha_hrepo = $dctx->commita->is_handout($this->_pset);
+            $this->_hasha_hrepo = $dctx->commita_is_handout();
             $this->_filenamea = $dctx->pset_to_repo_file($filename);
             $this->wdiff = $dctx->wdiff;
         }
@@ -197,7 +197,7 @@ class DiffInfo implements Iterator {
     }
 
     /** @return bool */
-    function is_handout_commit_a() {
+    function commita_is_handout() {
         if ($this->_hasha_hrepo === null) {
             $this->_hasha_hrepo = $this->_pset && $this->_pset->handout_commit($this->_hasha);
         }

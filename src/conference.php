@@ -15,6 +15,8 @@ class APIData {
     /** @var ?string */
     public $branch;
     /** @var ?string */
+    public $directory;
+    /** @var ?string */
     public $hash;
     /** @var ?CommitRecord */
     public $commit;
@@ -2730,7 +2732,7 @@ class Conf {
             $hset->snaphash = $hrepo->snaphash;
             $hset->snaphash_at = Conf::$now;
             $hset->commits = [];
-            foreach ($hrepo->commits($pset, $pset->handout_branch) as $c) {
+            foreach ($hrepo->commits($pset, $pset->handout_branch, null) as $c) {
                 $hset->commits[] = [$c->hash, $c->commitat, $c->subject];
             }
             $this->save_setting($key, 1, $hset);
@@ -2818,9 +2820,8 @@ class Conf {
             return "master";
         } else if ($branchid === 1) {
             return "main";
-        } else {
-            return ($this->branch_map())[$branchid] ?? null;
         }
+        return ($this->branch_map())[$branchid] ?? null;
     }
 
     function clear_branch_map() {
@@ -2836,19 +2837,18 @@ class Conf {
             return 1;
         } else if (!Repository::validate_branch($branch)) {
             return null;
-        } else {
-            $key = array_search($branch, $this->branch_map(), true);
-            if ($key === false) {
-                $this->qe("insert into Branch set branch=?", $branch);
-                if (!$this->dblink->insert_id) {
-                    $this->_branch_map = null;
-                    return $this->ensure_branch($branch);
-                }
-                $key = $this->dblink->insert_id;
-                $this->_branch_map[$key] = $branch;
-            }
-            return $key;
         }
+        $key = array_search($branch, $this->branch_map(), true);
+        if ($key === false) {
+            $this->qe("insert into Branch set branch=?", $branch);
+            if (!$this->dblink->insert_id) {
+                $this->_branch_map = null;
+                return $this->ensure_branch($branch);
+            }
+            $key = $this->dblink->insert_id;
+            $this->_branch_map[$key] = $branch;
+        }
+        return $key;
     }
 
 
@@ -2926,6 +2926,7 @@ class Conf {
             "branch" => "19 RepoConfig_API::branch",
             "branches" => "1 Repo_API::branches",
             "diffconfig" => "15 Repo_API::diffconfig",
+            "directory" => "19 RepoConfig_API::directory",
             "filediff" => "15 Repo_API::filediff",
             "flag" => "15 Flag_API::flag",
             "grade" => "3 Grade_API::grade",

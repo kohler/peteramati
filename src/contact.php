@@ -811,30 +811,54 @@ class Contact {
     function has_branch(Pset $pset) {
         if ($pset->no_branch) {
             return false;
-        } else {
-            if ($this->links === null) {
-                $this->load_links();
-            }
-            return isset($this->links[LINK_BRANCH][$pset->id]);
         }
+        if ($this->links === null) {
+            $this->load_links();
+        }
+        return isset($this->links[LINK_BRANCH][$pset->id]);
     }
 
     /** @return int */
     function branchid(Pset $pset) {
         if ($pset->no_branch) {
             return 0;
-        } else {
-            if ($this->links === null) {
-                $this->load_links();
-            }
-            $l = $this->links[LINK_BRANCH][$pset->id] ?? null;
-            return $l !== null && count($l) === 1 ? $l[0] : 0;
         }
+        if ($this->links === null) {
+            $this->load_links();
+        }
+        $l = $this->links[LINK_BRANCH][$pset->id] ?? null;
+        return $l !== null && count($l) === 1 ? $l[0] : 0;
     }
 
     /** @return string */
     function branch(Pset $pset) {
         return $this->conf->branch($this->branchid($pset));
+    }
+
+    /** @return bool */
+    function has_directory_override(Pset $pset) {
+        if (!$pset->allow_directory_override) {
+            return false;
+        }
+        if ($this->links === null) {
+            $this->load_links();
+        }
+        return isset($this->links[LINK_DIRECTORY][$pset->id]);
+    }
+
+    /** @return string */
+    function pset_directory(Pset $pset) {
+        if (!$pset->allow_directory_override) {
+            return $pset->directory_noslash;
+        }
+        if ($this->links === null) {
+            $this->load_links();
+        }
+        $l = $this->links[LINK_DIRECTORY][$pset->id] ?? null;
+        if ($l === null || count($l) !== 1 || $l[0] === 0) {
+            return $pset->directory_noslash;
+        }
+        return $this->conf->branch($l[0]);
     }
 
     /** @param int $type
@@ -852,42 +876,34 @@ class Contact {
 
     /** @param int $type
      * @param int $psetid
-     * @return bool */
+     * @return void */
     function clear_links($type, $psetid = 0, $nolog = false) {
         unset($this->links[$type][$psetid]);
         $this->adjust_links($type, $psetid);
-        if ($this->conf->qe("delete from ContactLink where cid=? and type=? and pset=?", $this->contactId, $type, $psetid)) {
-            if (!$nolog) {
-                $this->conf->log("Clear links [$type,$psetid]", $this);
-            }
-            return true;
-        } else {
-            return false;
+        $result = $this->conf->qe("delete from ContactLink where cid=? and type=? and pset=?", $this->contactId, $type, $psetid);
+        if ($result && $result->affected_rows && !$nolog) {
+            $this->conf->log("Clear links [$type,$psetid]", $this);
         }
     }
 
     /** @param int $type
      * @param int $psetid
      * @param int $link
-     * @return bool */
+     * @return void */
     function set_link($type, $psetid, $link) {
         if ($this->links === null) {
             $this->load_links();
         }
         $this->clear_links($type, $psetid, false);
         $this->links[$type][$psetid] = [$link];
-        if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $psetid, $link)) {
-            $this->conf->log("Set links [$type,$psetid,$link]", $this);
-            return true;
-        } else {
-            return false;
-        }
+        $result = $this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $psetid, $link);
+        $this->conf->log("Set links [$type,$psetid,$link]", $this);
     }
 
     /** @param int $type
      * @param int $psetid
      * @param int $value
-     * @return bool */
+     * @return void */
     function add_link($type, $psetid, $value) {
         assert($type !== LINK_REPO && $type !== LINK_BRANCH);
         if ($this->links === null) {
@@ -898,14 +914,9 @@ class Contact {
         }
         if (!in_array($value, $this->links[$type][$psetid])) {
             $this->links[$type][$psetid][] = $value;
-            if ($this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $psetid, $value)) {
-                $this->conf->log("Add link [$type,$psetid,$value]", $this);
-                return true;
-            } else {
-                return false;
-            }
+            $this->conf->qe("insert into ContactLink (cid,type,pset,link) values (?,?,?,?)", $this->contactId, $type, $psetid, $value);
+            $this->conf->log("Add link [$type,$psetid,$value]", $this);
         }
-        return true;
     }
 
     /** @param int $pset
@@ -1573,12 +1584,13 @@ class Contact {
             $this->conf->qe("delete from ContactLink where cid=? and type=? and pset=? and link=?", $link, LINK_BACKPARTNER, $pset, $this->contactId);
         }
         if ($pc->contactId == $this->contactId) {
-            return $this->clear_links(LINK_PARTNER, $pset);
+            $this->clear_links(LINK_PARTNER, $pset);
         } else {
-            return $this->set_link(LINK_PARTNER, $pset, $pc->contactId)
-                && $this->conf->qe("insert into ContactLink set cid=?, type=?, pset=?, link=?",
-                                   $pc->contactId, LINK_BACKPARTNER, $pset, $this->contactId);
+            $this->set_link(LINK_PARTNER, $pset, $pc->contactId);
+            $this->conf->qe("insert into ContactLink set cid=?, type=?, pset=?, link=?",
+                            $pc->contactId, LINK_BACKPARTNER, $pset, $this->contactId);
         }
+        return true;
     }
 
     function can_view_repo_contents(Repository $repo, $branch = null, $cached = false) {

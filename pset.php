@@ -918,8 +918,8 @@ class PsetRequest {
                 '" data-pa-branch="', htmlspecialchars($this->info->branch()),
                 '" data-pa-commit="', htmlspecialchars($this->info->commit_hash());
         }
-        if (!$this->pset->gitless && $this->pset->directory) {
-            echo '" data-pa-directory="', htmlspecialchars($this->pset->directory_slash);
+        if (!$this->pset->gitless && $this->info->directory) {
+            echo '" data-pa-directory="', htmlspecialchars($this->info->directory_slash());
         }
         if ($this->user->extension) {
             echo '" data-pa-user-extension="yes';
@@ -964,7 +964,7 @@ class PsetRequest {
             $notelinks = [];
             foreach ($lnorder->seq() as $note) {
                 if (!$note->is_empty()) {
-                    $notelinks[] = $note->render_line_link_html($this->pset);
+                    $notelinks[] = $note->render_line_link_html($this->info);
                 }
             }
             if (!empty($notelinks)) {

@@ -29,6 +29,9 @@ class PsetView {
     /** @var ?int
      * @readonly */
     public $branchid;
+    /** @var ?string
+     * @readonly */
+    public $directory;
     /** @var ?bool */
     private $partner_same;
 
@@ -128,6 +131,7 @@ class PsetView {
             $info->repo = $user->repo($pset->id);
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
+            $info->directory = $user->pset_directory($pset);
         }
         if ($hash !== "none" && $info->repo) {
             $info->set_hash($hash, $refresh);
@@ -152,11 +156,13 @@ class PsetView {
         if ($info->_rpi) {
             $info->branchid = $info->_rpi->branchid;
             $info->branch = $info->conf->branch($info->branchid);
+            $info->directory = $user->pset_directory($pset);
             $info->_hash = $info->_rpi->gradehash;
             $bhash = $bhash ?? $info->_rpi->gradebhash;
         } else {
             $info->branchid = $user->branchid($pset);
             $info->branch = $info->conf->branch($info->branchid);
+            $info->directory = $user->pset_directory($pset);
         }
         if ($bhash !== null) {
             $info->_cpi = $sset->cpi_for($pset, $bhash, $info->repo);
@@ -225,6 +231,7 @@ class PsetView {
             $this->repo = $this->user->repo($this->pset->id);
             $this->branchid = $this->user->branchid($this->pset);
             $this->branch = $this->conf->branch($this->branchid);
+            $this->directory = $this->user->pset_directory($this->pset);
         }
         if ($this->repo) {
             $this->set_hash(null, $refresh);
@@ -262,7 +269,7 @@ class PsetView {
         if (!$this->repo) {
             return new CommitList;
         }
-        return $this->repo->commit_list($this->pset, $this->branch, Repository::CL_EXPAND);
+        return $this->repo->commit_list($this->pset, $this->branch, $this->directory, Repository::CL_EXPAND);
     }
 
     /** @return ?CommitRecord */
@@ -286,7 +293,7 @@ class PsetView {
         if (!$this->repo) {
             return null;
         }
-        return $this->repo->latest_commit($this->pset, $this->branch);
+        return $this->repo->latest_commit($this->pset, $this->branch, $this->directory);
     }
 
     /** @return ?non-empty-string */
@@ -300,7 +307,7 @@ class PsetView {
         if (!$this->repo) {
             return null;
         }
-        return $this->repo->latest_nontrivial_commit($this->pset, $this->branch);
+        return $this->repo->latest_nontrivial_commit($this->pset, $this->branch, $this->directory);
     }
 
     /** @return ?non-empty-string */
@@ -556,11 +563,6 @@ class PsetView {
         return $c ? $c->commitat : null;
     }
 
-    /** @return bool */
-    function can_have_grades() {
-        return $this->pset->gitless_grades || $this->commit();
-    }
-
     /** @return ?CommitRecord */
     function derived_handout_commit() {
         if ($this->_derived_handout_commit === false) {
@@ -629,6 +631,21 @@ class PsetView {
             $c = $this->commit_in_base($this->pset->diff_base) ?? $c;
         }
         return $c;
+    }
+
+
+    /** @return string */
+    function directory_slash() {
+        if ($this->directory === "" || $this->directory === ".") {
+            return "";
+        }
+        return $this->directory . "/";
+    }
+
+
+    /** @return bool */
+    function can_have_grades() {
+        return $this->pset->gitless_grades || $this->commit();
     }
 
     /** @param ?callable(PsetView,?RepositoryPsetInfo):bool $updater
@@ -2353,7 +2370,7 @@ class PsetView {
     private function _read_diff(DiffContext $dctx) {
         // both repos must be in the same directory; assume handout
         // is only potential problem
-        if ($dctx->commita->is_handout($this->pset) !== $dctx->commitb->is_handout($this->pset)) {
+        if ($dctx->commita_is_handout() !== $dctx->commitb_is_handout()) {
             $this->conf->handout_repo($this->pset, $this->repo);
         }
 
@@ -2386,12 +2403,12 @@ class PsetView {
                 if ($g->landmark_file
                     && ($di = $diff[$g->landmark_file] ?? null)
                     && !$di->contains_linea($g->landmark_line)
-                    && $di->is_handout_commit_a()) {
+                    && $di->commita_is_handout()) {
                     $di->expand_linea($g->landmark_line - 2, $g->landmark_line + 3);
                 }
                 if ($g->landmark_range_file
                     && ($di = $diff[$g->landmark_range_file] ?? null)
-                    && $di->is_handout_commit_a()) {
+                    && $di->commita_is_handout()) {
                     $di->expand_linea($g->landmark_range_first, $g->landmark_range_last);
                 }
             }
@@ -2549,7 +2566,7 @@ class PsetView {
         if ($this->pset->has_grade_landmark
             && $this->pc_view
             && !$this->is_handout_commit()
-            && $dinfo->is_handout_commit_a()
+            && $dinfo->commita_is_handout()
             && !$no_grades) {
             $rangeg = [];
             foreach ($this->pset->grades() as $g) {

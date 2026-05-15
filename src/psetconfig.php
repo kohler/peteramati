@@ -107,6 +107,8 @@ class Pset {
     public $directory_slash;
     /** @var string */
     public $directory_noslash;
+    /** @var bool */
+    public $allow_directory_override = false;
     /** @var ?string */
     public $test_file;
     /** @var ?string */
@@ -362,6 +364,7 @@ class Pset {
             $this->directory_slash = substr($this->directory_slash, 1);
         }
         $this->directory_noslash = preg_replace('/\/+\z/', '', $this->directory_slash);
+        $this->allow_directory_override = self::cbool($p, "allow_directory_override");
         $this->test_file = self::cstr($p, "test_file");
         $this->grading_commit_function = self::cstr($p, "grading_commit_function");
 
