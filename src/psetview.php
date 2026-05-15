@@ -2477,7 +2477,7 @@ class PsetView {
 
         // collect bases that differ from pset-wide base
         $bases = $cbyhash = $fbyhash = [];
-        foreach ($this->repo->ls_files($dctx->diff_hashb()) as $fn) {
+        foreach ($this->repo->ls_files($dctx->repo_hashb()) as $fn) {
             if (!$dctx->file_allowed($fn)) {
                 continue;
             }
