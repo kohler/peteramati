@@ -8,6 +8,10 @@ require_once("lib/navigation.php");
 /** @param NavigationState $nav
  * @return string */
 function choose_page($nav) {
+    if ($nav->page === "u" && !$nav->shift_path_components(2)) {
+        $unum = $nav->path_component(0) ?? 0;
+        Navigation::redirect_absolute("{$nav->server}{$nav->base_path}u/{$unum}/{$nav->query}");
+    }
     $page = $nav->page;
     if ($page !== "" && $page[0] === "~") {
         $xpage = $nav->path_component(0, true);

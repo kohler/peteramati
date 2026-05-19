@@ -455,6 +455,16 @@ class Contact {
 
     // initialization
 
+    /** @param Qrequest|Qsession $qreq
+     * @return list<string> */
+    static function session_emails($qreq) {
+        $qs = $qreq instanceof Qsession ? $qreq : $qreq->qsession();
+        if (($u = $qs->get("u")) !== null) {
+            return [$u];
+        }
+        return [];
+    }
+
     /** @return Contact */
     private function actas_user($x) {
         assert(!self::$base_auth_user || self::$base_auth_user === $this);
@@ -568,9 +578,8 @@ class Contact {
     function can_enable() {
         if (!$this->isPC && $this->conf->opt("disableNonPC")) {
             return false;
-        } else {
-            return $this->disabled || $this->password === "";
         }
+        return $this->disabled || $this->password === "";
     }
 
     /** @return bool */
@@ -643,9 +652,8 @@ class Contact {
         } else if ($this->contactTags === false) {
             trigger_error(caller_landmark(1, "/^Conf::/") . ": Contact $this->email contactTags missing");
             $this->contactTags = null;
-        } else {
-            return false;
         }
+        return false;
     }
 
     function tag_value($t) {
@@ -654,19 +662,18 @@ class Contact {
         } if ($this->contactTags
               && ($p = stripos($this->contactTags, " $t#")) !== false) {
             return (float) substr($this->contactTags, $p + strlen($t) + 2);
-        } else {
-            return false;
         }
+        return false;
     }
 
     static function roles_all_contact_tags($roles, $tags) {
         $t = "";
         if ($roles & self::ROLE_PC)
             $t = " pc#0";
-        if ($tags)
+        if ($tags) {
             return $t . $tags;
-        else
-            return $t ? $t . " " : "";
+        }
+        return $t ? $t . " " : "";
     }
 
     function all_contact_tags() {

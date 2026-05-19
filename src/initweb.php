@@ -74,16 +74,32 @@ function initialize_request() {
     }
     $qreq->qsession()->maybe_open();
 
-    // determine user
-    $trueemail = $qreq->gsession("u");
+    // determine desired account
+    $us = Contact::session_emails($qreq);
+    $nus = count($us);
+    $uindex = 0;
+
+    $nav = $qreq->navigation();
+    if (str_starts_with($nav->shifted_path, "u/")) {
+        $s = substr($nav->shifted_path, 2, -1);
+        if (($e = $conf->opt["publicUserPaths"][$s] ?? null)) {
+            $us = [$e];
+            $nus = 1;
+            $uindex = 0;
+        } else {
+            $uindex = -1;
+        }
+    }
+
+    $uemail = $us[$uindex] ?? "";
 
     // look up and activate user
     $guser = null;
-    if ($trueemail) {
-        $guser = $conf->user_by_email($trueemail);
+    if ($uemail !== "") {
+        $guser = $conf->user_by_email($uemail);
     }
     if (!$guser) {
-        $guser = new Contact($trueemail ? (object) ["email" => $trueemail] : null);
+        $guser = new Contact($uemail !== "" ? (object) ["email" => $uemail] : null);
     }
     $muser = $guser->activate($qreq, true);
     Contact::set_main_user($muser);

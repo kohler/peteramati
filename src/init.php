@@ -92,7 +92,7 @@ function expand_json_includes_callback($includelist, $callback) {
             if ($x === null && json_last_error()) {
                 $x = Json::decode($entry);
                 if ($x === null) {
-                    error_log("$landmark: Invalid JSON: " . Json::last_error_msg());
+                    error_log("{$landmark}: Invalid JSON: " . Json::last_error_msg());
                 }
             }
             $entry = $x;
@@ -105,7 +105,7 @@ function expand_json_includes_callback($includelist, $callback) {
                 $v->__subposition = ++Conf::$next_xt_subposition;
             }
             if (!call_user_func($callback, $v, $k, $landmark)) {
-                error_log((Conf::$main ? Conf::$main->dbname . ": " : "") . "$landmark: Invalid expansion " . json_encode($v) . "\n" . debug_string_backtrace());
+                error_log((Conf::$main ? Conf::$main->dbname . ": " : "") . "{$landmark}: Invalid expansion " . json_encode($v) . "\n" . debug_string_backtrace());
             }
         }
     }
