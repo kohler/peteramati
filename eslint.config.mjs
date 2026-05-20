@@ -13,7 +13,6 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.jquery,
-        hljs: "readonly",
         siteinfo: "readonly",
         markdownit: "readonly",
         markdownit_katex: "readonly",

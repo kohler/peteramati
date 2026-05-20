@@ -9,6 +9,7 @@ import { markdownit_attributes } from "./markdown-attributes.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
 import { hasClass, addClass, removeClass, $e } from "./ui.js";
 import { string_utf8_index } from "./utils.js";
+import { supports_language, can_support, ensure_language, highlight_block } from "./shiki-highlight.js";
 
 function render_class(c, format) {
     if (c) {
@@ -76,40 +77,65 @@ add_format({
 });
 
 let md, md2;
-function try_highlight(str, lang, langAttr, token) {
-    if (lang && hljs.getLanguage(lang)) {
-        try {
-            var hlstr = hljs.highlight(str, {language: lang, ignoreIllegals: true}).value,
-                classIndex = token ? token.attrIndex("class") : -1,
-                lineIndex = token ? token.attrIndex("data-lineno-start") : -1;
-            if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
-                let n = lineIndex >= 0 ? token.attrs[lineIndex][1] : "1";
-                const m = n.match(/^(.*?)(\d*)(\D*)$/),
-                    pfx = m[1], minlen = m[2].startsWith("0") ? m[2].length : 0, sfx = m[3],
-                    fmt = (n) => pfx + n.toString().padStart(minlen, "0") + sfx;
-                n = m[2] ? +m[2] : 1;
-                let lines = hlstr.split(/\n/);
-                if (lines.length > 0 && lines[lines.length - 1] === "") {
-                    lines.pop();
-                }
-                const linestart = '<span class="has-lineno has-lineno-'.concat(fmt(n + lines.length - 1).length, '" data-lineno="');
-                for (let i = 0; i !== lines.length; ++i, ++n) {
-                    lines[i] = linestart.concat(fmt(n), '">', lines[i], '</span>');
-                }
-                hlstr = lines.join("\n") + "\n";
+
+// Markdown code blocks are emitted by markdown-it as `<pre><code class="...
+// language-LANG">ESCAPED</code></pre>` (markdown-it copies fence token
+// attributes such as `need-lineno` and `data-lineno-start` onto the <code>).
+// They are highlighted in a post-render sweep, because the Shiki highlighter
+// loads asynchronously.
+
+function code_block_lang(ce) {
+    const m = (ce.className || "").match(/(?:^|\s)language-(\S+)/);
+    return m ? m[1] : null;
+}
+
+// Wrap each highlighted line in a numbered `<span class="has-lineno">`.
+function lineno_wrap(lines, start) {
+    const m = String(start).match(/^(.*?)(\d*)(\D*)$/),
+        pfx = m[1], minlen = m[2].startsWith("0") ? m[2].length : 0, sfx = m[3],
+        fmt = (n) => pfx + n.toString().padStart(minlen, "0") + sfx;
+    let n = m[2] ? +m[2] : 1;
+    const head = '<span class="has-lineno has-lineno-'.concat(fmt(n + lines.length - 1).length, '" data-lineno="'),
+        out = [];
+    for (let i = 0; i !== lines.length; ++i, ++n) {
+        out.push(head.concat(fmt(n), '">', lines[i], "</span>"));
+    }
+    return out.join("\n") + "\n";
+}
+
+function decorate_code_blocks(context) {
+    const els = context.querySelectorAll("pre > code[class*=language-]:not(.pa-hl)");
+    if (!els.length) {
+        return;
+    }
+    const pending = new Set();
+    for (const ce of els) {
+        const lang = code_block_lang(ce);
+        if (lang && supports_language(lang)) {
+            const lines = highlight_block(lang, ce.textContent).lines;
+            if (lines.length > 0 && lines[lines.length - 1] === "") {
+                lines.pop();
             }
-            return hlstr;
-        } catch {
+            ce.innerHTML = hasClass(ce, "need-lineno")
+                ? lineno_wrap(lines, ce.getAttribute("data-lineno-start") || "1")
+                : lines.join("\n") + "\n";
+            addClass(ce, "pa-hl");
+        } else if (lang && can_support(lang)) {
+            pending.add(lang); // grammar still loading; revisit when ready
+        } else {
+            addClass(ce, "pa-hl"); // no or unsupported language; leave as plain text
         }
     }
-    return "";
+    if (pending.size) {
+        Promise.all(Array.from(pending, ensure_language)).then(() => decorate_code_blocks(context));
+    }
 }
 
 add_format({
     format: 1,
     render: function (text) {
         if (!md) {
-            md = window.markdownit('hotcrp', {highlight: try_highlight, linkify: true})
+            md = window.markdownit('hotcrp', {linkify: true})
                 .use(markdownit_katex)
                 .use(markdownit_minihtml);
         }
@@ -129,7 +155,7 @@ add_format({
     format: 3,
     render: function (text) {
         if (!md2) {
-            md2 = window.markdownit('hotcrp', {highlight: try_highlight, linkify: true, html: true, attributes: true})
+            md2 = window.markdownit('hotcrp', {linkify: true, html: true, attributes: true})
                 .use(markdownit_katex)
                 .use(markdownit_attributes)
                 .use(markdownit_deflist);
@@ -160,6 +186,7 @@ function render_with(context, renderer, text) {
         && context.firstChild.tagName === "P") {
         context.firstChild.replaceWith(...context.firstChild.childNodes);
     }
+    decorate_code_blocks(context);
 }
 
 export function render_onto(context, format, text) {

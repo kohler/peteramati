@@ -6,10 +6,12 @@
         "build": "npx webpack"
     },
     "dependencies": {
+        "@shikijs/langs-precompiled": "^4.1.0",
         "@xterm/xterm": "^5.5.0",
         "linkify-it": "latest",
         "markdown-it": "latest",
         "markdown-it-attrs": "latest",
+        "shiki": "^4.1.0",
         "uglify-js": "^3.17",
         "webpack": "^5.94.0"
     },

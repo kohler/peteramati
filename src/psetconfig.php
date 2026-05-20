@@ -139,6 +139,8 @@ class Pset {
     /** @var int */
     public $scores_visible_at;
     /** @var bool */
+    public $total_visible;
+    /** @var bool */
     public $grades_history = false;
     /** @var ?string */
     public $grades_selection_function;

@@ -8,23 +8,12 @@ import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
 import { markdownit_katex } from "./markdown-katex.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
+import {
+    supports_language, can_support, ensure_language, highlight_line,
+    highlight_fences_when_ready
+} from "./shiki-highlight.js";
 
 let md, mdcontext;
-const nonwsre = /[^ \t\r\n]/;
-
-
-function hljs_line(lang, s, hlstate) {
-    try {
-        const result = hljs.highlight(s, {language: lang, ignoreIllegals: true}),
-            ns = result.value;
-        if (s.endsWith("\r\n") && ns.endsWith("\n\n")) {
-            result.value = ns.substring(0, ns.length - 1);
-        }
-        return result;
-    } catch {
-        return null;
-    }
-}
 
 function render_map(map) {
     if (map[0] + 1 === map[1]) {
@@ -139,49 +128,40 @@ function render_landmark_fence(md) {
             }
         }
         let lang = info ? info.trim().split(/\s+/g)[0] : "";
-        if (!lang || !hljs.getLanguage(lang)) {
-            lang = null;
-        }
 
+        // Lines are emitted unhighlighted and tagged `need-highlight`; a Shiki
+        // pass upgrades them once the (async) highlighter and grammar load.
         let xtoken = token;
         if (lang) {
             let i = token.attrIndex("class");
+            const cls = options.langPrefix + lang + " need-highlight";
             xtoken = {attrs: token.attrs ? token.attrs.slice() : []};
             if (i < 0) {
-                xtoken.attrs.push(["class", options.langPrefix + lang]);
+                xtoken.attrs.push(["class", cls]);
             } else {
-                xtoken.attrs[i][1] += " " + options.langPrefix + lang;
+                xtoken.attrs[i] = [xtoken.attrs[i][0], xtoken.attrs[i][1] + " " + cls];
             }
         }
-        let xattrs = '><code'.concat(self.renderAttrs(xtoken), '>');
+        let xcode = '><code'.concat(self.renderAttrs(xtoken));
 
         if (token.map && token.level === 0) {
             // split into lines, assign landmarks
             const x = token.content.split(/\n/), y = [];
             x[x.length - 1] === "" && x.pop();
             const xl = x.length;
-            let i = 0, ln0 = token.map[0] + 2, hlstate = null;
-            while (lang && i !== xl) {
-                const result = hljs_line(lang, x[i] + "\n", hlstate);
-                if (result) {
-                    y.push('<pre data-landmark="', ln0 + i,
-                           i + 1 !== xl ? '" class="partial"' : '"',
-                           xattrs, result.value, "</code></pre>");
-                    hlstate = result.top;
-                    ++i;
-                } else {
-                    break;
-                }
-            }
-            while (i !== xl) {
+            let ln0 = token.map[0] + 2;
+            for (let i = 0; i !== xl; ++i) {
                 y.push('<pre data-landmark="', ln0 + i,
-                       i + 1 !== xl ? '" class="partial"' : '"',
-                       xattrs, x[i], "\n</code></pre>");
-                ++i;
+                       i + 1 !== xl ? '" class="partial"' : '"', xcode);
+                if (lang) {
+                    y.push(' data-language="', md.utils.escapeHtml(lang),
+                           '" data-pa-text="', md.utils.escapeHtml(x[i] + "\n"), '"');
+                }
+                y.push('>', md.utils.escapeHtml(x[i]), "\n</code></pre>");
             }
             return y.join("");
         } else {
-            return '<pre'.concat(xattrs, md.utils.escapeHtml(token.content), '</code></pre>');
+            return '<pre'.concat(xcode, '>', md.utils.escapeHtml(token.content), '</code></pre>');
         }
     };
 }
@@ -329,6 +309,7 @@ Filediff.define_method("markdown", function () {
     }
     addClass(elt, "pa-markdown");
     removeClass(elt, "need-markdown");
+    highlight_fences_when_ready(elt);
 });
 
 Filediff.define_method("unmarkdown", function () {
@@ -359,14 +340,28 @@ Filediff.define_method("highlight", function () {
         }
         lang && elt.setAttribute("data-language", lang);
     }
-    if (!lang
-        || !hljs.getLanguage(lang)
-        || hasClass(elt, "pa-markdown")) {
+    if (!lang || hasClass(elt, "pa-markdown")) {
         return;
     }
-    // collect content
+    if (!supports_language(lang)) {
+        // The highlighter and/or grammar may still be loading. Keep the
+        // `need-highlight` marker and retry once available; give up if the
+        // language is not highlightable at all.
+        if (can_support(lang)) {
+            ensure_language(lang).then(() => {
+                if (hasClass(elt, "need-highlight")) {
+                    this.highlight();
+                }
+            });
+        } else {
+            removeClass(elt, "need-highlight");
+        }
+        return;
+    }
+    // collect content; thread grammar state separately for the a-side
+    // (context + deleted) and b-side (context + inserted)
     const langclass = "language-" + lang;
-    let e = elt.firstChild, hlstatei = null, hlstated = null;
+    let e = elt.firstChild, statei = null, stated = null;
     for (; e; e = e.nextSibling) {
         const type = hasClass(e, "pa-gi") ? 2 : (hasClass(e, "pa-gc") ? 3 : (hasClass(e, "pa-gd") ? 1 : 0));
         if (type === 0) {
@@ -375,35 +370,22 @@ Filediff.define_method("highlight", function () {
         const ce = e.lastChild,
             ishl = hasClass(ce, langclass),
             s = ishl ? ce.getAttribute("data-pa-text") : ce.textContent,
-            result = hljs_line(lang, s, type & 2 ? hlstatei : hlstated);
-        if (!result) {
-            break;
-        }
+            result = highlight_line(lang, s, type & 2 ? statei : stated);
         if (type & 1) {
-            hlstated = result.top;
+            stated = result.state;
         }
         if (type & 2) {
-            hlstatei = result.top;
+            statei = result.state;
         }
         if (ishl) {
             continue;
         }
         ce.setAttribute("data-pa-text", s);
-        ce.innerHTML = result.value;
+        ce.innerHTML = result.html;
         addClass(ce, langclass);
-        let state = 0;
-        for (let xe = ce.firstChild; xe; xe = xe.nextSibling) {
-            if ((xe.nodeType === 1 && !hasClass(xe, "hljs-comment"))
-                || (xe.nodeType === 3 && nonwsre.test(xe.textContent))) {
-                state = -1;
-                break;
-            } else if (xe.nodeType === 1) {
-                state = 1;
-            }
-        }
-        if (state === 0) {
+        if (result.kind === "blank") {
             addClass(e, "pa-gblank");
-        } else if (state === 1) {
+        } else if (result.kind === "comment") {
             addClass(e, "pa-gcomment");
         }
     }
