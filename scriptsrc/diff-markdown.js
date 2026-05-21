@@ -34,7 +34,7 @@ function render_map(map) {
 }
 
 function add_landmark(tokens, idx, options, env, self) {
-    var token = tokens[idx];
+    const token = tokens[idx];
     if (token.map && token.level === 0) {
         token.attrSet("data-landmark", render_map(token.map));
     }
@@ -42,16 +42,16 @@ function add_landmark(tokens, idx, options, env, self) {
 }
 
 function add_landmark_1(tokens, idx, options, env, self) {
-    var token = tokens[idx];
+    const token = tokens[idx];
     if (token.map && token.level <= 1) {
         token.attrSet("data-landmark", render_map(token.map));
     }
     return self.renderToken(tokens, idx, options, env);
 }
 
-function fix_landmark_html(html, token) {
-    if (token.map && token.level === 0) {
-        var lm = " data-landmark=\"" + render_map(token.map) + "\"",
+function fix_landmark_html(html, token, level) {
+    if (token.map && token.level <= level) {
+        let lm = " data-landmark=\"" + render_map(token.map) + "\"",
             sp = html.indexOf(" "),
             gt = html.indexOf(">");
         if (sp > 0 && sp < gt) {
@@ -62,13 +62,13 @@ function fix_landmark_html(html, token) {
     return html;
 }
 
-function modify_landmark(base) {
+function modify_landmark(base, level) {
     if (!base) {
-        return add_landmark;
+        return level === 0 ? add_landmark : add_landmark_1;
     }
     return function (tokens, idx, options, env, self) {
-        var token = tokens[idx];
-        return fix_landmark_html(base(tokens, idx, options, env, self), token);
+        const token = tokens[idx];
+        return fix_landmark_html(base(tokens, idx, options, env, self), token, level);
     };
 }
 
@@ -192,40 +192,76 @@ function make_markdownit() {
             .use(markdownit_katex)
             .use(markdownit_minihtml)
             .use(markdownit_deflist);
-        for (var x of ["paragraph_open", "heading_open", "ordered_list_open",
-                       "bullet_list_open", "table_open", "blockquote_open",
-                       "hr"]) {
-            md.renderer.rules[x] = modify_landmark(md.renderer.rules[x]);
+        for (let x of ["paragraph_open", "heading_open", "ordered_list_open",
+                       "bullet_list_open", "dl_open", "table_open",
+                       "blockquote_open", "hr"]) {
+            md.renderer.rules[x] = modify_landmark(md.renderer.rules[x], 0);
+        }
+        for (let x of ["list_item_open", "dt_open", "dd_open"]) {
+            md.renderer.rules[x] = modify_landmark(md.renderer.rules[x], 1);
         }
         md.renderer.rules.fence = md.renderer.rules.code_block = render_landmark_fence(md);
         md.renderer.rules.image = modify_landmark_image(md.renderer.rules.image);
-        md.renderer.rules.list_item_open = add_landmark_1;
     }
     return md;
 }
 
 function fix_list_item(d) {
-    var dc;
+    let dc;
     while ((dc = d.firstChild) && dc.nodeType !== 1) {
         d.removeChild(dc);
     }
-    if (dc && dc.hasAttribute("data-landmark")) {
-        while (dc.nextSibling && dc.nextSibling.nodeType !== 1) {
-            d.removeChild(dc.nextSibling);
-        }
-        if (dc.nextSibling) {
-            if (d.tagName === "OL") {
-                if (!dc.hasAttribute("value")) {
-                    dc.value = d.start;
-                }
-                d.start = dc.value + 1;
-            }
-            var nd = document.createElement(d.tagName);
-            nd.appendChild(d.removeChild(dc));
-            d = nd;
-        }
-        d.setAttribute("data-landmark", dc.getAttribute("data-landmark"));
+    if (!dc || !dc.hasAttribute("data-landmark")) {
+        return d;
     }
+    while (dc.nextSibling && dc.nextSibling.nodeType !== 1) {
+        d.removeChild(dc.nextSibling);
+    }
+    if (dc.nextSibling) {
+        if (d.tagName === "OL") {
+            if (!dc.hasAttribute("value")) {
+                dc.value = d.start;
+            }
+            d.start = dc.value + 1;
+        }
+        let nd = document.createElement(d.tagName);
+        nd.appendChild(d.removeChild(dc));
+        d = nd;
+    }
+    d.setAttribute("data-landmark", dc.getAttribute("data-landmark"));
+    return d;
+}
+
+function fix_dl_item(d) {
+    let dc;
+    while ((dc = d.firstChild) && dc.nodeType !== 1) {
+        d.removeChild(dc);
+    }
+    if (!dc || !dc.hasAttribute("data-landmark")) {
+        return d;
+    }
+    let seen_dd = dc.tagName === "DD";
+    while (true) {
+        let dn = dc.nextSibling;
+        if (dn && dn.nodeType !== 1) {
+            d.removeChild(dn);
+            continue;
+        }
+        dc = dn;
+        if (!dc || (seen_dd && dc.tagName === "DT")) {
+            break;
+        } else if (dc.tagName === "DD") {
+            seen_dd = true;
+        }
+    }
+    if (dc) {
+        let nd = document.createElement(d.tagName);
+        while (d.firstChild !== dc) {
+            nd.appendChild(d.removeChild(d.firstChild));
+        }
+        d = nd;
+    }
+    d.setAttribute("data-landmark", d.firstChild.getAttribute("data-landmark"));
     return d;
 }
 
@@ -268,6 +304,8 @@ Filediff.define_method("markdown", function () {
             continue;
         } else if (d.tagName === "OL" || d.tagName === "UL") {
             d = fix_list_item(d);
+        } else if (d.tagName === "DL") {
+            d = fix_dl_item(d);
         } else if (d.tagName === "P"
                    && d.firstChild.nodeType === 1
                    && d.firstChild.tagName === "IMG"
