@@ -616,7 +616,7 @@ class PsetRequest {
             . '<button type="button" class="q ui js-pset-viewoptions">'
             . foldarrow(!$fold_viewoptions)
             . 'options</button><span style="padding-left:1em"'
-            . ($fold_viewoptions ? ' class="hidden"' : '') . '>tab width:';
+            . ($fold_viewoptions ? ' hidden' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
             $value .= '&nbsp;<a href="' . Ht::escape_attr($this->conf->selfurl($this->qreq, ["tab" => $i], Conf::HOTURL_RAW)) . '"'
                 . ($TABWIDTH == $i ? " class=\"q\"><strong>$i</strong>" : '>' . $i)
@@ -853,14 +853,14 @@ class PsetRequest {
             && !$info->viewer->can_run($info->pset, $runner, $info->user)) {
             return;
         }
-        echo '<div id="run-', $runner->name, '" class="pa-runout';
+        echo '<div id="run-', $runner->name, '" class="pa-runout"';
         if (!$rr || !isset($rr->timestamp)) {
             echo ' hidden';
         }
-        echo '"><h3><button type="button" class="qo ui pa-run-show">',
+        echo '><h3><button type="button" class="qo ui pa-run-show">',
             foldarrow(false),
             htmlspecialchars($runner->display_title), '</button></h3>',
-            '<div class="pa-run pa-run-short need-run hidden"',
+            '<div class="pa-run pa-run-short need-run" hidden',
             $runner->div_attributes($info->pset);
         if ($rr && isset($rr->timestamp)) {
             echo ' data-pa-timestamp="', $rr->timestamp, '"';

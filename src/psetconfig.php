@@ -1002,16 +1002,18 @@ class Pset {
         }
         $this->_all_diffs = [
             DiffConfig::make_default_highlight(".c", "c"),
-            DiffConfig::make_default_highlight(".h", "c"),
+            DiffConfig::make_default_highlight(".h", "c", -1),
             DiffConfig::make_default_highlight(".c++", "c++"),
             DiffConfig::make_default_highlight(".cpp", "c++"),
             DiffConfig::make_default_highlight(".C", "c++"),
             DiffConfig::make_default_highlight(".cc", "c++"),
-            DiffConfig::make_default_highlight(".hpp", "c++"),
-            DiffConfig::make_default_highlight(".H", "c++"),
-            DiffConfig::make_default_highlight(".hh", "c++"),
+            DiffConfig::make_default_highlight(".hpp", "c++", -1),
+            DiffConfig::make_default_highlight(".H", "c++", -1),
+            DiffConfig::make_default_highlight(".hh", "c++", -1),
             DiffConfig::make_default_highlight(".py", "python"),
             DiffConfig::make_default_highlight(".sh", "sh"),
+            DiffConfig::make_default_highlight(".js", "javascript"),
+            DiffConfig::make_default_highlight(".ts", "typescript"),
             ...$this->diffs
         ];
         if (($regex = $this->file_ignore_regex())) {
@@ -1265,9 +1267,8 @@ class Pset {
                 return $a[0] < $b[0] ? -1 : 1;
             } else if ($a[1] != $b[1]) {
                 return $a[1] < $b[1] ? -1 : 1;
-            } else {
-                return 0;
             }
+            return 0;
         });
         $y = [];
         foreach (array_keys($xp) as $k) {
@@ -1625,17 +1626,18 @@ final class DiffConfig {
     /** @var string
      * @readonly */
     public $title;
-    /** @var float
+    /** @var ?float
      * @readonly */
     public $order;
+    /** @var ?float
+     * @readonly */
+    public $extension_order;
     /** @var int */
     public $subposition = 0;
     /** @var bool */
     public $fileless;
     /** @var bool */
     public $full;
-    /** @var bool */
-    public $collate;
     /** @var bool */
     public $ignore;
     /** @var ?bool */
@@ -1697,9 +1699,9 @@ final class DiffConfig {
         $d->priority = $p;
         $d->priority_default = $p >= 100.0 ? -INF : $p;
         $d->order = Pset::cnum($loc, $j, "order", "position");
+        $d->extension_order = Pset::cnum($loc, $j, "extension_order");
         $d->fileless = Pset::cbool($loc, $j, "fileless");
         $d->full = Pset::cbool($loc, $j, "full");
-        $d->collate = Pset::cbool($loc, $j, "collate");
         $d->ignore = Pset::cbool($loc, $j, "ignore");
         $d->collapse = Pset::cbool($loc, $j, "collapse", "boring");
         $d->collapse_default = $p >= 100.0 ? null : $d->collapse;
@@ -1736,14 +1738,16 @@ final class DiffConfig {
 
     /** @param string $extension
      * @param string $language
+     * @param ?float $extension_order
      * @return DiffConfig
      * @suppress PhanAccessReadOnlyProperty */
-    static function make_default_highlight($extension, $language) {
+    static function make_default_highlight($extension, $language, $extension_order = null) {
         $d = new DiffConfig;
         $d->extension = $extension;
         $d->highlight = true;
         $d->language = $language;
         $d->priority = -10.0;
+        $d->extension_order = $extension_order;
         return $d;
     }
 
@@ -1792,14 +1796,14 @@ final class DiffConfig {
             if (isset($b->order)) {
                 $a->order = $b->order;
             }
+            if (isset($b->extension_order)) {
+                $a->extension_order = $b->extension_order;
+            }
             if (isset($b->fileless)) {
                 $a->fileless = $b->fileless;
             }
             if (isset($b->full)) {
                 $a->full = $b->full;
-            }
-            if (isset($b->collate)) {
-                $a->collate = $b->collate;
             }
             if (isset($b->ignore)) {
                 $a->ignore = $b->ignore;

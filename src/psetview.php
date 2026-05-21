@@ -2670,9 +2670,6 @@ class PsetView {
         if (($this->vf() & VF_STUDENT_ALLOWED) === 0) {
             echo " pa-scores-hidden";
         }
-        if (!$expand || !$dinfo->loaded) {
-            echo " hidden";
-        }
         if (!$dinfo->loaded) {
             echo " need-load";
         } else {
@@ -2684,11 +2681,15 @@ class PsetView {
         } else if ($hide_left && $dinfo->markdown) {
             echo " need-decorate need-markdown";
         }
+        echo '"';
 
-        if ($dinfo->language) {
-            echo '" data-language="', htmlspecialchars($dinfo->language);
+        if (!$expand || !$dinfo->loaded) {
+            echo " hidden";
         }
-        echo '">'; // end div#F_...
+        if ($dinfo->language) {
+            echo ' data-language="', htmlspecialchars($dinfo->language), '"';
+        }
+        echo '>'; // end div#F_...
         if ($has_grade_range) {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
                 '</div><div class="pa-dg">';
@@ -2893,18 +2894,10 @@ class PsetView {
             return;
         }
         echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">';
-        if (($flags & self::SIDEBAR_FILENAV) !== 0) {
-            echo '<div class="pa-gradebox pa-filenavbox"><nav>',
-                '<ul class="pa-filenav-list">';
-            foreach ($diff as $file => $di) {
-                echo '<li><a class="ui pa-filenav ulh" href="#';
-                if ($this->conf->multiuser_page) {
-                    echo "U", html_id_encode($this->user_linkpart()), "/";
-                }
-                echo 'F', html_id_encode($file), '">',
-                    htmlspecialchars($file), '</a></li>';
-            }
-            echo '</ul></nav></div>';
+        if (($flags & self::SIDEBAR_FILENAV) !== 0 && !empty($diff)) {
+            echo '<div class="pa-gradebox pa-filenavbox"><nav class="pa-filenav-list">';
+            $this->print_filenav_directory("", "", $diff);
+            echo '</nav></div>';
         }
         if (($flags & self::SIDEBAR_GRADELIST) !== 0) {
             echo '<div class="pa-gradebox pa-ps need-pa-gradelist';
@@ -2921,6 +2914,56 @@ class PsetView {
         if ($flags !== 0) {
             echo '</div></div>';
         }
+    }
+
+    /** @param string $prefix
+     * @param string $label
+     * @param array<DiffInfo> $dir */
+    private function print_filenav_directory($prefix, $label, $dir) {
+        // group by initial pathname component
+        $byname = [];
+        $collapse = true;
+        $pfxlen = strlen($prefix);
+        foreach ($dir as $di) {
+            $slash = strpos($di->filename, "/", $pfxlen);
+            if ($slash === false) {
+                $component = $pfxlen ? substr($di->filename, $pfxlen) : $di->filename;
+            } else {
+                $component = substr($di->filename, $pfxlen, $slash + 1 - $pfxlen);
+            }
+            $byname[$component][] = $di;
+            $collapse = $collapse && $di->collapse;
+        }
+        // print components
+        if (count($byname) > 1 && $prefix !== "") {
+            echo '<details class="pa-filenav-dir"', $collapse ? "" : " open data-initial-open",
+                '><summary><span class="foldarrow"></span>',
+                htmlspecialchars($label), '</summary>';
+            $sublabel = "";
+        } else {
+            $sublabel = $label;
+        }
+        foreach ($byname as $component => $dis) {
+            if (count($dis) > 1) {
+                $this->print_filenav_directory($prefix . $component, $sublabel . $component, $dis);
+            } else {
+                $this->print_filenav_file($sublabel . $component, $dis[0]);
+            }
+        }
+        if (count($byname) > 1 && $prefix !== "") {
+            echo '</details>';
+        }
+    }
+
+    /** @param string $label
+     * @param DiffInfo $di */
+    private function print_filenav_file($label, $di) {
+        echo '<a class="ui pa-filenav ulh" href="#';
+        if ($this->conf->multiuser_page) {
+            echo "U", html_id_encode($this->user_linkpart()), "/";
+        }
+        echo 'F', html_id_encode($di->filename), '">',
+            htmlspecialchars($label), '</a>';
     }
 }
 

@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { ImmediatePromise } from "./utils.js";
-import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui, $e } from "./ui.js";
+import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui, $e, with_scroll_anchor } from "./ui.js";
 import { dropmenu } from "./dropmenu.js";
 import { hoturl } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
@@ -105,7 +105,7 @@ export class Filediff {
     }
     toggle(show) {
         if (show == null) {
-            show = hasClass(this.element, "hidden");
+            show = this.element.hidden;
         }
         const h3 = this.element.previousSibling,
             h3fd = h3 && hasClass(h3, "pa-fileref") ? Filediff.referenced(h3) : null,
@@ -493,7 +493,7 @@ export class Linediff {
 handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
         fd = Filediff.by_hash(this.hash),
-        show = hasClass(fd.element, "hidden"),
+        show = fd.element.hidden,
         direction = evt.metaKey ? true : show;
     $es.each(function () {
         Filediff.by_hash(this.hash).load().then(fd => fd.toggle(direction));
@@ -525,6 +525,46 @@ handle_ui.on("pa-filenav-all", function () {
         fd && fd.load().then(() => { fd.toggle(true); });
     }
 });
+
+function filenav_dir_collect(container, recurse, fds) {
+    for (let e = container.firstElementChild; e; e = e.nextElementSibling) {
+        if (hasClass(e, "pa-filenav")) {
+            const fd = Filediff.by_href(e.href);
+            fd && fds.push(fd);
+        } else if (hasClass(e, "pa-filenav-dir") && recurse) {
+            filenav_dir_collect(e, recurse, fds);
+        }
+    }
+}
+
+// Folding a filenav directory folds the matching diffs to match. The `toggle`
+// event does not bubble, so listen in the capture phase.
+document.addEventListener("toggle", function (evt) {
+    const details = evt.target;
+    if (!hasClass(details, "pa-filenav-dir")) {
+        return;
+    }
+    // Workaround: Safari (2026) fires `toggle` on initial page load. Don't process it
+    const initial_open = details.hasAttribute("data-initial-open"), open = details.open;
+    initial_open && details.removeAttribute("data-initial-open");
+    if (open && initial_open) {
+        return;
+    }
+    const fds = [];
+    filenav_dir_collect(details, !open, fds);
+    if (!fds.length) {
+        return;
+    }
+    with_scroll_anchor(fds[0].element, fds[fds.length - 1].element, () => {
+        for (const fd of fds) {
+            if (open && hasClass(fd.element, "need-load")) {
+                fd.load().then(() => { fd.toggle(true); });
+            } else {
+                fd.toggle(open);
+            }
+        }
+    });
+}, true);
 
 function goto_hash(hash) {
     const m = hash.match(/^[^#]*#(L[ab]\d+|)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@/]+)$/),

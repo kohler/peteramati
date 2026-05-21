@@ -1187,8 +1187,8 @@ class Repository {
                     && $diffconfig->full) {
                     $command = ["git", "show", $dctx->repo_hashb() . ":" . $dctx->pset_to_repo_file($fname)];
                     $result = $this->gitrun($command);
-                    $di = new DiffInfo($fname, $diffconfig);
-                    $di->set_contentb(new RepositoryFileContent($dctx->repo_hashb(), $fname, $result));
+                    $di = new DiffInfo($fname, $diffconfig, $dctx);
+                    $di->set_full_contentb(new RepositoryFileContent($dctx->repo_hashb(), $fname, $result));
                     $diffs[$di->filename] = $di;
                     $di->finish();
                 }

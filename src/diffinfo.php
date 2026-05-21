@@ -7,6 +7,8 @@ class DiffInfo implements Iterator {
     /** @var string
      * @readonly */
     public $filename;
+    /** @var int */
+    private $_filenamepos;
     /** @var bool */
     public $binary = false;
     /** @var bool */
@@ -36,7 +38,9 @@ class DiffInfo implements Iterator {
     /** @var bool */
     public $hide_if_anonymous = false;
     /** @var float */
-    public $order = 0.0;
+    private $order = 0.0;
+    /** @var float */
+    private $extension_order = 0.0;
     /** @var bool */
     public $removed = false;
     /** @var bool */
@@ -49,31 +53,18 @@ class DiffInfo implements Iterator {
     private $_dflags;
     /** @var int */
     private $_itpos = 0;
-
-    /** @var ?Repository */
-    private $_repoa;
-    /** @var ?Pset */
-    private $_pset;
-    /** @var ?string */
-    private $_hasha;
-    /** @var ?string */
-    private $_filenamea;
-    /** @var ?bool */
-    private $_hasha_hrepo;
+    /** @var DiffContext */
+    private $_dctx;
 
     const MAXLINES = 8000;
     const MAXDIFFSZ = self::MAXLINES << 2;
 
     const LINE_NONL = 1;
 
-    static public $extension_position = [
-        ".hh" => -1, ".h" => -1, ".H" => -1, ".hpp" => -1
-    ];
-
     /** @param string $filename */
-    function __construct($filename, ?DiffConfig $diffconfig = null,
-                         ?DiffContext $dctx = null) {
+    function __construct($filename, ?DiffConfig $diffconfig, DiffContext $dctx) {
         $this->filename = $filename;
+        $this->_filenamepos = (int) strrpos($filename, "/");
         $ismd = str_ends_with($filename, ".md");
         if ($diffconfig) {
             $this->title = $diffconfig->title;
@@ -82,6 +73,7 @@ class DiffInfo implements Iterator {
             $this->_collapse_set = isset($diffconfig->collapse);
             $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
             $this->order = (float) $diffconfig->order;
+            $this->extension_order = (float) $diffconfig->extension_order;
             $this->markdown = $diffconfig->markdown ?? $ismd;
             $this->markdown_allowed = $diffconfig->markdown_allowed ?? $ismd;
             $this->highlight = !!$diffconfig->highlight;
@@ -91,14 +83,8 @@ class DiffInfo implements Iterator {
         } else {
             $this->markdown = $this->markdown_allowed = $ismd;
         }
-        if ($dctx) {
-            $this->_repoa = $dctx->repo;
-            $this->_pset = $dctx->pset;
-            $this->_hasha = $dctx->repo_hasha();
-            $this->_hasha_hrepo = $dctx->commita_is_handout();
-            $this->_filenamea = $dctx->pset_to_repo_file($filename);
-            $this->wdiff = $dctx->wdiff;
-        }
+        $this->_dctx = $dctx;
+        $this->wdiff = $dctx->wdiff;
     }
 
     /** @param bool $wdiff */
@@ -112,7 +98,7 @@ class DiffInfo implements Iterator {
         $this->_collapse_set = isset($collapse);
     }
 
-    function set_contentb(RepositoryFileContent $rfc) {
+    function set_full_contentb(RepositoryFileContent $rfc) {
         assert(empty($this->_diff));
         foreach ($rfc->lines as $i => $line) {
             $this->add("+", 0, $i + 1, $line);
@@ -124,7 +110,7 @@ class DiffInfo implements Iterator {
 
     /** @return string */
     function repo_filename() {
-        return $this->_filenamea ?? $this->filename;
+        return $this->_dctx->pset_to_repo_file($this->filename);
     }
 
     /** @return list<null|string|int> $diff */
@@ -198,10 +184,7 @@ class DiffInfo implements Iterator {
 
     /** @return bool */
     function commita_is_handout() {
-        if ($this->_hasha_hrepo === null) {
-            $this->_hasha_hrepo = $this->_pset && $this->_pset->handout_commit($this->_hasha);
-        }
-        return $this->_hasha_hrepo;
+        return $this->_dctx->commita_is_handout();
     }
 
     /** @return int */
@@ -228,9 +211,8 @@ class DiffInfo implements Iterator {
     function entry($i) {
         if ($i >= 0 && $i < ($this->_diffsz >> 2)) {
             return array_slice($this->_diff, $i << 2, 4);
-        } else {
-            return null;
         }
+        return null;
     }
 
     /** @param int $off
@@ -370,7 +352,7 @@ class DiffInfo implements Iterator {
 
         // if we get here, we need to insert
         // XXX assert(we are returning context lines)
-        if (!$this->_repoa) {
+        if (!$this->_dctx->repo) {
             return false;
         }
 
@@ -398,7 +380,7 @@ class DiffInfo implements Iterator {
         }
 
         // load old content
-        $rfc = $this->_repoa->file_content($this->_hasha, $this->_filenamea);
+        $rfc = $this->_dctx->repo->file_content($this->_dctx->repo_hasha(), $this->repo_filename());
         if ($line_lx > count($rfc->lines)) {
             return true;
         }
@@ -496,27 +478,47 @@ class DiffInfo implements Iterator {
     }
 
 
+    /** @return float */
+    private function diffconfig_order($pfxlen) {
+        if ($pfxlen === strlen($this->filename)) {
+            return $this->order;
+        } else if (($dc = $this->_dctx->pset->find_diffconfig(substr($this->filename, 0, $pfxlen)))) {
+            return (float) $dc->order;
+        }
+        return 0.0;
+    }
+
     /** @param DiffInfo $a
      * @param DiffInfo $b
      * @return int */
     static function compare($a, $b) {
+        // if files are in different directories, compare the shallowest different component
+        if ($a->_filenamepos !== $b->_filenamepos
+            || substr_compare($a->filename, $b->filename, 0, $a->_filenamepos) !== 0) {
+            $pfxlen = 0;
+            while (($slash = strpos($a->filename, "/", $pfxlen)) !== false
+                   && substr_compare($a->filename, $b->filename, 0, $slash + 1) === 0) {
+                $pfxlen = $slash + 1;
+            }
+            $slasha = strlpos($a->filename, "/", $pfxlen);
+            $aorder = $a->diffconfig_order($slasha);
+            $slashb = strlpos($b->filename, "/", $pfxlen);
+            $border = $b->diffconfig_order($slashb);
+            if ($aorder != $border) {
+                return $aorder < $border ? -1 : 1;
+            }
+            return strcmp(substr($a->filename, 0, $slasha), substr($b->filename, 0, $slashb));
+        }
+
+        // otherwise, files are in the same directory; compare order and extension order
         if ($a->order != $b->order) {
             return $a->order < $b->order ? -1 : 1;
         }
-        $adot = strrpos($a->filename, ".");
-        $adot = $adot === false ? strlen($a->filename) : $adot;
-        $bdot = strrpos($b->filename, ".");
-        $bdot = $bdot === false ? strlen($b->filename) : $bdot;
-        if ($adot === $bdot
-            && substr_compare($a->filename, $b->filename, 0, $adot) === 0) {
-            $aext = substr($a->filename, $adot);
-            $apos = self::$extension_position[$aext] ?? 0;
-            $bext = substr($b->filename, $bdot);
-            $bpos = self::$extension_position[$bext] ?? 0;
-            if ($apos != $bpos) {
-                return $apos < $bpos ? -1 : 1;
-            }
-            return strcmp($aext, $bext);
+        if ($a->extension_order != $b->extension_order
+            && ($adot = strrpos($a->filename, ".", $a->_filenamepos)) !== false
+            && substr_compare($a->filename, $b->filename, 0, $adot + 1) === 0
+            && strpos($b->filename, ".", $adot + 1) === false) {
+            return $a->extension_order < $b->extension_order ? -1 : 1;
         }
         return strcmp($a->filename, $b->filename);
     }

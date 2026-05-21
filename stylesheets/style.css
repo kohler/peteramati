@@ -2680,8 +2680,6 @@ td.mhcb {
 }
 .pa-filenav-list {
 	font-size: smaller;
-	list-style-type: none;
-	padding-left: 0;
 	margin: 0;
 }
 
@@ -3427,7 +3425,33 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-filenav-list {
 	margin-top: 0.65rem;
 	margin-bottom: 0.65rem;
+}
+.pa-filenav-list summary {
+	list-style: none;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
 	text-overflow: ellipsis;
+}
+.pa-filenav-list summary::-webkit-details-marker {
+	display: none;
+}
+.pa-filenav-list .foldarrow {
+	width: 0.664em;
+	height: 0.5em;
+	margin-right: 0.08em;
+}
+.pa-filenav-list details[open] > summary > .foldarrow {
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 85 64' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'%3E%3Cpath d='M4 4L32 60L60 4z' fill='%23000099' /%3E%3C/svg%3E");
+}
+.pa-filenav-list .pa-filenav {
+	display: block;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.pa-filenav-dir > :not(summary) {
+	margin-left: 0.95em;
 }
 .pa-gradebox > .pa-p {
 	margin-left: 0;

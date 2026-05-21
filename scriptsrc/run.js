@@ -147,7 +147,7 @@ export function run(button, opts) {
         sendtimeout = null,
         completed = false;
 
-    therunout && removeClass(therunout, "hidden");
+    therunout && (therunout.hidden = false);
     removeClass(therun, "need-run");
     fold61(therun, therunout, true);
 
