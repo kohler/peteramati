@@ -597,18 +597,22 @@ class PsetRequest {
         Dbl::free($result);
 
         if (!empty($sel)
-            && ($h = $this->info->grading_hash())
-            && isset($sel[$h])) {
-            $sel[$h] = preg_replace('/\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z/', '$1  G⃝$2', $sel[$h]);
+            && ($gh = $this->info->grading_hash())
+            && isset($sel[$gh])) {
+            $sel[$gh] = preg_replace('/\A(.*?)(?:  |)((?:|♪)(?:|⚑|⚐))\z/', '$1  G⃝$2', $sel[$gh]);
         }
-        assert(isset($sel[$this->info->hash()]));
+        if (!$this->info->hash()) {
+            $sel = array_merge(["" => "—"], $sel);
+        } else {
+            isset($sel[$this->info->hash()]);
+        }
 
         if ($this->info->is_grading_commit()) {
             $key = "grading commit";
         } else {
             $key = "this commit";
         }
-        $value = Ht::select("newcommit", $sel, $this->info->commit_hash(), ["class" => "uich js-pset-setcommit pa-commit-selector"]);
+        $value = Ht::select("newcommit", $sel, $this->info->hash() ?? "", ["class" => "uich js-pset-setcommit pa-commit-selector"]);
 
         // view options
         $fold_viewoptions = !isset($this->qreq->tab) && !isset($this->qreq->wdiff);

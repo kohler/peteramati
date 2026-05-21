@@ -375,7 +375,6 @@ class PsetView {
 
     /** @return ?CommitRecord */
     function commit() {
-        assert($this->_hash !== null);
         return $this->_hash ? $this->connected_commit($this->_hash) : null;
     }
 
