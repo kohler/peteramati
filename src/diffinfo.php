@@ -515,9 +515,8 @@ class DiffInfo implements Iterator {
             $bpos = self::$extension_position[$bext] ?? 0;
             if ($apos != $bpos) {
                 return $apos < $bpos ? -1 : 1;
-            } else {
-                return strcmp($aext, $bext);
             }
+            return strcmp($aext, $bext);
         }
         return strcmp($a->filename, $b->filename);
     }

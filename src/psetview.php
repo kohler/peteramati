@@ -2305,11 +2305,11 @@ class PsetView {
     private function _add_local_diffconfigs($diffs, $prio) {
         if (is_object($diffs)) {
             foreach (get_object_vars($diffs) as $k => $v) {
-                $this->pset->add_local_diffconfig(new DiffConfig($v, $k, $prio));
+                $this->pset->add_local_diffconfig(DiffConfig::make_json($v, $k, $prio));
             }
         } else if (is_array($diffs)) {
             foreach ($diffs as $v) {
-                $this->pset->add_local_diffconfig(new DiffConfig($v, null, $prio));
+                $this->pset->add_local_diffconfig(DiffConfig::make_json($v, null, $prio));
             }
         }
     }
@@ -2324,7 +2324,7 @@ class PsetView {
             $this->pset->set_local_diffconfig_source(null);
         } else if ($this->pset->set_local_diffconfig_source($this)) {
             if (($tw = $this->commit_jnote("tabwidth"))) {
-                $this->pset->add_local_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));
+                $this->pset->add_local_diffconfig(DiffConfig::make_tabwidth_override($tw));
             }
             if (($diffs = $this->repository_jnote("diffs"))) {
                 $this->_add_local_diffconfigs($diffs, 100.0);
@@ -2350,7 +2350,7 @@ class PsetView {
             $this->pset->set_local_diffconfig_source(null);
         } else if ($this->pset->set_local_diffconfig_source($this)) {
             if (($tw = $this->commit_jnote("tabwidth"))) {
-                $this->pset->add_local_diffconfig(new DiffConfig((object) ["tabwidth" => $tw], ".*", 101.0));
+                $this->pset->add_local_diffconfig(DiffConfig::make_tabwidth_override($tw));
             }
             if (($diffs = $this->repository_jnote("diffs"))) {
                 $this->_add_local_diffconfigs($diffs, 100.0);

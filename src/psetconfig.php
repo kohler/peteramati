@@ -535,11 +535,11 @@ class Pset {
         $diffs = $p->diffs ?? null;
         if (is_object($diffs)) {
             foreach (get_object_vars($p->diffs) as $k => $v) {
-                $this->diffs[] = new DiffConfig($v, $k);
+                $this->diffs[] = DiffConfig::make_json($v, $k);
             }
         } else if (is_array($diffs)) {
             foreach ($p->diffs as $i => $v) {
-                $this->diffs[] = new DiffConfig($v);
+                $this->diffs[] = DiffConfig::make_json($v);
             }
         } else if ($diffs) {
             throw new PsetConfigException("`diffs` format error", "diffs");
@@ -997,16 +997,30 @@ class Pset {
 
 
     private function seal_diffconfig() {
-        if ($this->_all_diffs === null) {
-            $this->_all_diffs = $this->diffs;
-            if (($regex = $this->file_ignore_regex())) {
-                $this->_all_diffs[] = new DiffConfig((object) ["match" => $regex, "ignore" => true, "priority" => -10]);
-            }
-            foreach ($this->_all_diffs as $i => $di) {
-                $di->subposition = $i;
-            }
-            $this->_baseline_diffconfig_count = count($this->_all_diffs);
+        if ($this->_all_diffs !== null) {
+            return;
         }
+        $this->_all_diffs = [
+            DiffConfig::make_default_highlight(".c", "c"),
+            DiffConfig::make_default_highlight(".h", "c"),
+            DiffConfig::make_default_highlight(".c++", "c++"),
+            DiffConfig::make_default_highlight(".cpp", "c++"),
+            DiffConfig::make_default_highlight(".C", "c++"),
+            DiffConfig::make_default_highlight(".cc", "c++"),
+            DiffConfig::make_default_highlight(".hpp", "c++"),
+            DiffConfig::make_default_highlight(".H", "c++"),
+            DiffConfig::make_default_highlight(".hh", "c++"),
+            DiffConfig::make_default_highlight(".py", "python"),
+            DiffConfig::make_default_highlight(".sh", "sh"),
+            ...$this->diffs
+        ];
+        if (($regex = $this->file_ignore_regex())) {
+            $this->_all_diffs[] = DiffConfig::make_ignore($regex);
+        }
+        foreach ($this->_all_diffs as $i => $di) {
+            $di->subposition = $i;
+        }
+        $this->_baseline_diffconfig_count = count($this->_all_diffs);
     }
 
     /** @return list<DiffConfig> */
@@ -1021,14 +1035,7 @@ class Pset {
      * @return ?DiffConfig */
     function find_diffconfig($filename) {
         if (!array_key_exists($filename, $this->_file_diffinfo)) {
-            $diffinfo = null;
-            foreach ($this->all_diffconfig() as $d) {
-                if ($d->match === ".*"
-                    || preg_match('{(?:\A|/)(?:' . $d->match . ')(?:/|\z)}', $filename)) {
-                    $diffinfo = DiffConfig::combine($filename, $diffinfo, $d);
-                }
-            }
-            $this->_file_diffinfo[$filename] = $diffinfo;
+            $this->_file_diffinfo[$filename] = DiffConfig::make_combined($this->all_diffconfig(), $filename);
         }
         return $this->_file_diffinfo[$filename];
     }
@@ -1036,14 +1043,8 @@ class Pset {
     /** @param string $filename
      * @return DiffConfig */
     function baseline_diffconfig($filename) {
-        $diffinfo = null;
-        foreach ($this->diffs as $d) {
-            if ($d->match === ".*"
-                || preg_match('{(?:\A|/)(?:' . $d->match . ')(?:/|\z)}', $filename)) {
-                $diffinfo = DiffConfig::combine($filename, $diffinfo, $d);
-            }
-        }
-        return $diffinfo ?? new DiffConfig((object) [], $filename);
+        return DiffConfig::make_combined($this->diffs, $filename)
+            ?? new DiffConfig($filename);
     }
 
     /** @return list<string> */
@@ -1612,6 +1613,9 @@ final class DiffConfig {
     /** @var string
      * @readonly */
     public $match;
+    /** @var string
+     * @readonly */
+    public $extension;
     /** @var float
      * @readonly */
     public $priority;
@@ -1659,100 +1663,198 @@ final class DiffConfig {
     /** @var ?string */
     public $base;
 
-    /** @param object $d
+    /** @param ?string $match */
+    function __construct($match = null) {
+        $this->match = $match;
+    }
+
+    /** @param object $j
      * @param ?string $match
-     * @param ?float $priority */
-    function __construct($d, $match = null, $priority = 0.0) {
-        if (!is_object($d)) {
+     * @param ?float $priority
+     * @suppress PhanAccessReadOnlyProperty */
+    static function make_json($j, $match = null, $priority = 0.0) {
+        if (!is_object($j)) {
             throw new PsetConfigException("diff format error", ["diffs", $match]);
         }
 
         // obsolete components
-        Pset::check_obsolete(null, $d, ["diffs", $match], true, [
+        Pset::check_obsolete(null, $j, ["diffs", $match], true, [
             "boring" => "collapse", "gradeable" => "gradable"
         ]);
 
-        $this->match = $d->match ?? $d->regex ?? $match;
-        if (!is_string($this->match) || $this->match === "") {
-            throw new PsetConfigException("`match` diff format error", ["diffs", $match]);
+        $d = new DiffConfig;
+        if (isset($j->extension)) {
+            $d->extension = Pset::cstr($loc, $j, "extension");
+        } else {
+            $d->match = $j->match ?? $j->regex ?? $match;
+            if (!is_string($d->match) || $d->match === "") {
+                throw new PsetConfigException("`match` diff format error", ["diffs", $match]);
+            }
         }
-        $loc = ["diffs", $this->match];
-        $this->title = Pset::cstr($loc, $d, "title");
-        $p = (float) (Pset::cnum($loc, $d, "priority", "match_priority") ?? $priority ?? 0.0);
-        $this->priority = $p;
-        $this->priority_default = $p >= 100.0 ? -INF : $p;
-        $this->order = Pset::cnum($loc, $d, "order", "position");
-        $this->fileless = Pset::cbool($loc, $d, "fileless");
-        $this->full = Pset::cbool($loc, $d, "full");
-        $this->collate = Pset::cbool($loc, $d, "collate");
-        $this->ignore = Pset::cbool($loc, $d, "ignore");
-        $this->collapse = Pset::cbool($loc, $d, "collapse", "boring");
-        $this->collapse_default = $p >= 100.0 ? null : $this->collapse;
-        $this->gradable = Pset::cbool($loc, $d, "gradable", "gradeable");
-        $this->hide_if_anonymous = Pset::cbool($loc, $d, "hide_if_anonymous");
-        $this->markdown = Pset::cbool($loc, $d, "markdown");
-        $this->markdown_allowed = Pset::cbool($loc, $d, "markdown_allowed");
-        if ($this->markdown && $this->markdown_allowed === null) {
-            $this->markdown_allowed = true;
+        $loc = ["diffs", $d->extension ?? $d->match];
+        $d->title = Pset::cstr($loc, $j, "title");
+        $p = (float) (Pset::cnum($loc, $j, "priority", "match_priority") ?? $priority ?? 0.0);
+        $d->priority = $p;
+        $d->priority_default = $p >= 100.0 ? -INF : $p;
+        $d->order = Pset::cnum($loc, $j, "order", "position");
+        $d->fileless = Pset::cbool($loc, $j, "fileless");
+        $d->full = Pset::cbool($loc, $j, "full");
+        $d->collate = Pset::cbool($loc, $j, "collate");
+        $d->ignore = Pset::cbool($loc, $j, "ignore");
+        $d->collapse = Pset::cbool($loc, $j, "collapse", "boring");
+        $d->collapse_default = $p >= 100.0 ? null : $d->collapse;
+        $d->gradable = Pset::cbool($loc, $j, "gradable", "gradeable");
+        $d->hide_if_anonymous = Pset::cbool($loc, $j, "hide_if_anonymous");
+        $d->markdown = Pset::cbool($loc, $j, "markdown");
+        $d->markdown_allowed = Pset::cbool($loc, $j, "markdown_allowed");
+        if ($d->markdown && $d->markdown_allowed === null) {
+            $d->markdown_allowed = true;
         }
-        $this->highlight = Pset::cbool($loc, $d, "highlight");
-        $this->highlight_allowed = Pset::cbool($loc, $d, "highlight_allowed");
-        if ($this->highlight && $this->highlight_allowed === null) {
-            $this->highlight_allowed = true;
+        $d->highlight = Pset::cbool($loc, $j, "highlight");
+        $d->highlight_allowed = Pset::cbool($loc, $j, "highlight_allowed");
+        if ($d->highlight && $d->highlight_allowed === null) {
+            $d->highlight_allowed = true;
         }
-        $this->language = Pset::cstr($loc, $d, "language");
-        $this->tabwidth = Pset::cint($loc, $d, "tabwidth");
-        if (isset($d->base)) {
-            $this->base = is_int($d->base) ? $d->base : Pset::cstr($loc, $d, "base");
+        $d->language = Pset::cstr($loc, $j, "language");
+        $d->tabwidth = Pset::cint($loc, $j, "tabwidth");
+        if (isset($j->base)) {
+            $d->base = is_int($j->base) ? $j->base : Pset::cstr($loc, $j, "base");
         }
+        return $d;
     }
 
-    /** @param string $filename
+    /** @param string $match
+     * @return DiffConfig
+     * @suppress PhanAccessReadOnlyProperty */
+    static function make_ignore($match) {
+        $d = new DiffConfig;
+        $d->match = $match;
+        $d->ignore = true;
+        $d->priority = -10.0;
+        return $d;
+    }
+
+    /** @param string $extension
+     * @param string $language
+     * @return DiffConfig
+     * @suppress PhanAccessReadOnlyProperty */
+    static function make_default_highlight($extension, $language) {
+        $d = new DiffConfig;
+        $d->extension = $extension;
+        $d->highlight = true;
+        $d->language = $language;
+        $d->priority = -10.0;
+        return $d;
+    }
+
+    /** @param int $tabwidth
+     * @return DiffConfig
+     * @suppress PhanAccessReadOnlyProperty */
+    static function make_tabwidth_override($tabwidth) {
+        $d = new DiffConfig;
+        $d->match = ".*";
+        $d->tabwidth = $tabwidth;
+        $d->priority = 101.0;
+        return $d;
+    }
+
+    /** @param list<DiffConfig> $diffs
+     * @param string $filename
      * @return ?DiffConfig
      * @suppress PhanAccessReadOnlyProperty */
-    static function combine($filename, ?DiffConfig $a = null, ?DiffConfig $b = null) {
-        if (!$a && !$b) {
-            return null;
-        } else if (!$a || !$b) {
-            return $a ?? $b;
-        } else {
-            if ($a->priority > $b->priority
-                || ($a->priority == $b->priority
-                    && $a->subposition > $b->subposition)) {
-                $tmp = $b;
-                $b = $a;
-                $a = $tmp;
+    static function make_combined($diffs, $filename) {
+        $dis = [];
+        foreach ($diffs as $dc) {
+            if ($dc->matches($filename))
+                $dis[] = $dc;
+        }
+        if (count($dis) <= 1) {
+            return $dis[0] ?? null;
+        }
+        usort($dis, function ($a, $b) {
+            if ($a->priority != $b->priority) {
+                return $a->priority < $b->priority ? -1 : 1;
+            } else if ($a->subposition != $b->subposition) {
+                return $a->subposition < $b->subposition ? -1 : 1;
             }
-            if (!$a->nonshared) {
-                $a = clone $a;
-                $a->match = preg_quote($filename);
-                $a->nonshared = true;
+            return 0;
+        });
+        $a = clone $dis[0];
+        $a->match = preg_quote($filename);
+        $a->nonshared = true;
+        foreach ($dis as $i => $b) {
+            if ($i === 0) {
+                continue;
             }
-            $a->title = $b->title ?? $a->title;
-            $a->order = $b->order ?? $a->order;
-            $a->fileless = $b->fileless ?? $a->fileless;
-            $a->full = $b->full ?? $a->full;
-            $a->collate = $b->collate ?? $a->collate;
-            $a->ignore = $b->ignore ?? $a->ignore;
-            $a->collapse = $b->collapse ?? $a->collapse;
-            $a->gradable = $b->gradable ?? $a->gradable;
-            $a->hide_if_anonymous = $b->hide_if_anonymous ?? $a->hide_if_anonymous;
-            $a->markdown = $b->markdown ?? $a->markdown;
-            $a->markdown_allowed = $b->markdown_allowed ?? $a->markdown_allowed;
-            $a->highlight = $b->highlight ?? $a->highlight;
-            $a->highlight_allowed = $b->highlight_allowed ?? $a->highlight_allowed;
-            $a->language = $b->language ?? $a->language;
-            $a->tabwidth = $b->tabwidth ?? $a->tabwidth;
+            if (isset($b->title)) {
+                $a->title = $b->title;
+            }
+            if (isset($b->order)) {
+                $a->order = $b->order;
+            }
+            if (isset($b->fileless)) {
+                $a->fileless = $b->fileless;
+            }
+            if (isset($b->full)) {
+                $a->full = $b->full;
+            }
+            if (isset($b->collate)) {
+                $a->collate = $b->collate;
+            }
+            if (isset($b->ignore)) {
+                $a->ignore = $b->ignore;
+            }
+            if (isset($b->collapse)) {
+                $a->collapse = $b->collapse;
+            }
+            if (isset($b->gradable)) {
+                $a->gradable = $b->gradable;
+            }
+            if (isset($b->hide_if_anonymous)) {
+                $a->hide_if_anonymous = $b->hide_if_anonymous;
+            }
+            if (isset($b->markdown)) {
+                $a->markdown = $b->markdown;
+            }
+            if (isset($b->markdown_allowed)) {
+                $a->markdown_allowed = $b->markdown_allowed;
+            }
+            if (isset($b->highlight)) {
+                $a->highlight = $b->highlight;
+            }
+            if (isset($b->highlight_allowed)) {
+                $a->highlight_allowed = $b->highlight_allowed;
+            }
+            if (isset($b->language)) {
+                $a->language = $b->language;
+            }
+            if (isset($b->tabwidth)) {
+                $a->tabwidth = $b->tabwidth;
+            }
+            if (isset($b->base)) {
+                $a->base = $b->base;
+            }
             if ($b->priority_default > -INF
                 && ($b->priority_default > $a->priority_default
                     || ($b->priority_default == $a->priority_default
                         && $b->subposition > $a->subposition))) {
                 $a->priority_default = $b->priority_default;
-                $a->collapse_default = $b->collapse_default ?? $a->collapse_default;
+                if (isset($b->collapse_default)) {
+                    $a->collapse_default = $b->collapse_default;
+                }
             }
-            $a->base = $b->base ?? $a->base;
-            return $a;
         }
+        return $a;
+    }
+
+    /** @param string $filename
+     * @return bool */
+    function matches($filename) {
+        if ($this->extension !== null) {
+            return str_ends_with($filename, $this->extension);
+        }
+        return $this->match === ".*"
+            || preg_match('{(?:\A|/)(?:' . $this->match . ')(?:/|\z)}', $filename);
     }
 
     /** @return ?string */
