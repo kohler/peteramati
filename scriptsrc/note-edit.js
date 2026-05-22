@@ -123,36 +123,39 @@ function arrowcapture_focusat(what, evt) {
         curgrade = what;
         requestAnimationFrame(() => what.select());
     }
-    what.focus();
+    what.focus({preventScroll: true});
     const wf = what.closest(".pa-with-fixed");
-    $(wf).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
+    $(what).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
     evt.preventDefault();
 }
 
 function arrowcapture_arrow(evt, key) {
-    let ln = curline && curline.visible_source();
-    if (ln || curgrade) {
-        let start = curgrade || ln.element;
+    const ln = curline && curline.visible_source();
+    if (!ln && !curgrade) {
+        uncapture();
+        return;
+    }
+    const start = curgrade || ln.element,
+        flags = Linediff.ANYFILE + (key === "ArrowDown" ? 0 : Linediff.BACKWARD) + Linediff.GRADES;
+    let target = null;
+    for (let lnx of Linediff.all(start, flags)) {
+        if (lnx.nodeName !== "PA-LINEDIFF") {
+            target = lnx;
+            break;
+        } else if (lnx.element !== start && lnx.is_visible() && lnx.is_source()) {
+            target = lnx;
+            break;
+        }
+    }
+    if (target) {
         if (ln) {
             removeClass(ln.element, "live");
             ln.element.tabIndex = -1;
         }
-        ln = null;
-        const flags = Linediff.ANYFILE + (key === "ArrowDown" ? 0 : Linediff.BACKWARD) + Linediff.GRADES;
-        for (let lnx of Linediff.all(start, flags)) {
-            if (lnx.nodeName !== "PA-LINEDIFF") {
-                arrowcapture_focusat(lnx, evt);
-                return;
-            } else if (lnx.element !== start && lnx.is_visible() && lnx.is_source()) {
-                ln = lnx;
-                break;
-            }
-        }
-    }
-    if (ln) {
-        arrowcapture_focusat(ln, evt);
+        arrowcapture_focusat(target, evt);
     } else {
-        uncapture();
+        // already at the first/last navigable line; keep focus where it is
+        evt.preventDefault();
     }
 }
 
