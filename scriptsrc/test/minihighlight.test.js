@@ -97,6 +97,49 @@ test("multi-line strings", () => {
     assert.equal(r2.value, '<span class="hljs-string">`abc</span>\n<span class="hljs-string">def</span>\n<span class="hljs-string">ghi`</span>');
 });
 
+test("function is hljs-built_in (cpp)", () => {
+    assert.equal(minihighlight("int add(int a) {", "cpp").value,
+        '<span class="hljs-type">int</span> <span class="hljs-built_in">add</span>(<span class="hljs-type">int</span> a) {');
+    // name after a pointer/reference is still a function
+    assert.match(minihighlight("char *dup(void) {", "cpp").value,
+        /\*<span class="hljs-built_in">dup<\/span>\(/);
+    // calls (no preceding type) are built_in
+    assert.match(minihighlight("return foo(a);", "cpp").value,
+        /<span class="hljs-built_in">foo<\/span>\(/);
+    assert.match(minihighlight('printf("x");', "cpp").value,
+        /<span class="hljs-built_in">printf<\/span>\(/);
+    // template-argument call
+    assert.match(minihighlight("v.push_back<int>(3);", "cpp").value,
+        /<span class="hljs-built_in">push_back<\/span>/);
+});
+
+test("class / struct / enum / union name is hljs-title class_ (cpp)", () => {
+    assert.equal(minihighlight("class Foo {", "cpp").value,
+        '<span class="hljs-keyword">class</span> <span class="hljs-title class_">Foo</span> {');
+    assert.match(minihighlight("struct Bar : public Base {", "cpp").value,
+        /<span class="hljs-title class_">Bar<\/span>/);
+    // base class is not tagged
+    assert.doesNotMatch(minihighlight("struct Bar : public Base {", "cpp").value,
+        /class_">Base/);
+    assert.match(minihighlight("enum class Dir { N };", "cpp").value,
+        /<span class="hljs-title class_">Dir<\/span>/);
+    assert.match(minihighlight("union U {", "cpp").value,
+        /<span class="hljs-title class_">U<\/span>/);
+    // namespace names are NOT class_ (matching hljs)
+    assert.doesNotMatch(minihighlight("namespace ns {", "cpp").value, /class_/);
+});
+
+test("no false function detection on keywords or comparisons (cpp)", () => {
+    assert.equal(minihighlight("if (x) {", "cpp").value,
+        '<span class="hljs-keyword">if</span> (x) {');
+    assert.equal(minihighlight("int x = a < b;", "cpp").value,
+        '<span class="hljs-type">int</span> x = a &lt; b;');
+});
+
+test("function detection is off for languages without it", () => {
+    assert.doesNotMatch(minihighlight("foo() {", "shell").value, /hljs-(?:title|built_in)/);
+});
+
 test("blank line inside a multi-line construct emits no empty span", () => {
     const r = minihighlight("`a\n\nb`", "javascript", null);
     assert.equal(r.value, '<span class="hljs-string">`a</span>\n\n<span class="hljs-string">b`</span>');

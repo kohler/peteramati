@@ -16,14 +16,25 @@ function esc(s) {
     return s.replace(AMPRE, c => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
 }
 
-function words(s) {
-    return new Set(s.trim().split(/\s+/));
+// Word classification flags. A word can carry several (e.g. `class` is both a
+// keyword and a class introducer), so they live together in one Map.
+const WF_KEYWORD = 1, WF_TYPE = 2, WF_LITERAL = 4, WF_CLASSKW = 8;
+
+function add_words(map, s, flag) {
+    for (const w of (s || "").trim().split(/\s+/)) {
+        if (w !== "") {
+            map.set(w, (map.get(w) || 0) | flag);
+        }
+    }
 }
 
 // Shared patterns (sticky, matched at a given position).
 const NUM = /(?:0[xX][0-9a-fA-F][0-9a-fA-F']*|0[bB][01][01']*|0[oO][0-7][0-7']*|(?:\d[\d']*\.?[\d']*|\.\d[\d']*)(?:[eEpP][-+]?\d+)?)[uUlLfFjJ]*/y;
 const ID = /[A-Za-z_$\u0080-\uffff][\w$\u0080-\uffff]*/y;
 const CPP_RAW = /(?:u8|u|U|L)?R"([^()\\ \t]{0,16})\(/y;
+// An identifier is a function name if directly followed by `(` (with optional
+// template arguments), matching hljs's `function.dispatch` heuristic.
+const FN_CALL = /(?:<[^<>]*>)?[ \t]*\(/y;
 
 const C_KEYWORDS = "alignas alignof asm auto break case catch class concept const consteval constexpr constinit const_cast continue co_await co_return co_yield decltype default delete do dynamic_cast else enum explicit export extern for friend goto if inline mutable namespace new noexcept operator private protected public register reinterpret_cast requires return sizeof static static_assert static_cast struct switch template this thread_local throw try typedef typeid typename union using virtual volatile while restrict _Alignas _Alignof _Atomic _Generic _Noreturn _Static_assert _Thread_local";
 const C_TYPES = "bool char char8_t char16_t char32_t double float int long short signed unsigned void wchar_t size_t ssize_t ptrdiff_t intptr_t uintptr_t int8_t int16_t int32_t int64_t uint8_t uint16_t uint32_t uint64_t FILE va_list";
@@ -58,6 +69,7 @@ const STR_PY = [
     STR_DQ, STR_SQ
 ];
 
+// Character flags, used in `spec.table`
 const CHF_ID = 1, CHF_STRING = 2, CHF_CPP_RAW = 4, CHF_META = 8,
     CHF_LC = 16, CHF_BC = 32, CHF_NUM = 64, CHF_NL = 128;
 
@@ -74,17 +86,21 @@ function spec(o) {
         }
         table[ch < 128 ? ch : 128] |= f;
     }
+    const wordmap = new Map;
+    add_words(wordmap, o.kw, WF_KEYWORD);
+    add_words(wordmap, o.type, WF_TYPE);
+    add_words(wordmap, o.lit, WF_LITERAL);
+    add_words(wordmap, o.classkw, WF_CLASSKW);
     const s = {
         lc: o.lc || [],
         bc: o.bc || [],
         strings: o.strings || [],
         cpp_raw: !!o.cpp_raw,
         meta: o.meta || null,
-        kw: o.kw || new Set,
-        type: o.type || null,
-        lit: o.lit || null,
+        words: wordmap,
         num: o.num || NUM,
         id: o.id || ID,
+        fn: !!o.fn,
         table: table,
         flag: flag
     };
@@ -134,35 +150,37 @@ function create_spec(lang) {
         SPECS[lang] = spec({
             lc: ["//"], bc: [["/*", "*/"]],
             strings: [STR_DQ, STR_SQ, ...STR_C_LONG],
-            meta: /#\s*[A-Za-z_]+/y, kw: words(C_KEYWORDS),
-            type: words(C_TYPES), lit: words(C_LITERALS)
+            meta: /#\s*[A-Za-z_]+/y, kw: C_KEYWORDS,
+            type: C_TYPES, lit: C_LITERALS, fn: true,
+            classkw: "struct enum union"
         });
         SPECS[lang].flag("#", CHF_META);
     } else if (lang === "cpp") {
         SPECS[lang] = spec({
             lc: ["//"], bc: [["/*", "*/"]],
             strings: [STR_DQ, STR_SQ, ...STR_C_LONG],
-            meta: /#\s*[A-Za-z_]+/y, kw: words(C_KEYWORDS),
-            type: words(C_TYPES), lit: words(C_LITERALS), cpp_raw: true
+            meta: /#\s*[A-Za-z_]+/y, kw: C_KEYWORDS,
+            type: C_TYPES, lit: C_LITERALS, cpp_raw: true, fn: true,
+            classkw: "class struct enum union"
         });
         SPECS[lang].flag("#", CHF_META);
     } else if (lang === "javascript" || lang === "typescript") {
         SPECS[lang] = spec({
             lc: ["//"], bc: [["/*", "*/"]], strings: [STR_DQ, STR_SQ, STR_TMPL],
-            kw: words(JS_KEYWORDS), lit: words(JS_LITERALS)
+            kw: JS_KEYWORDS, lit: JS_LITERALS
         });
     } else if (lang === "python") {
         SPECS[lang] = spec({
             lc: ["#"], strings: STR_PY,
-            kw: words(PY_KEYWORDS), lit: words(PY_LITERALS)
+            kw: PY_KEYWORDS, lit: PY_LITERALS
         });
     } else if (lang === "shell") {
         SPECS[lang] = spec({
-            lc: ["#"], strings: [STR_DQ, STR_SQ_RAW], kw: words(SH_KEYWORDS)
+            lc: ["#"], strings: [STR_DQ, STR_SQ_RAW], kw: SH_KEYWORDS
         });
     } else if (lang === "make") {
         SPECS[lang] = spec({
-            lc: ["#"], strings: [STR_DQ, STR_SQ_RAW], kw: words(MAKE_KEYWORDS)
+            lc: ["#"], strings: [STR_DQ, STR_SQ_RAW], kw: MAKE_KEYWORDS
         });
     }
     return SPECS[lang];
@@ -252,7 +270,13 @@ function minihighlight_substring(sp, text, pos, len, state) {
     if (len > pos && text.charCodeAt(len - 1) === 13 /* \r */) {
         --len;
     }
-    let out = "", last = pos, sol = true /* start of line */;
+    // `last_idf` holds the word flags of the most recent identifier token, so an
+    // identifier can be classified from the one before it (a name after a type
+    // is a function definition, a name after `class`/`struct`/... is a type
+    // name) without scanning backward. Only `emit` clears it, so it carries
+    // across unflagged characters (whitespace, `*`, `&`, other operators); it
+    // starts fresh each call, i.e. per line in the diff path.
+    let out = "", last = pos, sol = true /* start of line */, last_idf = 0;
 
     function flush() {
         if (pos !== last) {
@@ -265,6 +289,7 @@ function minihighlight_substring(sp, text, pos, len, state) {
         out += '<span class="hljs-' + cls + '">' + esc(text.substring(pos, pos1)) + "</span>";
         pos = last = pos1;
         sol = false;
+        last_idf = 0;
     }
     function done() {
         flush();
@@ -371,20 +396,32 @@ function minihighlight_substring(sp, text, pos, len, state) {
             sp.id.lastIndex = pos;
             const idm = sp.id.exec(text);
             if (idm) {
-                const w = idm[0];
+                const w = idm[0], wf = sp.words.get(w) || 0;
                 let cls = null;
-                if (sp.kw.has(w)) {
+                if (wf & WF_KEYWORD) {
                     cls = "keyword";
-                } else if (sp.type && sp.type.has(w)) {
+                } else if (wf & WF_TYPE) {
                     cls = "type";
-                } else if (sp.lit && sp.lit.has(w)) {
+                } else if (wf & WF_LITERAL) {
                     cls = "literal";
+                } else if (last_idf & WF_CLASSKW) {
+                    cls = "title class_";
+                } else if (sp.fn) {
+                    // A name followed by `(` is a function. We don't try to
+                    // distinguish definitions (hljs-title) from calls: our type
+                    // detection is too limited (user types aren't known), so the
+                    // split would color methods inconsistently within a class.
+                    FN_CALL.lastIndex = pos + w.length;
+                    if (FN_CALL.test(text)) {
+                        cls = "built_in";
+                    }
                 }
                 if (cls) {
                     emit(cls, pos + w.length);
                 } else {
                     pos += w.length;
                 }
+                last_idf = wf;
                 continue;
             }
         }
@@ -401,7 +438,7 @@ function minihighlight_substring(sp, text, pos, len, state) {
             }
             sol = true;
         }
-        // any other character
+        // skip character (most previous cases advanced `pos` and `continue`d)
         ++pos;
     }
 
