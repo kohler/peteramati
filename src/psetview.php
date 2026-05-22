@@ -2895,7 +2895,7 @@ class PsetView {
         echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">';
         if (($flags & self::SIDEBAR_FILENAV) !== 0 && !empty($diff)) {
             echo '<div class="pa-gradebox pa-filenavbox"><nav class="pa-filenav-list">';
-            $this->print_filenav_directory("", "", $diff);
+            $this->print_filenav_directory("", "", array_values($diff), 0, count($diff));
             echo '</nav></div>';
         }
         if (($flags & self::SIDEBAR_GRADELIST) !== 0) {
@@ -2917,39 +2917,49 @@ class PsetView {
 
     /** @param string $prefix
      * @param string $label
-     * @param array<DiffInfo> $dir */
-    private function print_filenav_directory($prefix, $label, $dir) {
-        // group by initial pathname component
-        $byname = [];
+     * @param list<DiffInfo> $dir
+     * @param int $l
+     * @param int $r */
+    private function print_filenav_directory($prefix, $label, $dir, $l, $r) {
+        // are any uncollapsed?
         $collapse = true;
+        for ($i = $l; $i !== $r; ++$i) {
+            if (!$dir[$i]->collapse) {
+                $collapse = false;
+                break;
+            }
+        }
+        // go by group
         $pfxlen = strlen($prefix);
-        foreach ($dir as $di) {
-            $slash = strpos($di->filename, "/", $pfxlen);
-            if ($slash === false) {
-                $component = $pfxlen ? substr($di->filename, $pfxlen) : $di->filename;
-            } else {
-                $component = substr($di->filename, $pfxlen, $slash + 1 - $pfxlen);
+        $sublabel = $label;
+        $details = false;
+        for ($i = $l; $i !== $r; ) {
+            $difn = $dir[$i]->filename;
+            $j = $i + 1;
+            if (($slash = strpos($difn, "/", $pfxlen)) !== false) {
+                while ($j !== $r
+                       && substr_compare($dir[$j]->filename, $difn, 0, $slash + 1) === 0) {
+                    ++$j;
+                }
             }
-            $byname[$component][] = $di;
-            $collapse = $collapse && $di->collapse;
-        }
-        // print components
-        if (count($byname) > 1 && $prefix !== "") {
-            echo '<details class="pa-filenav-dir"', $collapse ? "" : " open data-initial-open",
-                '><summary><span class="foldarrow"></span>',
-                htmlspecialchars($label), '</summary>';
-            $sublabel = "";
-        } else {
-            $sublabel = $label;
-        }
-        foreach ($byname as $component => $dis) {
-            if (count($dis) > 1) {
-                $this->print_filenav_directory($prefix . $component, $sublabel . $component, $dis);
-            } else {
-                $this->print_filenav_file($sublabel . $component, $dis[0]);
+            if ($i === $l && $j !== $r && $label !== "") {
+                echo '<details class="pa-filenav-dir"',
+                    $collapse ? "" : " open data-initial-open",
+                    '><summary><span class="foldarrow"></span>',
+                    htmlspecialchars($label), '</summary>';
+                $sublabel = "";
+                $details = true;
             }
+            if ($j !== $i + 1) {
+                $this->print_filenav_directory(substr($difn, 0, $slash + 1),
+                    $sublabel . substr($difn, $pfxlen, $slash + 1 - $pfxlen),
+                    $dir, $i, $j);
+            } else {
+                $this->print_filenav_file($sublabel . substr($difn, $pfxlen), $dir[$i]);
+            }
+            $i = $j;
         }
-        if (count($byname) > 1 && $prefix !== "") {
+        if ($details) {
             echo '</details>';
         }
     }
