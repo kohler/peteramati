@@ -2,6 +2,7 @@
     "url": "https://github.com/kohler/peteramati/issues",
     "email": "ekohler@gmail.com",
     "repository": "github:kohler/peteramati",
+    "type": "module",
     "scripts": {
         "build": "npx webpack"
     },
