@@ -4,7 +4,8 @@
     "repository": "github:kohler/peteramati",
     "type": "module",
     "scripts": {
-        "build": "npx webpack"
+        "build": "npx webpack",
+        "test": "node --test \"scriptsrc/test/**/*.test.js\""
     },
     "dependencies": {
         "@xterm/xterm": "^5.5.0",

@@ -30,5 +30,13 @@ export default [
       "no-empty": [ "error", { allowEmptyCatch: true } ],
       "no-control-regex": [ "off" ]
     }
+  },
+  {
+    files: ["scriptsrc/test/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.node
+      }
+    }
   }
 ];
