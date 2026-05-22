@@ -411,7 +411,7 @@ Filediff.define_method("highlight", function () {
         }
         const ce = e.lastChild,
             ishl = hasClass(ce, langclass),
-            s = ishl ? ce.getAttribute("data-pa-text") : ce.textContent,
+            s = ce.textContent,
             result = linefn(s, lang, type & 2 ? hlstatei : hlstated);
         if (!result) {
             break;
@@ -425,7 +425,6 @@ Filediff.define_method("highlight", function () {
         if (ishl) {
             continue;
         }
-        ce.setAttribute("data-pa-text", s);
         ce.innerHTML = result.value;
         addClass(ce, langclass);
         let state = 0;
@@ -456,10 +455,8 @@ Filediff.define_method("unhighlight", function () {
     let e = elt.firstChild, et;
     while (e) {
         if ((et = e.lastChild)
-            && et.hasAttribute("data-pa-text")
             && (!langclass || hasClass(et, langclass))) {
-            et.innerText = et.getAttribute("data-pa-text");
-            et.removeAttribute("data-pa-text");
+            et.replaceChildren(et.textContent);
             langclass && removeClass(et, langclass);
         }
         e = e.nextSibling;
