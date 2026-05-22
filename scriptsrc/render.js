@@ -9,6 +9,7 @@ import { markdownit_attributes } from "./markdown-attributes.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
 import { hasClass, addClass, removeClass, $e } from "./ui.js";
 import { string_utf8_index } from "./utils.js";
+import { minihighlight_supports, minihighlight } from "./minihighlight.js";
 
 function render_class(c, format) {
     if (c) {
@@ -77,32 +78,37 @@ add_format({
 
 let md, md2;
 function try_highlight(str, lang, langAttr, token) {
-    if (lang && hljs.getLanguage(lang)) {
-        try {
-            var hlstr = hljs.highlight(str, {language: lang, ignoreIllegals: true}).value,
-                classIndex = token ? token.attrIndex("class") : -1,
-                lineIndex = token ? token.attrIndex("data-lineno-start") : -1;
-            if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
-                let n = lineIndex >= 0 ? token.attrs[lineIndex][1] : "1";
-                const m = n.match(/^(.*?)(\d*)(\D*)$/),
-                    pfx = m[1], minlen = m[2].startsWith("0") ? m[2].length : 0, sfx = m[3],
-                    fmt = (n) => pfx + n.toString().padStart(minlen, "0") + sfx;
-                n = m[2] ? +m[2] : 1;
-                let lines = hlstr.split(/\n/);
-                if (lines.length > 0 && lines[lines.length - 1] === "") {
-                    lines.pop();
-                }
-                const linestart = '<span class="has-lineno has-lineno-'.concat(fmt(n + lines.length - 1).length, '" data-lineno="');
-                for (let i = 0; i !== lines.length; ++i, ++n) {
-                    lines[i] = linestart.concat(fmt(n), '">', lines[i], '</span>');
-                }
-                hlstr = lines.join("\n") + "\n";
-            }
-            return hlstr;
-        } catch {
-        }
+    if (!lang) {
+        return "";
     }
-    return "";
+    const ismini = minihighlight_supports(lang);
+    if (!ismini && !hljs.getLanguage(lang)) {
+        return "";
+    }
+    try {
+        let hlstr = ismini ? minihighlight(str, lang).value : hljs.highlight(str, {language: lang, ignoreIllegals: true}).value;
+        const classIndex = token ? token.attrIndex("class") : -1,
+            lineIndex = token ? token.attrIndex("data-lineno-start") : -1;
+        if (classIndex >= 0 && /^(.*(?: |^))need-lineno((?: |$).*)$/.test(token.attrs[classIndex][1])) {
+            let n = lineIndex >= 0 ? token.attrs[lineIndex][1] : "1";
+            const m = n.match(/^(.*?)(\d*)(\D*)$/),
+                pfx = m[1], minlen = m[2].startsWith("0") ? m[2].length : 0, sfx = m[3],
+                fmt = (n) => pfx + n.toString().padStart(minlen, "0") + sfx;
+            n = m[2] ? +m[2] : 1;
+            let lines = hlstr.split(/\n/);
+            if (lines.length > 0 && lines[lines.length - 1] === "") {
+                lines.pop();
+            }
+            const linestart = '<span class="has-lineno has-lineno-'.concat(fmt(n + lines.length - 1).length, '" data-lineno="');
+            for (let i = 0; i !== lines.length; ++i, ++n) {
+                lines[i] = linestart.concat(fmt(n), '">', lines[i], '</span>');
+            }
+            hlstr = lines.join("\n") + "\n";
+        }
+        return hlstr;
+    } catch {
+        return "";
+    }
 }
 
 add_format({

@@ -7,7 +7,7 @@
 // so multi-line constructs (block comments, multi-line/raw/triple strings,
 // template literals) highlight correctly even when they open off-screen.
 //
-// `minihighlight_line(lang, text, state)` returns `{value, top}`, where `value`
+// `minihighlight(text, lang, state)` returns `{value, top}`, where `value`
 // is HTML using highlight.js class names and `top` is the opaque lexer state to
 // pass to the next line.
 
@@ -39,25 +39,27 @@ const SH_KEYWORDS = "if then elif else fi for while until do done case esac in f
 
 const MAKE_KEYWORDS = "ifeq ifneq ifdef ifndef else endif define endef include sinclude vpath override export unexport private";
 
-const STR_DQ = { o: '"', c: '"', e: true };
-const STR_SQ = { o: "'", c: "'", e: true };
+const SF_ESCAPE = 1, SF_MULTILINE = 2;
+
+const STR_DQ = { o: '"', c: '"', f: SF_ESCAPE };
+const STR_SQ = { o: "'", c: "'", f: SF_ESCAPE };
 const STR_C_LONG = [
-    { o: 'L"', c: '"', e: true }, { o: 'u"', c: '"', e: true },
-    { o: 'U"', c: '"', e: true }, { o: 'u8"', c: '"', e: true },
-    { o: "L'", c: "'", e: true }, { o: "u'", c: "'", e: true },
-    { o: "U'", c: "'", e: true }, { o: "u8'", c: "'", e: true }
+    { o: 'L"', c: '"', f: SF_ESCAPE }, { o: 'u"', c: '"', f: SF_ESCAPE },
+    { o: 'U"', c: '"', f: SF_ESCAPE }, { o: 'u8"', c: '"', f: SF_ESCAPE },
+    { o: "L'", c: "'", f: SF_ESCAPE }, { o: "u'", c: "'", f: SF_ESCAPE },
+    { o: "U'", c: "'", f: SF_ESCAPE }, { o: "u8'", c: "'", f: SF_ESCAPE }
 ];
-const STR_SQ_RAW = { o: "'", c: "'", e: false };
-const STR_TMPL = { o: "`", c: "`", e: true, multiline: true };
+const STR_SQ_RAW = { o: "'", c: "'", f: 0 };
+const STR_TMPL = { o: "`", c: "`", f: SF_ESCAPE + SF_MULTILINE };
 // Triple-quoted strings must precede single-character delimiters.
 const STR_PY = [
-    { o: '"""', c: '"""', e: true, multiline: true },
-    { o: "'''", c: "'''", e: true, multiline: true },
+    { o: '"""', c: '"""', f: SF_ESCAPE + SF_MULTILINE },
+    { o: "'''", c: "'''", f: SF_ESCAPE + SF_MULTILINE },
     STR_DQ, STR_SQ
 ];
 
 const CHF_ID = 1, CHF_STRING = 2, CHF_CPP_RAW = 4, CHF_META = 8,
-    CHF_LC = 16, CHF_BC = 32, CHF_NUM = 64;
+    CHF_LC = 16, CHF_BC = 32, CHF_NUM = 64, CHF_NL = 128;
 
 const SPECS = {
     c: null, cpp: null, javascript: null, typescript: null,
@@ -110,6 +112,8 @@ function spec(o) {
             flag(ch, CHF_ID);
         }
     }
+    flag("\r", CHF_NL);
+    flag("\n", CHF_NL);
     // sanity-check regular expressions
     for (const re of [s.meta, s.num, s.id, s.cpp_raw ? CPP_RAW : null]) {
         if (re) {
@@ -188,19 +192,26 @@ export function minihighlight_supports(lang) {
 
 
 // Scan from `from` for the (unescaped) `close` delimiter.
-function consume(text, len, pos, close, escaped) {
+function consume(text, pos, len, k, close, sf) {
     const closech = close.charCodeAt(0);
     while (pos < len) {
         const ch = text.charCodeAt(pos);
-        if (escaped && ch === 92 /* \ */) {
-            pos += 2;
+        if (ch === 92 /* \ */ && (sf & SF_ESCAPE)) {
+            ++pos;
+            const nch = pos < len ? text.charCodeAt(pos) : 10 /* \n */;
+            if (nch == 10 /* \n */ || nch === 13 /* \r */) {
+                return { end: pos, state: { k: k, c: close, f: sf } };
+            }
+            ++pos;
         } else if (ch === closech && text.startsWith(close, pos)) {
-            return { end: pos + close.length, closed: true };
+            return { end: pos + close.length, state: null };
+        } else if (ch === 10 /* \n */ || ch === 13 /* \r */) {
+            break;
         } else {
             ++pos;
         }
     }
-    return { end: len, closed: false };
+    return { end: pos, state: sf & SF_MULTILINE ? { k: k, c: close, f: sf } : null };
 }
 
 function string_at(strings, text, pos) {
@@ -230,23 +241,18 @@ function prefix_at(prefixes, text, pos) {
     return null;
 }
 
-/** @param {string} lang
+/** @param {*} sp
  * @param {string} text one line, optionally ending in \n|\r|\r\n
  * @param {*} state lexer state from the previous line, or null
  * @return {?{value: string, top: *}} null if `lang` is unsupported */
-export function minihighlight_line(lang, text, state) {
-    const sp = create_spec(canon(lang));
-    if (!sp) {
-        return null;
-    }
-    let len = text.length;
-    if (len > 0 && text.charCodeAt(len - 1) === 10 /* \n */) {
+function minihighlight_substring(sp, text, pos, len, state) {
+    if (len > pos && text.charCodeAt(len - 1) === 10 /* \n */) {
         --len;
     }
-    if (len > 0 && text.charCodeAt(len - 1) === 13 /* \r */) {
+    if (len > pos && text.charCodeAt(len - 1) === 13 /* \r */) {
         --len;
     }
-    let out = "", pos = 0, last = 0, sol = true /* start of line */;
+    let out = "", last = pos, sol = true /* start of line */;
 
     function flush() {
         if (pos !== last) {
@@ -265,20 +271,32 @@ export function minihighlight_line(lang, text, state) {
         return { value: out + (len !== text.length ? "\n" : ""), top: state };
     }
 
-    // Continue a multi-line construct opened on a previous line.
-    if (state) {
-        const r = consume(text, len, 0, state.c, state.e);
-        emit(state.k === "block" ? "comment" : "string", r.end);
-        if (!r.closed) {
-            return done();
-        }
-        state = null;
-    }
-
     const table = sp.table;
     while (true) {
-        // whitespace
         let ch, f;
+        // continue a multi-line construct opened on a previous line
+        if (state) {
+            // if we get here, `last === pos` by definition
+            if (pos === len) {
+                break;
+            }
+            if (pos < len
+                && ((ch = text.charCodeAt(pos)) === 10 /* \n */ || ch === 13 /* \r */)) {
+                out += "\n";
+                ++pos;
+                if (ch === 13 && pos < len && text.charCodeAt(pos) === 10) {
+                    ++pos;
+                }
+                last = pos;
+            }
+            const r = consume(text, pos, len, state.k, state.c, state.f);
+            if (r.end > pos) {
+                emit(state.k === "bc" ? "comment" : "string", r.end);
+            }
+            state = r.state;
+            continue;
+        }
+        // whitespace
         while (pos < len) {
             ch = text.charCodeAt(pos);
             if ((f = table[ch < 128 ? ch : 128]) !== 0) {
@@ -311,12 +329,9 @@ export function minihighlight_line(lang, text, state) {
         if (f & CHF_BC) {
             const bc = pair_at(sp.bc, text, pos);
             if (bc) {
-                const r = consume(text, len, pos + bc[0].length, bc[1], false);
+                const r = consume(text, pos + bc[0].length, len, "bc", bc[1], SF_MULTILINE);
                 emit("comment", r.end);
-                if (!r.closed) {
-                    state = { k: "block", c: bc[1], e: false };
-                    break;
-                }
+                state = r.state;
                 continue;
             }
         }
@@ -326,12 +341,9 @@ export function minihighlight_line(lang, text, state) {
             const rm = CPP_RAW.exec(text);
             if (rm) {
                 const close = ")" + rm[1] + '"',
-                    r = consume(text, len, pos + rm[0].length, close, false);
+                    r = consume(text, pos + rm[0].length, len, "s", close, SF_MULTILINE);
                 emit("string", r.end);
-                if (!r.closed) {
-                    state = { k: "str", c: close, e: false };
-                    break;
-                }
+                state = r.state;
                 continue;
             }
         }
@@ -339,13 +351,9 @@ export function minihighlight_line(lang, text, state) {
         if (f & CHF_STRING) {
             const sd = string_at(sp.strings, text, pos);
             if (sd) {
-                const r = consume(text, len, pos + sd.o.length, sd.c, sd.e);
+                const r = consume(text, pos + sd.o.length, len, "s", sd.c, sd.f);
                 emit("string", r.end);
-                if (!r.closed
-                    && (sd.multiline || text.charCodeAt(len - 1) === 92 /* \ */)) {
-                    state = { k: "str", c: sd.c, e: sd.e };
-                    break;
-                }
+                state = r.state;
                 continue;
             }
         }
@@ -380,9 +388,31 @@ export function minihighlight_line(lang, text, state) {
                 continue;
             }
         }
+        // newline
+        if (f & CHF_NL) {
+            if (ch === 13 /* \r */) {
+                flush();
+                last = pos + 1;
+                if (last < len && text.charCodeAt(last) === 10 /* \n */) {
+                    ++pos;
+                } else {
+                    out += "\n";
+                }
+            }
+            sol = true;
+        }
         // any other character
         ++pos;
     }
 
     return done();
+}
+
+/** @param {string} text
+ * @param {string} lang
+ * @param {*} state lexer state from the previous line, or null
+ * @return {?{value: string, top: *}} null if `lang` is unsupported */
+export function minihighlight(text, lang, state) {
+    const sp = create_spec(canon(lang));
+    return sp ? minihighlight_substring(sp, text, 0, text.length, state) : null;
 }
