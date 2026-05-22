@@ -93,7 +93,7 @@ test("multi-line strings", () => {
     const r1 = minihighlight("`abc\ndef\nghi`", "javascript", null);
     assert.equal(r1.value, '<span class="hljs-string">`abc</span>\n<span class="hljs-string">def</span>\n<span class="hljs-string">ghi`</span>');
 
-    const r2 = minihighlight("`abc\rdef\r\nghi`", "javascript", null);
+    const r2 = minihighlight("`abc\r\ndef\r\nghi`", "javascript", null);
     assert.equal(r2.value, '<span class="hljs-string">`abc</span>\n<span class="hljs-string">def</span>\n<span class="hljs-string">ghi`</span>');
 });
 

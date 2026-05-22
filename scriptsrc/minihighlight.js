@@ -212,24 +212,24 @@ export function minihighlight_supports(lang) {
 // Scan from `from` for the (unescaped) `close` delimiter.
 function consume(text, pos, len, k, close, sf) {
     const closech = close.charCodeAt(0);
+    let bs = false;
     while (pos < len) {
         const ch = text.charCodeAt(pos);
         if (ch === 92 /* \ */ && (sf & SF_ESCAPE)) {
+            bs = !bs;
             ++pos;
-            const nch = pos < len ? text.charCodeAt(pos) : 10 /* \n */;
-            if (nch == 10 /* \n */ || nch === 13 /* \r */) {
-                return { end: pos, state: { k: k, c: close, f: sf } };
-            }
-            ++pos;
-        } else if (ch === closech && text.startsWith(close, pos)) {
-            return { end: pos + close.length, state: null };
-        } else if (ch === 10 /* \n */ || ch === 13 /* \r */) {
+        } else if (ch === 10 /* \n */
+                   || (ch === 13 /* \r */
+                       && (pos + 1 === len || text.charCodeAt(pos + 1) === 10))) {
             break;
+        } else if (ch === closech && !bs && text.startsWith(close, pos)) {
+            return { end: pos + close.length, state: null };
         } else {
+            bs = false;
             ++pos;
         }
     }
-    return { end: pos, state: sf & SF_MULTILINE ? { k: k, c: close, f: sf } : null };
+    return { end: pos, state: bs || (sf & SF_MULTILINE) ? { k: k, c: close, f: sf } : null };
 }
 
 function string_at(strings, text, pos) {
@@ -306,12 +306,11 @@ function minihighlight_substring(sp, text, pos, len, state) {
                 break;
             }
             if (pos < len
-                && ((ch = text.charCodeAt(pos)) === 10 /* \n */ || ch === 13 /* \r */)) {
+                && ((ch = text.charCodeAt(pos)) === 10 /* \n */
+                    || (ch === 13 /* \r */
+                        && (pos + 1 === len || text.charCodeAt(pos + 1) === 10)))) {
                 out += "\n";
-                ++pos;
-                if (ch === 13 && pos < len && text.charCodeAt(pos) === 10) {
-                    ++pos;
-                }
+                pos += ch === 13 && pos + 1 < len ? 2 : 1;
                 last = pos;
             }
             const r = consume(text, pos, len, state.k, state.c, state.f);
@@ -428,15 +427,15 @@ function minihighlight_substring(sp, text, pos, len, state) {
         // newline
         if (f & CHF_NL) {
             if (ch === 13 /* \r */) {
+                if (pos + 1 !== len && text.charCodeAt(pos + 1) !== 10) {
+                    ++pos;
+                    continue;
+                }
                 flush();
                 last = pos + 1;
-                if (last < len && text.charCodeAt(last) === 10 /* \n */) {
-                    ++pos;
-                } else {
-                    out += "\n";
-                }
+            } else {
+                sol = true;
             }
-            sol = true;
         }
         // skip character (most previous cases advanced `pos` and `continue`d)
         ++pos;
