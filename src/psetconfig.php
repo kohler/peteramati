@@ -1007,6 +1007,7 @@ class Pset {
             DiffConfig::make_default_highlight(".cpp", "c++"),
             DiffConfig::make_default_highlight(".C", "c++"),
             DiffConfig::make_default_highlight(".cc", "c++"),
+            DiffConfig::make_default_highlight(".h++", "c++", -1),
             DiffConfig::make_default_highlight(".hpp", "c++", -1),
             DiffConfig::make_default_highlight(".H", "c++", -1),
             DiffConfig::make_default_highlight(".hh", "c++", -1),

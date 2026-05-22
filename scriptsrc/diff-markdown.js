@@ -8,12 +8,13 @@ import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
 import { markdownit_katex } from "./markdown-katex.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
+import { minihighlight_line, minihighlight_supports } from "./minihighlight.js";
 
 let md, mdcontext;
 const nonwsre = /[^ \t\r\n]/;
 
 
-function hljs_line(lang, s, hlstate) {
+function hljs_line(lang, s) {
     try {
         const result = hljs.highlight(s, {language: lang, ignoreIllegals: true}),
             ns = result.value;
@@ -138,10 +139,12 @@ function render_landmark_fence(md) {
                 info = "";
             }
         }
-        let lang = info ? info.trim().split(/\s+/g)[0] : "";
-        if (!lang || !hljs.getLanguage(lang)) {
+        let lang = info ? info.trim().split(/\s+/g)[0] : null;
+        const ismini = minihighlight_supports(lang);
+        if (lang && !ismini && !hljs.getLanguage(lang)) {
             lang = null;
         }
+        const linefn = ismini ? minihighlight_line : hljs_line;
 
         let xtoken = token;
         if (lang) {
@@ -162,7 +165,7 @@ function render_landmark_fence(md) {
             const xl = x.length;
             let i = 0, ln0 = token.map[0] + 2, hlstate = null;
             while (lang && i !== xl) {
-                const result = hljs_line(lang, x[i] + "\n", hlstate);
+                const result = linefn(lang, x[i] + "\n", hlstate);
                 if (result) {
                     y.push('<pre data-landmark="', ln0 + i,
                            i + 1 !== xl ? '" class="partial"' : '"',
@@ -387,21 +390,17 @@ Filediff.define_method("unmarkdown", function () {
 Filediff.define_method("highlight", function () {
     const elt = this.element;
     // compute language
-    let lang;
-    if (!(lang = elt.getAttribute("data-language"))) {
-        let file = this.file;
-        if (/\.(?:cc|cpp|hh|hpp|c\+\+|h\+\+|C|H)$/.test(file)) {
-            lang = "c++";
-        } else if (/\.(?:c|h)$/.test(file)) {
-            lang = "c";
-        }
-        lang && elt.setAttribute("data-language", lang);
-    }
-    if (!lang
-        || !hljs.getLanguage(lang)
-        || hasClass(elt, "pa-markdown")) {
+    let lang = elt.getAttribute("data-language");
+    if (!lang || hasClass(elt, "pa-markdown")) {
         return;
     }
+    // Prefer minihighlight (fast, correct across lines);
+    // fall back to highlight.js for languages it doesn't cover.
+    const ismini = minihighlight_supports(lang);
+    if (!ismini && !hljs.getLanguage(lang)) {
+        return;
+    }
+    const linefn = ismini ? minihighlight_line : hljs_line;
     // collect content
     const langclass = "language-" + lang;
     let e = elt.firstChild, hlstatei = null, hlstated = null;
@@ -413,7 +412,7 @@ Filediff.define_method("highlight", function () {
         const ce = e.lastChild,
             ishl = hasClass(ce, langclass),
             s = ishl ? ce.getAttribute("data-pa-text") : ce.textContent,
-            result = hljs_line(lang, s, type & 2 ? hlstatei : hlstated);
+            result = linefn(lang, s, type & 2 ? hlstatei : hlstated);
         if (!result) {
             break;
         }
