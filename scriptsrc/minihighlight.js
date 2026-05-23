@@ -452,3 +452,47 @@ export function minihighlight(text, lang, state) {
     const sp = create_spec(canon(lang));
     return sp ? minihighlight_substring(sp, text, 0, text.length, state) : null;
 }
+
+/** Entry lexer state at line `lineno` per a server transition list (see
+ * src/minihighlightsummary.php). `summary` elements are 1-indexed lines whose
+ * entry state changes: a bare number resets to none; `[lineno, "bc"]` is a
+ * block comment (close/flags taken from `lang`); `[lineno, k, c, f]` is a
+ * string state. Returns minihighlight's `top` (or null).
+ * @param {?string} lang
+ * @param {?Array} summary
+ * @param {number} lineno
+ * @return {?{k: string, c: string, f: number}} */
+export function minihighlight_summary_state(lang, summary, lineno) {
+    if (!summary || summary.length === 0) {
+        return null;
+    }
+    // binary search for the rightmost transition with line <= `lineno`
+    let lo = 0, hi = summary.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1, t = summary[mid];
+        if ((typeof t === "number" ? t : t[0]) <= lineno) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    if (lo === 0) {
+        return null;
+    }
+    const t = summary[lo - 1];
+    if (typeof t === "number") {
+        return null;
+    } else if (t.length === 2) {            // block comment
+        const sp = create_spec(canon(lang));
+        return sp && sp.bc.length ? { k: "bc", c: sp.bc[0][1], f: SF_MULTILINE } : null;
+    } else {
+        return { k: t[1], c: t[2], f: t[3] };
+    }
+}
+
+export function minihighlight_state_equals(a, b) {
+    if (!a || !b) {
+        return !a && !b;
+    }
+    return a.k === b.k && a.c === b.c && a.f === b.f;
+}

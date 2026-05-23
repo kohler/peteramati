@@ -32,6 +32,8 @@ final class DiffInfo implements Iterator {
     /** @var int */
     private $_known_flags = 0;
     /** @var int */
+    private $_max_lineno = 0;
+    /** @var int */
     private $_itpos = 0;
     /** @var DiffContext */
     private $_dctx;
@@ -97,10 +99,17 @@ final class DiffInfo implements Iterator {
         return $this->_dctx->pset_to_repo_file($this->filename);
     }
 
+    /** @param 'a'|'b' $side
+     * @return string */
+    function repo_hash($side) {
+        return $side === "a" ? $this->_dctx->repo_hasha() : $this->_dctx->repo_hashb();
+    }
+
     /** @return list<null|string|int> $diff */
     function __diff() {
         return $this->_diff;
     }
+
 
     /** @param string $ch
      * @param ?int $linea
@@ -116,6 +125,16 @@ final class DiffInfo implements Iterator {
         } else {
             array_push($this->_diff, $ch, $linea, $lineb, $text);
             $this->_diffsz += 4;
+            if ($ch === "@"
+                && ($this->_diffsz > 4 || !preg_match('/\A@@ -[01],\d+ \+[01],/', $text))) {
+                $this->_flags |= DiffConfig::F_GAP;
+            }
+            if ($linea !== null && $linea > $this->_max_lineno) {
+                $this->_max_lineno = $linea;
+            }
+            if ($lineb !== null && $lineb > $this->_max_lineno) {
+                $this->_max_lineno = $lineb;
+            }
         }
     }
 
@@ -223,21 +242,7 @@ final class DiffInfo implements Iterator {
 
     /** @return int */
     function max_lineno() {
-        $l = $this->_diffsz;
-        $max = 0;
-        $have = 0;
-        while ($l !== 0 && $have !== 3) {
-            $l -= 4;
-            if ($this->_diff[$l + 1] !== null) {
-                $max = max($max, $this->_diff[$l + 1]);
-                $have |= 1;
-            }
-            if ($this->_diff[$l + 2] !== null) {
-                $max = max($max, $this->_diff[$l + 2]);
-                $have |= 2;
-            }
-        }
-        return $max;
+        return $this->_max_lineno;
     }
 
     /** @param int $i
@@ -602,5 +607,37 @@ final class DiffInfo implements Iterator {
             $n = $this->_diff[$this->_itpos + 6] - $lb;
             return $n ? "a{$la}b{$lb}+$n" : "";
         }
+    }
+
+
+    /** @return bool */
+    function need_hlsummary() {
+        return $this->language
+            && ($this->_flags & DiffConfig::F_UNLOADED) === 0
+            && ($this->_flags & DiffConfig::F_HIGHLIGHT) !== 0
+            && ($this->_flags & DiffConfig::F_GAP) !== 0
+            && $this->_dctx->repo
+            && MinihighlightSummary::supports($this->language);
+    }
+
+    /** Commit hash that defines the content of diff side `$side`. Identifies the
+     * CommitNotes row under which an `hlsummary($side)` result may be cached.
+     * @param 'a'|'b' $side
+     * @return non-empty-string */
+    function hlsummary_commit_hash($side) {
+        return $side === "a" ? $this->_dctx->commita->hash : $this->_dctx->commitb->hash;
+    }
+
+    /** Multi-line highlight-state summaries for re-seeding the client
+     * highlighter inside hidden context, one per diff side.
+     * @param 'a'|'b' $side
+     * @return ?list A list of context, if necessary */
+    function hlsummary($side) {
+        $rf = $this->_dctx->repo->file_content($this->repo_hash($side), $this->repo_filename());
+        if (!$rf || empty($rf->lines)) {
+            return null;
+        }
+        $sum = MinihighlightSummary::summary($this->language, $rf->lines);
+        return empty($sum) ? null : $sum;
     }
 }

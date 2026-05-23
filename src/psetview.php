@@ -45,6 +45,8 @@ class PsetView {
     private $_rpi;
     /** @var ?CommitPsetInfo */
     private $_cpi;
+    /** @var array<string,CommitPsetInfo> */
+    private $_hlcpi = [];
     /** @var ?string */
     private $_hash;
     /** @var false|null|CommitRecord */
@@ -221,11 +223,70 @@ class PsetView {
         return $this->_cpi;
     }
 
+    /** Return the CommitPsetInfo for an arbitrary commit `$hash` (e.g. the
+     * handout commit on diff side `a`), loading and memoizing as needed.
+     * @param non-empty-string $hash
+     * @return ?CommitPsetInfo */
+    private function commit_psetinfo($hash) {
+        if (!$this->repo) {
+            return null;
+        }
+        if ($hash === $this->_hash) {
+            return $this->cpi();
+        }
+        if (!isset($this->_hlcpi[$hash])) {
+            $cpi = new CommitPsetInfo($this->pset->id, hex2bin($hash), $this->repo->repoid);
+            $cpi->reload($this->conf);
+            $this->_hlcpi[$hash] = $cpi;
+        }
+        return $this->_hlcpi[$hash];
+    }
+
+    /** Highlight-state summary for one diff side, cached in the side's
+     * CommitNotes as `xnotes->hlsummary = {v, d}`, where `v` is the format
+     * version and `d` maps `filename => [language, summary]`. A version mismatch
+     * discards the whole payload (so stale entries never accumulate); the commit
+     * tree fixes filename->content, so within a version the cache is keyed by
+     * filename and invalidated when the file's language changes.
+     * @param 'a'|'b' $side
+     * @return ?list */
+    private function diff_hlsummary(DiffInfo $dinfo, $side) {
+        $cpi = $this->commit_psetinfo($dinfo->repo_hash($side));
+        if (!$cpi) { // uncacheable
+            return $dinfo->hlsummary($side);
+        }
+        $repo_filename = $dinfo->repo_filename();
+        $cache = $cpi->jxnote("hlsummary");
+        $replace = !is_object($cache)
+            || ($cache->v ?? null) !== MinihighlightSummary::SUMMARY_VERSION
+            || !is_object($cache->d);
+        if (!$replace) {
+            $cv = $cache->d->$repo_filename ?? null;
+            if (is_array($cv)
+                && count($cv) === 2
+                && $cv[0] === $dinfo->language) {
+                return $cv[1];
+            }
+        }
+        $sum = $dinfo->hlsummary($side);
+        $dupdate = [$repo_filename => [$dinfo->language, $sum]];
+        if ($replace) {
+            $update = new JsonReplacement([
+                "v" => MinihighlightSummary::SUMMARY_VERSION, "d" => $dupdate
+            ]);
+        } else {
+            $update = ["d" => $dupdate];
+        }
+        $this->update_cpi_xnotes($cpi, ["hlsummary" => $update]);
+        return $sum;
+    }
+
 
     /** @param bool $refresh
      * @suppress PhanAccessReadOnlyProperty */
     function reload_repo($refresh = false) {
         $this->repo = $this->_rpi = $this->_cpi = $this->_hash = null;
+        $this->_hlcpi = [];
         $this->_is_sset = $this->_derived_handout_commit = false;
         if (!$this->pset->gitless) {
             $this->repo = $this->user->repo($this->pset->id);
@@ -1206,7 +1267,12 @@ class PsetView {
         if (!$this->_hash) {
             throw new Error("update_commit_xnotes with no hash");
         }
-        $cpi = $this->cpi();
+        $this->update_cpi_xnotes($this->cpi(), $updates);
+    }
+
+    /** @param CommitPsetInfo $cpi
+     * @param array $updates */
+    private function update_cpi_xnotes($cpi, $updates) {
         $cpi->materialize($this->conf);
         $new_xnotes = json_update($cpi->jxnotes(), $updates);
         $xnotes = json_encode_db($new_xnotes);
@@ -2687,6 +2753,14 @@ class PsetView {
         }
         if ($dinfo->language) {
             echo ' data-language="', htmlspecialchars($dinfo->language), '"';
+            if ($dinfo->need_hlsummary()) {
+                if (($x = $this->diff_hlsummary($dinfo, "a"))) {
+                    echo ' data-pa-hlsummary-a="', htmlspecialchars(json_encode_browser($x)), '"';
+                }
+                if (($x = $this->diff_hlsummary($dinfo, "b"))) {
+                    echo ' data-pa-hlsummary-b="', htmlspecialchars(json_encode_browser($x)), '"';
+                }
+            }
         }
         echo '>'; // end div#F_...
         if ($has_grade_range) {

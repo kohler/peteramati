@@ -8,7 +8,7 @@ import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
 import { markdownit_katex } from "./markdown-katex.js";
 import { markdownit_deflist } from "./markdown-deflist.js";
-import { minihighlight, minihighlight_supports } from "./minihighlight.js";
+import { minihighlight, minihighlight_supports, minihighlight_summary_state, minihighlight_state_equals } from "./minihighlight.js";
 
 let md, mdcontext;
 const nonwsre = /[^ \t\r\n]/;
@@ -401,13 +401,36 @@ Filediff.define_method("highlight", function () {
         return;
     }
     const linefn = ismini ? minihighlight : hljs_line;
+    // Parse hlsummaries: compact representations of highlight-sensitive
+    // multi-line constructs. This lets us correctly render, e.g., block
+    // comments that started in hidden context (outside the range of the diff).
+    let hlsuma = null, hlsumb = null;
+    if (ismini) {
+        const la = elt.getAttribute("data-pa-hlsummary-a"),
+            lb = elt.getAttribute("data-pa-hlsummary-b");
+        hlsuma = la ? JSON.parse(la) : null;
+        hlsumb = lb ? JSON.parse(lb) : null;
+    }
     // collect content
     const langclass = "language-" + lang;
-    let e = elt.firstChild, hlstatei = null, hlstated = null;
+    let e = elt.firstChild, hlstatei = null, hlstated = null, resync = ismini ? 3 : 0;
     for (; e; e = e.nextSibling) {
         const type = hasClass(e, "pa-gi") ? 2 : (hasClass(e, "pa-gc") ? 3 : (hasClass(e, "pa-gd") ? 1 : 0));
         if (type === 0) {
+            if (hasClass(e, "pa-gx")) {     // hunk boundary: re-seed at the next code line
+                resync = ismini ? 3 : 0;
+            }
             continue;
+        }
+        if (resync & type & 1) {
+            const da = e.firstChild;
+            hlstated = minihighlight_summary_state(lang, hlsuma, +da.getAttribute("data-landmark"));
+            resync &= ~1;
+        }
+        if (resync & type & 2) {
+            const db = e.firstChild.nextSibling;
+            hlstatei = minihighlight_summary_state(lang, hlsumb, +db.getAttribute("data-landmark"));
+            resync &= ~2;
         }
         const ce = e.lastChild,
             ishl = hasClass(ce, langclass),
@@ -417,7 +440,13 @@ Filediff.define_method("highlight", function () {
             break;
         }
         if (type & 1) {
-            hlstated = result.top;
+            if ((type & 2)
+                && (hlstatei || hlstated)
+                && !minihighlight_state_equals(hlstatei, hlstated)) {
+                hlstated = linefn(s, lang, hlstated).top;
+            } else {
+                hlstated = result.top;
+            }
         }
         if (type & 2) {
             hlstatei = result.top;

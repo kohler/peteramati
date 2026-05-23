@@ -73,6 +73,14 @@ export class Filediff {
                     success: data => {
                         if (data.ok && data.content_html) {
                             const result = $(data.content_html);
+                            for (const k of ["data-pa-hlsummary-a", "data-pa-hlsummary-b"]) {
+                                const v = result.attr(k);
+                                if (v != null) {
+                                    this.element.setAttribute(k, v);
+                                } else {
+                                    this.element.removeAttribute(k);
+                                }
+                            }
                             $(this.element).html(result.children());
                             this.decorate();
                             $pa.render_text_page();
