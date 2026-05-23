@@ -104,12 +104,17 @@ export class Filediff {
         }
     }
     static decorate_page() {
-        $(".pa-filediff.need-decorate").each(function () {
-            removeClass(this, "need-decorate");
-            if (!hasClass(this, "need-load")) {
-                (new Filediff(this)).decorate();
+        for (const fdiff of document.querySelectorAll(".pa-filediff.need-decorate")) {
+            removeClass(fdiff, "need-decorate");
+            if (!hasClass(fdiff, "need-load")) {
+                (new Filediff(fdiff)).decorate();
             }
-        });
+        }
+        if (window.IntersectionObserver) {
+            for (const nav of document.querySelectorAll(".pa-filenav-list")) {
+                install_filenav_scrollspy(nav);
+            }
+        }
     }
     toggle(show) {
         if (show == null) {
@@ -573,6 +578,103 @@ document.addEventListener("toggle", function (evt) {
         }
     });
 }, true);
+
+// Scroll-spy: as the document scrolls, highlight the file navigator entries for
+// every file currently intersecting the viewport, and keep the topmost such
+// entry visible within the (scrollable) navigator box.
+
+// Anchor element that represents `fd`’s region in the document. The file body
+// can be hidden (collapsed or not-yet-loaded), but the wrapping `.pa-with-fixed`
+// (or the `h3.pa-fileref` header) is always laid out, so spy on that.
+function filenav_section_anchor(fd) {
+    const e = fd.element, p = e.parentElement;
+    if (p && hasClass(p, "pa-with-fixed")) {
+        return p;
+    }
+    const h3 = e.previousElementSibling;
+    return h3 && hasClass(h3, "pa-fileref") ? h3 : e;
+}
+
+// The visible element to highlight for `link`: the link itself, or—if it is
+// hidden inside a collapsed directory—the summary of the nearest collapsed
+// ancestor directory that is itself visible.
+function filenav_visible_repr(link) {
+    if (link.offsetParent !== null) {
+        return link;
+    }
+    let repr = null;
+    for (let d = link.closest("details.pa-filenav-dir"); d; d = d.parentElement.closest("details.pa-filenav-dir")) {
+        const summary = d.firstElementChild;
+        if (summary && summary.nodeName === "SUMMARY" && summary.offsetParent !== null) {
+            repr = summary;
+        }
+    }
+    return repr;
+}
+
+// Scroll `box` (only) so that `el` is visible within it. When a scroll is
+// needed, center `el` in the box (clamped to the scrollable range).
+function filenav_reveal(box, el) {
+    if (el.offsetParent === null || box.scrollHeight <= box.clientHeight) {
+        return;
+    }
+    const br = box.getBoundingClientRect(), er = el.getBoundingClientRect();
+    if (er.top >= br.top && er.bottom <= br.bottom) {
+        return;
+    }
+    const target = box.scrollTop + (er.top - br.top) - (box.clientHeight - er.height) / 2;
+    box.scrollTop = Math.max(0, Math.min(target, box.scrollHeight - box.clientHeight));
+}
+
+function install_filenav_scrollspy(nav) {
+    const sections = [];
+    for (const a of nav.querySelectorAll(".pa-filenav")) {
+        const fd = Filediff.by_href(a.href);
+        fd && sections.push({anchor: filenav_section_anchor(fd), link: a, visible: false});
+    }
+    if (sections.length === 0) {
+        return;
+    }
+    const box = nav.closest(".pa-filenavbox") || nav;
+    // Map anchor element -> section so the IO callback can update visibility.
+    const byanchor = new Map(sections.map(s => [s.anchor, s]));
+    // Currently-highlighted representative elements, so we can clear them even
+    // when a link’s visibility (collapsed directory) changes between updates.
+    let lit = [];
+
+    function update(entries) {
+        for (const entry of entries) {
+            const s = byanchor.get(entry.target);
+            s && (s.visible = entry.isIntersecting);
+        }
+        const next = [];
+        let first = null;
+        for (const s of sections) {
+            if (!s.visible) {
+                continue;
+            }
+            const repr = filenav_visible_repr(s.link);
+            if (repr) {
+                next.push(repr);
+                first = first || repr;
+            }
+        }
+        for (const el of lit) {
+            next.indexOf(el) < 0 && removeClass(el, "pa-filenav-active");
+        }
+        for (const el of next) {
+            addClass(el, "pa-filenav-active");
+        }
+        lit = next;
+        first && filenav_reveal(box, first);
+    }
+
+    const observer = new IntersectionObserver(update, {threshold: 0});
+    for (const s of sections) {
+        observer.observe(s.anchor);
+    }
+}
+
 
 function goto_hash(hash) {
     const m = hash.match(/^[^#]*#(L[ab]\d+|)((?:U[-A-Za-z0-9_.@]+\/|)F[-A-Za-z0-9_.@/]+)$/),

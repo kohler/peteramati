@@ -3450,6 +3450,9 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+.pa-filenav-list .pa-filenav-active {
+	font-weight: 600;
+}
 .pa-filenav-dir > :not(summary) {
 	margin-left: 0.95em;
 }
