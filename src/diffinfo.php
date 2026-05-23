@@ -3,54 +3,34 @@
 // HotCRP and Peteramati are Copyright (c) 2006-2026 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
-class DiffInfo implements Iterator {
+final class DiffInfo implements Iterator {
     /** @var string
      * @readonly */
     public $filename;
     /** @var int */
     private $_filenamepos;
-    /** @var bool */
-    public $binary = false;
-    /** @var bool */
-    public $truncated = false;
     /** @var ?string */
     public $title;
-    /** @var bool */
-    public $fileless = false;
-    /** @var bool */
-    public $collapse = false;
-    /** @var bool */
-    private $_collapse_set = false;
-    /** @var bool */
-    public $markdown;
-    /** @var bool */
-    public $markdown_allowed;
-    /** @var bool */
-    public $highlight;
-    /** @var bool */
-    public $highlight_allowed;
     /** @var int */
     public $tabwidth = 4;
     /** @var bool */
     public $wdiff = false;
     /** @var ?string */
     public $language;
-    /** @var bool */
-    public $hide_if_anonymous = false;
     /** @var float */
     private $order = 0.0;
     /** @var float */
     private $extension_order = 0.0;
-    /** @var bool */
-    public $removed = false;
-    /** @var bool */
-    public $loaded = true;
     /** @var list<int|string|null> */
     private $_diff = [];
     /** @var int */
     private $_diffsz = 0;
     /** @var ?array<int,int> */
     private $_dflags;
+    /** @var int */
+    private $_flags = 0;
+    /** @var int */
+    private $_known_flags = 0;
     /** @var int */
     private $_itpos = 0;
     /** @var DiffContext */
@@ -59,8 +39,6 @@ class DiffInfo implements Iterator {
     const MAXLINES = 8000;
     const MAXDIFFSZ = self::MAXLINES << 2;
 
-    const LINE_NONL = 1;
-
     /** @param string $filename */
     function __construct($filename, ?DiffConfig $diffconfig, DiffContext $dctx) {
         $this->filename = $filename;
@@ -68,20 +46,20 @@ class DiffInfo implements Iterator {
         $ismd = str_ends_with($filename, ".md");
         if ($diffconfig) {
             $this->title = $diffconfig->title;
-            $this->fileless = !!$diffconfig->fileless;
-            $this->collapse = !!$diffconfig->collapse;
-            $this->_collapse_set = isset($diffconfig->collapse);
-            $this->hide_if_anonymous = !!$diffconfig->hide_if_anonymous;
+            $this->_flags |= $diffconfig->flags;
+            $this->_known_flags |= $diffconfig->known_flags;
             $this->order = (float) $diffconfig->order;
             $this->extension_order = (float) $diffconfig->extension_order;
-            $this->markdown = $diffconfig->markdown ?? $ismd;
-            $this->markdown_allowed = $diffconfig->markdown_allowed ?? $ismd;
-            $this->highlight = !!$diffconfig->highlight;
-            $this->highlight_allowed = !!$diffconfig->highlight_allowed;
             $this->language = $diffconfig->language;
             $this->tabwidth = $diffconfig->tabwidth ?? 4;
-        } else {
-            $this->markdown = $this->markdown_allowed = $ismd;
+        }
+        if ($ismd) {
+            if (($this->_known_flags & DiffConfig::F_MARKDOWN) === 0) {
+                $this->_flags |= DiffConfig::F_MARKDOWN;
+            }
+            if (($this->_known_flags & DiffConfig::F_MARKDOWN_ALLOWED) === 0) {
+                $this->_flags |= DiffConfig::F_MARKDOWN_ALLOWED;
+            }
         }
         $this->_dctx = $dctx;
         $this->wdiff = $dctx->wdiff;
@@ -94,8 +72,14 @@ class DiffInfo implements Iterator {
 
     /** @param ?bool $collapse */
     function set_collapse($collapse) {
-        $this->collapse = !!$collapse;
-        $this->_collapse_set = isset($collapse);
+        $this->_known_flags &= ~DiffConfig::F_COLLAPSE;
+        if ($collapse !== null) {
+            $this->_known_flags |= DiffConfig::F_COLLAPSE;
+        }
+        $this->_flags &= ~DiffConfig::F_COLLAPSE;
+        if ($collapse) {
+            $this->_flags |= DiffConfig::F_COLLAPSE;
+        }
     }
 
     function set_full_contentb(RepositoryFileContent $rfc) {
@@ -103,7 +87,7 @@ class DiffInfo implements Iterator {
         foreach ($rfc->lines as $i => $line) {
             $this->add("+", 0, $i + 1, $line);
         }
-        if (($rfc->flags & self::LINE_NONL) !== 0) {
+        if (($rfc->flags & DiffConfig::LINE_NONL) !== 0) {
             $this->set_ends_without_newline();
         }
     }
@@ -123,11 +107,11 @@ class DiffInfo implements Iterator {
      * @param ?int $lineb
      * @param string $text */
     function add($ch, $linea, $lineb, $text) {
-        if ($this->truncated) {
+        if ($this->_flags & DiffConfig::F_TRUNCATED) {
             /* do nothing */
         } else if ($this->_diffsz === self::MAXDIFFSZ) {
             array_push($this->_diff, "+", $linea, $lineb, "*** OUTPUT TRUNCATED ***");
-            $this->truncated = true;
+            $this->_flags |= DiffConfig::F_TRUNCATED | DiffConfig::F_GAP;
             $this->_diffsz += 4;
         } else {
             array_push($this->_diff, $ch, $linea, $lineb, $text);
@@ -144,21 +128,22 @@ class DiffInfo implements Iterator {
         if (!isset($this->_dflags[$di])) {
             $this->_dflags[$di] = 0;
         }
-        $this->_dflags[$di] |= self::LINE_NONL;
+        $this->_dflags[$di] |= DiffConfig::LINE_NONL;
     }
 
     function finish() {
         $n = $this->_diffsz;
         if ($n === 4 && str_starts_with($this->_diff[3], "B")) {
-            $this->binary = true;
+            $this->_flags |= DiffConfig::F_BINARY;
         }
-        if ($this->binary && !$this->_collapse_set) {
-            $this->collapse = true;
+        if (($this->_flags & DiffConfig::F_BINARY) !== 0
+            && ($this->_known_flags & DiffConfig::F_COLLAPSE) === 0) {
+            $this->_flags |= DiffConfig::F_COLLAPSE;
         }
-        if ($this->binary
+        if (($this->_flags & DiffConfig::F_BINARY) !== 0
             ? preg_match('/ and \/dev\/null differ$/', $this->_diff[3])
             : $n >= 4 && $this->_diff[$n - 2] === 0) {
-            $this->removed = true;
+            $this->_flags |= DiffConfig::F_REMOVED;
         }
         // add `@@` context line at end of diff to allow expanding file
         if ($n >= 16
@@ -172,14 +157,63 @@ class DiffInfo implements Iterator {
 
     function finish_unloaded() {
         $this->finish();
-        $this->loaded = false;
-        $this->collapse = true;
+        $this->_flags |= DiffConfig::F_UNLOADED | DiffConfig::F_COLLAPSE;
     }
 
 
     /** @return bool */
     function is_empty() {
         return $this->_diffsz === 0;
+    }
+
+    /** @return bool */
+    function ignore() {
+        return ($this->_flags & DiffConfig::F_IGNORE) !== 0;
+    }
+
+    /** @return bool */
+    function collapse() {
+        return ($this->_flags & DiffConfig::F_COLLAPSE) !== 0;
+    }
+
+    /** @return bool */
+    function truncated() {
+        return ($this->_flags & DiffConfig::F_TRUNCATED) !== 0;
+    }
+
+    /** @return bool */
+    function fileless() {
+        return ($this->_flags & DiffConfig::F_FILELESS) !== 0;
+    }
+
+    /** @return bool */
+    function removed() {
+        return ($this->_flags & DiffConfig::F_REMOVED) !== 0;
+    }
+
+    /** @return bool */
+    function loaded() {
+        return ($this->_flags & DiffConfig::F_UNLOADED) === 0;
+    }
+
+    /** @return bool */
+    function highlight() {
+        return ($this->_flags & DiffConfig::F_HIGHLIGHT) !== 0;
+    }
+
+    /** @return bool */
+    function markdown() {
+        return ($this->_flags & DiffConfig::F_MARKDOWN) !== 0;
+    }
+
+    /** @return bool */
+    function markdown_allowed() {
+        return ($this->_flags & DiffConfig::F_MARKDOWN_ALLOWED) !== 0;
+    }
+
+    /** @return bool */
+    function hide_if_anonymous() {
+        return ($this->_flags & DiffConfig::F_HIDE_IF_ANONYMOUS) !== 0;
     }
 
     /** @return bool */
@@ -427,7 +461,7 @@ class DiffInfo implements Iterator {
                 $this->_diffsz -= 4;
                 array_splice($this->_diff, $this->_diffsz, 4);
             }
-            if (($rfc->flags & self::LINE_NONL) !== 0) {
+            if (($rfc->flags & DiffConfig::LINE_NONL) !== 0) {
                 $this->set_ends_without_newline();
             }
         } else {

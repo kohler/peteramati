@@ -1054,7 +1054,7 @@ class Pset {
     function potential_diffconfig_full() {
         $fnames = [];
         foreach ($this->all_diffconfig() as $d) {
-            if ($d->full
+            if (($d->flags & DiffConfig::F_FULL) !== 0
                 && ($fname = $d->exact_filename()) !== null
                 && !in_array($fname, $fnames))
                 $fnames[] = $fname;
@@ -1621,9 +1621,6 @@ final class DiffConfig {
     /** @var float
      * @readonly */
     public $priority;
-    /** @var float
-     * @readonly */
-    public $priority_default;
     /** @var string
      * @readonly */
     public $title;
@@ -1635,28 +1632,6 @@ final class DiffConfig {
     public $extension_order;
     /** @var int */
     public $subposition = 0;
-    /** @var bool */
-    public $fileless;
-    /** @var bool */
-    public $full;
-    /** @var bool */
-    public $ignore;
-    /** @var ?bool */
-    public $collapse;
-    /** @var ?bool */
-    public $collapse_default;
-    /** @var bool */
-    public $gradable;
-    /** @var bool */
-    public $hide_if_anonymous;
-    /** @var ?bool */
-    public $markdown;
-    /** @var ?bool */
-    public $markdown_allowed;
-    /** @var ?bool */
-    public $highlight;
-    /** @var ?bool */
-    public $highlight_allowed;
     /** @var ?string */
     public $language;
     /** @var ?int */
@@ -1665,6 +1640,29 @@ final class DiffConfig {
     public $nonshared = false;
     /** @var ?string */
     public $base;
+    /** @var int */
+    public $flags = 0;
+    /** @var int */
+    public $known_flags = 0;
+
+    const LINE_NONL = 0x1;
+    const F_IGNORE = 0x2;
+    const F_FILELESS = 0x4;
+    const F_FULL = 0x8;
+    const F_COLLAPSE = 0x10;
+    const F_COLLAPSE_DEFAULT = 0x20;
+    const F_GRADABLE = 0x40;
+    const F_HIDE_IF_ANONYMOUS = 0x80;
+    const F_MARKDOWN = 0x100;
+    const F_MARKDOWN_ALLOWED = 0x200;
+    const F_HIGHLIGHT = 0x400;
+    const F_HIGHLIGHT_ALLOWED = 0x800;
+
+    const F_TRUNCATED = 0x1000;
+    const F_BINARY = 0x2000;
+    const F_UNLOADED = 0x4000;
+    const F_REMOVED = 0x8000;
+    const F_GAP = 0x10000;
 
     /** @param ?string $match */
     function __construct($match = null) {
@@ -1696,27 +1694,33 @@ final class DiffConfig {
         }
         $loc = ["diffs", $d->extension ?? $d->match];
         $d->title = Pset::cstr($loc, $j, "title");
-        $p = (float) (Pset::cnum($loc, $j, "priority", "match_priority") ?? $priority ?? 0.0);
-        $d->priority = $p;
-        $d->priority_default = $p >= 100.0 ? -INF : $p;
+        $prio = (float) (Pset::cnum($loc, $j, "priority", "match_priority") ?? $priority ?? 0.0);
+        $d->priority = $prio;
         $d->order = Pset::cnum($loc, $j, "order", "position");
         $d->extension_order = Pset::cnum($loc, $j, "extension_order");
-        $d->fileless = Pset::cbool($loc, $j, "fileless");
-        $d->full = Pset::cbool($loc, $j, "full");
-        $d->ignore = Pset::cbool($loc, $j, "ignore");
-        $d->collapse = Pset::cbool($loc, $j, "collapse", "boring");
-        $d->collapse_default = $p >= 100.0 ? null : $d->collapse;
-        $d->gradable = Pset::cbool($loc, $j, "gradable", "gradeable");
-        $d->hide_if_anonymous = Pset::cbool($loc, $j, "hide_if_anonymous");
-        $d->markdown = Pset::cbool($loc, $j, "markdown");
-        $d->markdown_allowed = Pset::cbool($loc, $j, "markdown_allowed");
-        if ($d->markdown && $d->markdown_allowed === null) {
-            $d->markdown_allowed = true;
+        $d->set_flag($loc, $j, self::F_IGNORE, "ignore");
+        $d->set_flag($loc, $j, self::F_FILELESS, "fileless");
+        $d->set_flag($loc, $j, self::F_FULL, "full");
+        $d->set_flag($loc, $j, self::F_COLLAPSE, "collapse", "boring");
+        if ($prio < 100.0 && ($d->known_flags & self::F_COLLAPSE)) {
+            $d->known_flags |= self::F_COLLAPSE_DEFAULT;
+            $d->flags |= $d->flags & self::F_COLLAPSE ? self::F_COLLAPSE_DEFAULT : 0;
         }
-        $d->highlight = Pset::cbool($loc, $j, "highlight");
-        $d->highlight_allowed = Pset::cbool($loc, $j, "highlight_allowed");
-        if ($d->highlight && $d->highlight_allowed === null) {
-            $d->highlight_allowed = true;
+        $d->set_flag($loc, $j, self::F_GRADABLE, "gradable", "gradeable");
+        $d->set_flag($loc, $j, self::F_HIDE_IF_ANONYMOUS, "hide_if_anonymous");
+        $d->set_flag($loc, $j, self::F_MARKDOWN, "markdown");
+        $d->set_flag($loc, $j, self::F_MARKDOWN_ALLOWED, "markdown_allowed");
+        if (($d->flags & self::F_MARKDOWN) !== 0
+            && ($d->known_flags & self::F_MARKDOWN_ALLOWED) === 0) {
+            $d->known_flags |= self::F_MARKDOWN_ALLOWED;
+            $d->flags |= self::F_MARKDOWN_ALLOWED;
+        }
+        $d->set_flag($loc, $j, self::F_HIGHLIGHT, "highlight");
+        $d->set_flag($loc, $j, self::F_HIGHLIGHT_ALLOWED, "highlight_allowed");
+        if (($d->flags & self::F_HIGHLIGHT) !== 0
+            && ($d->known_flags & self::F_HIGHLIGHT_ALLOWED) === 0) {
+            $d->known_flags |= self::F_HIGHLIGHT_ALLOWED;
+            $d->flags |= self::F_HIGHLIGHT_ALLOWED;
         }
         $d->language = Pset::cstr($loc, $j, "language");
         $d->tabwidth = Pset::cint($loc, $j, "tabwidth");
@@ -1732,7 +1736,8 @@ final class DiffConfig {
     static function make_ignore($match) {
         $d = new DiffConfig;
         $d->match = $match;
-        $d->ignore = true;
+        $d->flags |= self::F_IGNORE;
+        $d->known_flags |= self::F_IGNORE;
         $d->priority = -10.0;
         return $d;
     }
@@ -1745,7 +1750,8 @@ final class DiffConfig {
     static function make_default_highlight($extension, $language, $extension_order = null) {
         $d = new DiffConfig;
         $d->extension = $extension;
-        $d->highlight = true;
+        $d->flags |= self::F_HIGHLIGHT | self::F_HIGHLIGHT_ALLOWED;
+        $d->known_flags |= self::F_HIGHLIGHT | self::F_HIGHLIGHT_ALLOWED;
         $d->language = $language;
         $d->priority = -10.0;
         $d->extension_order = $extension_order;
@@ -1800,36 +1806,8 @@ final class DiffConfig {
             if (isset($b->extension_order)) {
                 $a->extension_order = $b->extension_order;
             }
-            if (isset($b->fileless)) {
-                $a->fileless = $b->fileless;
-            }
-            if (isset($b->full)) {
-                $a->full = $b->full;
-            }
-            if (isset($b->ignore)) {
-                $a->ignore = $b->ignore;
-            }
-            if (isset($b->collapse)) {
-                $a->collapse = $b->collapse;
-            }
-            if (isset($b->gradable)) {
-                $a->gradable = $b->gradable;
-            }
-            if (isset($b->hide_if_anonymous)) {
-                $a->hide_if_anonymous = $b->hide_if_anonymous;
-            }
-            if (isset($b->markdown)) {
-                $a->markdown = $b->markdown;
-            }
-            if (isset($b->markdown_allowed)) {
-                $a->markdown_allowed = $b->markdown_allowed;
-            }
-            if (isset($b->highlight)) {
-                $a->highlight = $b->highlight;
-            }
-            if (isset($b->highlight_allowed)) {
-                $a->highlight_allowed = $b->highlight_allowed;
-            }
+            $a->flags = ($a->flags & ~$b->known_flags) | $b->flags;
+            $a->known_flags |= $b->known_flags;
             if (isset($b->language)) {
                 $a->language = $b->language;
             }
@@ -1839,17 +1817,27 @@ final class DiffConfig {
             if (isset($b->base)) {
                 $a->base = $b->base;
             }
-            if ($b->priority_default > -INF
-                && ($b->priority_default > $a->priority_default
-                    || ($b->priority_default == $a->priority_default
-                        && $b->subposition > $a->subposition))) {
-                $a->priority_default = $b->priority_default;
-                if (isset($b->collapse_default)) {
-                    $a->collapse_default = $b->collapse_default;
-                }
-            }
         }
         return $a;
+    }
+
+    /** @param mixed $loc
+     * @param object $j
+     * @param int $flag
+     * @param string ...$params */
+    private function set_flag($loc, $j, $flag, ...$params) {
+        if (($x = Pset::cbool($loc, $j, ...$params)) !== null) {
+            $this->known_flags |= $flag;
+            $this->flags |= $x ? $flag : 0;
+        }
+    }
+
+    /** @return ?bool */
+    function collapse_default() {
+        if (($this->known_flags & self::F_COLLAPSE_DEFAULT) === 0) {
+            return null;
+        }
+        return ($this->flags & self::F_COLLAPSE_DEFAULT) !== 0;
     }
 
     /** @param string $filename

@@ -2425,7 +2425,7 @@ class PsetView {
                     }
                     $diffc = $this->pset->find_diffconfig($fn);
                     $diff[$fn] = $di = new DiffInfo($fn, $diffc, $dctx);
-                    if ($diffc->fileless) {
+                    if ($di->fileless()) {
                         // add fake file
                         foreach ($dctx->lnorder->file($fn) as $lineid => $note) {
                             $l = (int) substr($lineid, 1);
@@ -2452,8 +2452,8 @@ class PsetView {
         // restrict diff
         $ndiff = [];
         foreach ($diff as $fn => $diffi) {
-            if ((!$diffi->hide_if_anonymous || !$this->user->is_anonymous)
-                && (!$diffi->is_empty() || !$diffi->loaded)) {
+            if ((!$diffi->hide_if_anonymous() || !$this->user->is_anonymous)
+                && (!$diffi->is_empty() || !$diffi->loaded())) {
                 $ndiff[$fn] = $diffi;
             }
         }
@@ -2533,18 +2533,18 @@ class PsetView {
     function echo_file_diff($file, DiffInfo $dinfo, LineNotesOrder $lnorder, $args) {
         $this->_diff_tabwidth = $dinfo->tabwidth;
         $this->_diff_lnorder = $lnorder;
-        $expand = ($args["expand"] ?? !$dinfo->collapse) && $dinfo->loaded;
+        $expand = ($args["expand"] ?? !$dinfo->collapse()) && $dinfo->loaded();
         $only_content = !!($args["only_content"] ?? false);
         $no_heading = ($args["no_heading"] ?? false) || $only_content;
         $no_grades = ($args["only_diff"] ?? false) || $only_content;
-        $hide_left = ($args["hide_left"] ?? false) && !$only_content && !$dinfo->removed;
+        $hide_left = ($args["hide_left"] ?? false) && !$only_content && !$dinfo->removed();
 
         if (!$no_heading) {
             $icons = ["download"];
-            if (!$dinfo->removed && $dinfo->markdown_allowed) {
+            if (!$dinfo->removed() && $dinfo->markdown_allowed()) {
                 $icons[] = "markdown";
             }
-            if (!$dinfo->removed && !$dinfo->markdown_allowed && $dinfo->language) {
+            if (!$dinfo->removed() && !$dinfo->markdown_allowed() && $dinfo->language) {
                 $icons[] = "hide-comments";
             }
             if (Icons::stash_defs(...$icons)) {
@@ -2623,7 +2623,7 @@ class PsetView {
                 // NB Javascript depend on `h3` followed by `span`s and then `a`
                 '<h3 class="pa-fileref">';
             $a = "<a class=\"q ui pa-diff-unfold\" href=\"#{$tabid}\">";
-            echo $a, foldarrow($expand && $dinfo->loaded);
+            echo $a, foldarrow($expand && $dinfo->loaded());
             if ($args["diffcontext"] ?? false) {
                 echo '</a><span class="pa-fileref-context">',
                     $args["diffcontext"], '</span>', $a;
@@ -2633,15 +2633,15 @@ class PsetView {
             $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
                 . ($hide_left ? "" : " btn-primary")
                 . ' need-tooltip" aria-label="Diff view">±</button>';
-            if (!$dinfo->removed && $dinfo->markdown_allowed) {
+            if (!$dinfo->removed() && $dinfo->markdown_allowed()) {
                 $bts[] = '<button type="button" class="btn ui pa-diff-toggle-markdown need-tooltip'
-                    . ($hide_left && $dinfo->markdown ? " btn-primary" : "")
+                    . ($hide_left && $dinfo->markdown() ? " btn-primary" : "")
                     . '" aria-label="Markdown">' . Icons::markdown() . '</button>';
-            } else if (!$dinfo->removed && $dinfo->language) {
+            } else if (!$dinfo->removed() && $dinfo->language) {
                 $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-comments'
                     . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
             }
-            if (!$dinfo->removed && !$dinfo->fileless) {
+            if (!$dinfo->removed() && !$dinfo->fileless()) {
                 $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $dinfo->repo_filename(), "download" => 1], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
             }
             if (!empty($bts)) {
@@ -2669,20 +2669,20 @@ class PsetView {
         if (($this->vf() & VF_STUDENT_ALLOWED) === 0) {
             echo " pa-scores-hidden";
         }
-        if (!$dinfo->loaded) {
+        if (!$dinfo->loaded()) {
             echo " need-load";
         } else {
             $maxline = max(1000, $dinfo->max_lineno()) - 1;
             echo " pa-line-digits-", ceil(log10($maxline));
         }
-        if ($dinfo->highlight) {
+        if ($dinfo->highlight()) {
             echo " need-decorate need-highlight";
-        } else if ($hide_left && $dinfo->markdown) {
+        } else if ($hide_left && $dinfo->markdown()) {
             echo " need-decorate need-markdown";
         }
         echo '"';
 
-        if (!$expand || !$dinfo->loaded) {
+        if (!$expand || !$dinfo->loaded()) {
             echo " hidden";
         }
         if ($dinfo->language) {
@@ -2712,7 +2712,7 @@ class PsetView {
             echo "<script>\$pa.render_text_page()</script>\n";
             $this->need_format = false;
         }
-        if (!$only_content && ($dinfo->highlight || ($hide_left && $dinfo->markdown))) {
+        if (!$only_content && ($dinfo->highlight() || ($hide_left && $dinfo->markdown()))) {
             echo "<script>\$pa.decorate_diff_page()</script>\n";
         }
     }
@@ -2800,9 +2800,9 @@ class PsetView {
                 '<div class="pa-da"', $ak, '></div>',
                 '<div class="pa-db"', $bk, '></div>',
                 '<div class="', $x[1],
-                ($f & DiffInfo::LINE_NONL ? ' pa-dnonl">' : '">'),
+                ($f & DiffConfig::LINE_NONL ? ' pa-dnonl">' : '">'),
                 $this->diff_line_code($x[4]),
-                ($f & DiffInfo::LINE_NONL ? "</div></div>\n" : "\n</div></div>\n");
+                ($f & DiffConfig::LINE_NONL ? "</div></div>\n" : "\n</div></div>\n");
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {
@@ -2924,7 +2924,7 @@ class PsetView {
         // are any uncollapsed?
         $collapse = true;
         for ($i = $l; $i !== $r; ++$i) {
-            if (!$dir[$i]->collapse) {
+            if (!$dir[$i]->collapse()) {
                 $collapse = false;
                 break;
             }

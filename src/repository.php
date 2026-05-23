@@ -1115,7 +1115,7 @@ class Repository {
         $pos = 0;
         $len = strlen($result);
         while (true) {
-            if ($di && $di->truncated) {
+            if ($di && $di->truncated()) {
                 while ($pos < $len
                        && (($ch = $result[$pos]) === " " || $ch === "+" || $ch === "-")) {
                     $nlpos = strpos($result, "\n", $pos);
@@ -1184,7 +1184,7 @@ class Repository {
                 }
                 if ($dctx->file_allowed($fname)
                     && ($diffconfig = $pset->find_diffconfig($fname))
-                    && $diffconfig->full) {
+                    && ($diffconfig->flags & DiffConfig::F_FULL) !== 0) {
                     $command = ["git", "show", $dctx->repo_hashb() . ":" . $dctx->pset_to_repo_file($fname)];
                     $result = $this->gitrun($command);
                     $di = new DiffInfo($fname, $diffconfig, $dctx);
@@ -1213,7 +1213,7 @@ class Repository {
             if ($diffconfig
                 && !$ignore_diffconfig
                 && !$dctx->no_full
-                && $diffconfig->full
+                && ($diffconfig->flags & DiffConfig::F_FULL) !== 0
                 && ($diffs[$file] ?? null)) {
                 continue;
             }
@@ -1226,18 +1226,18 @@ class Repository {
             // decide whether file is collapsed
             if ($dctx->no_user_collapse
                 && $diffconfig
-                && !$diffconfig->collapse_default) {
-                $di->set_collapse($diffconfig->collapse_default);
-            } else if ($di->collapse
+                && !$diffconfig->collapse_default()) {
+                $di->set_collapse($diffconfig->collapse_default());
+            } else if ($di->collapse()
                        && $dctx->file_required($file)) {
                 $di->set_collapse(null);
             }
             // store diff if collapsed, skip if ignored
             if ($diffconfig
                 && !$ignore_diffconfig
-                && ($diffconfig->ignore || $di->collapse)
+                && ($di->ignore() || $di->collapse())
                 && !$dctx->file_required($file)) {
-                if (!$diffconfig->ignore) {
+                if (!$di->ignore()) {
                     $di->finish_unloaded();
                     $diffs[$file] = $di;
                 }
@@ -1355,7 +1355,7 @@ class RepositoryFileContent {
             if ($this->lines[$n - 1] === "") {
                 array_pop($this->lines);
             } else {
-                $this->flags |= DiffInfo::LINE_NONL;
+                $this->flags |= DiffConfig::LINE_NONL;
             }
         }
         $this->mark_use();

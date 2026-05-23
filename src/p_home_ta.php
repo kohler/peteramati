@@ -396,7 +396,7 @@ class Home_TA_Page {
         }
         if (!$pset->gitless_grades) {
             foreach ($pset->all_diffconfig() as $dc) {
-                if (($dc->gradable || $dc->full)
+                if (($dc->flags & (DiffConfig::F_GRADABLE | DiffConfig::F_FULL)) !== 0
                     && ($f = $dc->exact_filename())) {
                     $jd["diff_files"][] = $f;
                 }
