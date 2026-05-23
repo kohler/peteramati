@@ -4,11 +4,16 @@
     "repository": "github:kohler/peteramati",
     "type": "module",
     "scripts": {
+        "//build": "`npm run build` to build scripts/pa.min.js",
         "build": "npx webpack",
+        "//build:highlight": "`npm run build:highlight` to build scripts/highlight.min.js",
+        "build:highlight": "npx webpack --config webpack.highlight.cjs",
+        "//test": "`npm run test` to run Javascript tests",
         "test": "node --test \"scriptsrc/test/**/*.test.js\""
     },
     "dependencies": {
         "@xterm/xterm": "^5.5.0",
+        "highlight.js": "^11.11.1",
         "linkify-it": "latest",
         "markdown-it": "latest",
         "markdown-it-attrs": "latest",

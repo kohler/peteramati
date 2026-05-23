@@ -1015,6 +1015,10 @@ class Pset {
             DiffConfig::make_default_highlight(".sh", "sh"),
             DiffConfig::make_default_highlight(".js", "javascript"),
             DiffConfig::make_default_highlight(".ts", "typescript"),
+            DiffConfig::make_default_highlight("GNUmakefile", "makefile"),
+            DiffConfig::make_default_highlight(".mk", "makefile"),
+            DiffConfig::make_default_highlight("CMakeLists.txt", "cmake"),
+            DiffConfig::make_default_highlight(".cmake", "cmake"),
             ...$this->diffs
         ];
         if (($regex = $this->file_ignore_regex())) {
@@ -1617,6 +1621,9 @@ final class DiffConfig {
     public $match;
     /** @var string
      * @readonly */
+    public $filename;
+    /** @var string
+     * @readonly */
     public $extension;
     /** @var float
      * @readonly */
@@ -1632,17 +1639,23 @@ final class DiffConfig {
     public $extension_order;
     /** @var int */
     public $subposition = 0;
-    /** @var ?string */
+    /** @var ?string
+     * @readonly */
     public $language;
-    /** @var ?int */
+    /** @var ?int
+     * @readonly */
     public $tabwidth;
-    /** @var bool */
+    /** @var bool
+     * @readonly */
     public $nonshared = false;
-    /** @var ?string */
+    /** @var ?string
+     * @readonly */
     public $base;
-    /** @var int */
+    /** @var int
+     * @readonly */
     public $flags = 0;
-    /** @var int */
+    /** @var int
+     * @readonly */
     public $known_flags = 0;
 
     const LINE_NONL = 0x1;
@@ -1686,6 +1699,8 @@ final class DiffConfig {
         $d = new DiffConfig;
         if (isset($j->extension)) {
             $d->extension = Pset::cstr($loc, $j, "extension");
+        } else if (isset($j->filename)) {
+            $d->filename = Pset::cstr($loc, $j, "filename");
         } else {
             $d->match = $j->match ?? $j->regex ?? $match;
             if (!is_string($d->match) || $d->match === "") {
@@ -1749,7 +1764,11 @@ final class DiffConfig {
      * @suppress PhanAccessReadOnlyProperty */
     static function make_default_highlight($extension, $language, $extension_order = null) {
         $d = new DiffConfig;
-        $d->extension = $extension;
+        if (str_starts_with($extension, ".")) {
+            $d->extension = $extension;
+        } else {
+            $d->filename = $extension;
+        }
         $d->flags |= self::F_HIGHLIGHT | self::F_HIGHLIGHT_ALLOWED;
         $d->known_flags |= self::F_HIGHLIGHT | self::F_HIGHLIGHT_ALLOWED;
         $d->language = $language;
@@ -1803,9 +1822,6 @@ final class DiffConfig {
             if (isset($b->order)) {
                 $a->order = $b->order;
             }
-            if (isset($b->extension_order)) {
-                $a->extension_order = $b->extension_order;
-            }
             $a->flags = ($a->flags & ~$b->known_flags) | $b->flags;
             $a->known_flags |= $b->known_flags;
             if (isset($b->language)) {
@@ -1845,6 +1861,11 @@ final class DiffConfig {
     function matches($filename) {
         if ($this->extension !== null) {
             return str_ends_with($filename, $this->extension);
+        } else if ($this->filename !== null) {
+            $ld = strlen($filename) - strlen($this->filename);
+            return $ld >= 0
+                && str_ends_with($filename, $this->filename)
+                && ($ld === 0 || $filename[$ld - 1] === "/");
         }
         return $this->match === ".*"
             || preg_match('{(?:\A|/)(?:' . $this->match . ')(?:/|\z)}', $filename);
