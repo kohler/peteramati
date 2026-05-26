@@ -1205,38 +1205,14 @@ $(".pa-download-timed").each(function () {
     show();
 });
 
-handle_ui.on("submit.pa-setrepo", function (evt) {
+handle_ui.on("submit.pa-repoconfig", function (evt) {
     let f = this;
     this.classList.remove("has-error", "has-warning");
     if (hasClass(this.firstChild, "feedback-list")) {
         this.removeChild(this.firstChild);
     }
     this.querySelector("button[type=submit]").disabled = true;
-    $.ajax(hoturl("=api/repo", {
-        pset: this.getAttribute("data-pa-pset"),
-        u: siteinfo.uservalue
-    }), {
-        type: "POST", cache: false, data: $(this).serialize(),
-        success: function (data) {
-            f.querySelector("button[type=submit]").disabled = false;
-            if (data.message_list) {
-                f.insertBefore(feedback.render_list(data.message_list), f.firstChild);
-            } else {
-                location.reload();
-            }
-        }
-    })
-    evt.preventDefault();
-});
-
-handle_ui.on("submit.pa-setbranch", function (evt) {
-    let f = this;
-    this.classList.remove("has-error", "has-warning");
-    if (hasClass(this.firstChild, "feedback-list")) {
-        this.removeChild(this.firstChild);
-    }
-    this.querySelector("button[type=submit]").disabled = true;
-    $.ajax(hoturl("=api/branch", {
+    $.ajax(hoturl("=api/repoconfig", {
         pset: this.getAttribute("data-pa-pset"),
         u: siteinfo.uservalue
     }), {
@@ -1284,30 +1260,6 @@ handle_ui.on("focusin.pa-branch-datalist", function () {
     if (!this.hasAttribute("list") && this.hasAttribute("data-pa-repoid")) {
         repo_branches(this.getAttribute("data-pa-repoid")).then((bl) => { this.setAttribute("list", bl.id); }).catch((e) => console.log(e));
     }
-});
-
-handle_ui.on("submit.pa-setdirectory", function (evt) {
-    let f = this;
-    this.classList.remove("has-error", "has-warning");
-    if (hasClass(this.firstChild, "feedback-list")) {
-        this.removeChild(this.firstChild);
-    }
-    this.querySelector("button[type=submit]").disabled = true;
-    $.ajax(hoturl("=api/directory", {
-        pset: this.getAttribute("data-pa-pset"),
-        u: siteinfo.uservalue
-    }), {
-        type: "POST", cache: false, data: $(this).serialize(),
-        success: function (data) {
-            f.querySelector("button[type=submit]").disabled = false;
-            if (data.message_list) {
-                f.insertBefore(feedback.render_list(data.message_list), f.firstChild);
-            } else {
-                location.reload();
-            }
-        }
-    })
-    evt.preventDefault();
 });
 
 function pa_checklatest(pset) {

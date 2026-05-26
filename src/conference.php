@@ -2940,6 +2940,7 @@ class Conf {
             "psetconfig" => "35 PsetConfig_API::psetconfig",
             "search" => "1 Search_API::search",
             "repo" => "19 RepoConfig_API::repo",
+            "repoconfig" => "19 RepoConfig_API::repoconfig",
             "repositories" => "17 RepoConfig_API::user_repositories",
             "runchainhead" => "1 Run_API::runchainhead"
         ];

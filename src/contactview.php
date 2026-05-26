@@ -299,7 +299,7 @@ class ContactView {
             $xvalue = $repo_url;
             $id = "repo-u{$user->contactId}p{$pset->id}";
             $js = ["style" => "width:32em", "id" => $id];
-            $value = Ht::entry("repo", $xvalue, $js) . " " . Ht::submit("Save");
+            $value = Ht::entry("repo", $xvalue, $js);
         } else if ($user->is_anonymous) {
             $value = $repo_url ? "[anonymous]" : "(none)";
         } else {
@@ -312,7 +312,7 @@ class ContactView {
             } else {
                 $value .= ' data-tooltip="' . htmlspecialchars($repo->ssh_url()) . '"';
             }
-            $value .= ' type="button">Copy URL to clipboard</button>';
+            $value .= ' type="button" aria-label="Copy URL to clipboard">' . Icons::ui_copy() . '</button>';
         }
         if ($repo && $info->viewer->privChair) {
             $value .= " <small class=\"no-print\" style=\"padding-left:1em;font-size:60%\">{$repo->repoid}/{$repo->repogid}</small>";
@@ -365,14 +365,11 @@ class ContactView {
             }
         }
 
-        // edit
+        // edit: one form saving repository, branch, and directory together
         if ($editable) {
-            echo '<form data-pa-pset="', $pset->urlkey, '" class="ui-submit pa-setrepo">';
+            echo '<form data-pa-pset="', $pset->urlkey, '" class="ui-submit pa-repoconfig">';
         }
         self::echo_group($title, $value, $notes, $id);
-        if ($editable) {
-            echo "</form>\n";
-        }
 
         if (!$pset->no_branch) {
             self::echo_branch_group($info);
@@ -380,6 +377,10 @@ class ContactView {
 
         if ($pset->allow_directory_override) {
             self::echo_directory_group($info);
+        }
+
+        if ($editable) {
+            echo '<div class="pa-p"><div class="pa-pt"></div><div class="pa-pv">', Ht::submit("Save"), "</div></div></form>\n";
         }
 
         return $repo;
@@ -408,21 +409,14 @@ class ContactView {
                 "class" => $repo ? "ui-focusin pa-branch-datalist" : null,
                 "data-pa-repoid" => $repo ? "repo{$repo->repoid}" : null
             ];
-            $value = Ht::entry("branch", $xvalue, $js) . " " . Ht::submit("Save");
+            $value = Ht::entry("branch", $xvalue, $js);
         } else if ($user->is_anonymous) {
             $value = $branch && $branch !== $pset->main_branch ? "[anonymous]" : $pset->main_branch;
         } else {
             $value = htmlspecialchars($branch);
         }
 
-        // edit
-        if ($editable) {
-            echo '<form data-pa-pset="', $pset->urlkey, '" class="ui-submit pa-setbranch">';
-        }
         self::echo_group("branch", $value, [], $id);
-        if ($editable) {
-            echo '</form>';
-        }
     }
 
     static function echo_directory_group(PsetView $info) {
@@ -450,19 +444,12 @@ class ContactView {
                 "placeholder" => $info->pset->directory_noslash,
                 "data-pa-repoid" => $info->repo ? "repo{$info->repo->repoid}" : null
             ];
-            $value = Ht::entry("directory", $xvalue, $js) . " " . Ht::submit("Save");
+            $value = Ht::entry("directory", $xvalue, $js);
         } else {
             $value = htmlspecialchars($directory);
         }
 
-        // edit
-        if ($editable) {
-            echo '<form data-pa-pset="', $info->pset->urlkey, '" class="ui-submit pa-setdirectory">';
-        }
         self::echo_group("directory", $value, [], $id);
-        if ($editable) {
-            echo '</form>';
-        }
     }
 
     static function echo_downloads_group(PsetView $info) {

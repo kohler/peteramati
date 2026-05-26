@@ -586,7 +586,7 @@ Filediff.add_decorator(function (fd) {
         render_filediff(fd);
     } else if (hasClass(elt, "need-highlight")) {
         if (!window.IntersectionObserver
-            || (!highlight_queue && !elt.hidden
+            || (!elt.hidden
                 && ++nsync_render <= SYNC_RENDER_BUDGET)) {
             render_filediff(fd);
         } else {
