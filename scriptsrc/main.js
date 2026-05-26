@@ -1415,6 +1415,7 @@ window.$pa = {
     onload: hotcrp_load,
     pset_actions: pa_pset_actions,
     pset_table: pa_pset_table,
+    register_navbox_page: Filediff.register_navbox_page,
     register_psets: pa_register_psets,
     render_text_page: render_text.on_page,
     runmany: pa_runmany,

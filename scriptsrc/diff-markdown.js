@@ -494,7 +494,9 @@ Filediff.define_method("unhighlight", function () {
 });
 
 Filediff.add_decorator(function (fd) {
-    if (hasClass(fd.element, "need-markdown")) {
+    if (hasClass(fd.element, "need-load")) {
+        /* do nothing */
+    } else if (hasClass(fd.element, "need-markdown")) {
         fd.markdown();
     } else if (hasClass(fd.element, "need-highlight")) {
         fd.highlight();

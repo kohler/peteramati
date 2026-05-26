@@ -2742,11 +2742,11 @@ class PsetView {
             echo " pa-line-digits-", ceil(log10($maxline));
         }
         if ($dinfo->highlight()) {
-            echo " need-decorate need-highlight";
+            echo " need-highlight";
         } else if ($hide_left && $dinfo->markdown()) {
-            echo " need-decorate need-markdown";
+            echo " need-markdown";
         }
-        echo '"';
+        echo ' need-decorate"';
 
         if (!$expand || !$dinfo->loaded()) {
             echo " hidden";
@@ -2971,6 +2971,7 @@ class PsetView {
             echo '<div class="pa-gradebox pa-filenavbox"><nav class="pa-filenav-list">';
             $this->print_filenav_directory("", "", array_values($diff), 0, count($diff));
             echo '</nav></div>';
+            echo "<script>\$pa.register_navbox_page()</script>";
         }
         if (($flags & self::SIDEBAR_GRADELIST) !== 0) {
             echo '<div class="pa-gradebox pa-ps need-pa-gradelist';

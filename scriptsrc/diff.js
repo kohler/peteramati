@@ -58,72 +58,60 @@ export class Filediff {
     load() {
         if (!hasClass(this.element, "need-load")) {
             return new ImmediatePromise(this);
-        } else {
-            const p = this.element.closest(".pa-psetinfo"),
-                wdiff = hasClass(this.element, "pa-wdiff");
-            removeClass(this.element, "need-load");
-            return new Promise(resolve => {
-                $.ajax(hoturl("api/filediff", {psetinfo: p, wdiff: wdiff ? 1 : null}), {
-                    type: "GET", cache: false, dataType: "json",
-                    data: {
-                        file: this.file,
-                        base_commit: p.getAttribute("data-pa-base-commit"),
-                        commit: p.getAttribute("data-pa-commit")
-                    },
-                    success: data => {
-                        if (data.ok && data.content_html) {
-                            const result = $(data.content_html);
-                            for (const k of ["data-pa-hlsummary-a", "data-pa-hlsummary-b"]) {
-                                const v = result.attr(k);
-                                if (v != null) {
-                                    this.element.setAttribute(k, v);
-                                } else {
-                                    this.element.removeAttribute(k);
-                                }
-                            }
-                            $(this.element).html(result.children());
-                            this.decorate();
-                            $pa.render_text_page();
-                        }
-                        resolve(this);
-                    }
-                })
-            });
         }
+        const p = this.element.closest(".pa-psetinfo"),
+            wdiff = hasClass(this.element, "pa-wdiff");
+        removeClass(this.element, "need-load");
+        return new Promise(resolve => {
+            $.ajax(hoturl("api/filediff", {psetinfo: p, wdiff: wdiff ? 1 : null}), {
+                type: "GET", cache: false, dataType: "json",
+                data: {
+                    file: this.file,
+                    base_commit: p.getAttribute("data-pa-base-commit"),
+                    commit: p.getAttribute("data-pa-commit")
+                },
+                success: data => {
+                    if (data.ok && data.content_html) {
+                        const result = $(data.content_html);
+                        for (const k of ["data-pa-hlsummary-a", "data-pa-hlsummary-b"]) {
+                            const v = result.attr(k);
+                            if (v != null) {
+                                this.element.setAttribute(k, v);
+                            } else {
+                                this.element.removeAttribute(k);
+                            }
+                        }
+                        $(this.element).html(result.children());
+                        this.decorate();
+                        $pa.render_text_page();
+                    }
+                    resolve(this);
+                }
+            })
+        });
     }
     load_if(show) {
         if (!show) {
             return new ImmediatePromise(this);
-        } else {
-            return this.load();
         }
+        return this.load();
     }
     decorate() {
+        removeClass(this.element, "need-decorate");
         for (let df of decorators) {
             df(this);
         }
     }
     static decorate_page() {
         for (const fdiff of document.querySelectorAll(".pa-filediff.need-decorate")) {
-            removeClass(fdiff, "need-decorate");
-            if (!hasClass(fdiff, "need-load")) {
-                (new Filediff(fdiff)).decorate();
-            }
-        }
-        if (window.IntersectionObserver) {
-            for (const nav of document.querySelectorAll(".pa-filenav-list")) {
-                install_filenav_scrollspy(nav);
-            }
+            (new Filediff(fdiff)).decorate();
         }
     }
     toggle(show) {
         if (show == null) {
             show = this.element.hidden;
         }
-        const h3 = this.element.previousSibling,
-            h3fd = h3 && hasClass(h3, "pa-fileref") ? Filediff.referenced(h3) : null,
-            isarrow = h3fd && h3fd.element === this.element;
-        fold61(this.element, isarrow ? h3 : null, show);
+        fold61(this.element, this.header_element, show);
     }
     toggle_show_left(show) {
         if (show == null) {
@@ -141,12 +129,11 @@ export class Filediff {
     }
     get file() {
         const id = this.element.id;
-        if (id.charAt(0) === "U") {
+        if (id.charCodeAt(0) === 85 /* U */) {
             const sl = id.indexOf("/F");
             return html_id_decode(id.substring(sl + 2));
-        } else {
-            return html_id_decode(id.substring(1));
         }
+        return html_id_decode(id.substring(1));
     }
     lineid_anchor(lineid) {
         return "L".concat(lineid, this.element.id);
@@ -157,7 +144,7 @@ export class Filediff {
     line(isb, lineno, start) {
         if (lineno == null) {
             lineno = +isb.substring(1);
-            isb = isb.charAt(0) === "b";
+            isb = isb.charCodeAt(0) === 98 /* b */;
         }
         return this.load().then(() => {
             for (let ln of Linediff.all(start || this.element.firstChild)) {
@@ -182,12 +169,16 @@ export class Filediff {
     get repourl() {
         return this.psetinfo.getAttribute("data-pa-repourl");
     }
+    get header_element() {
+        const h3 = this.element.previousSibling;
+        return h3 && hasClass(h3, "pa-fileref") ? h3 : null;
+    }
     scroll_position() {
         const cr = this.element.getBoundingClientRect();
         let top = cr.y + window.scrollY;
-        const preve = this.element.previousSibling;
-        if (preve && preve.nodeName === "H3") {
-            top -= preve.getBoundingClientRect().height + 8;
+        const header = this.header_element;
+        if (header) {
+            top -= header.getBoundingClientRect().height + 8;
         }
         return Math.max(top - 8, 0);
     }
@@ -196,6 +187,11 @@ export class Filediff {
             Object.defineProperty(Filediff.prototype, name, {
                 value: f, enumerable: false, configurable: true, writable: true
             });
+        }
+    }
+    static register_navbox_page() {
+        for (const box of document.querySelectorAll(".pa-filenavbox")) {
+            FilenavScrollspy.at(box);
         }
     }
 }
@@ -583,96 +579,132 @@ document.addEventListener("toggle", function (evt) {
 // every file currently intersecting the viewport, and keep the topmost such
 // entry visible within the (scrollable) navigator box.
 
-// Anchor element that represents `fd`’s region in the document. The file body
-// can be hidden (collapsed or not-yet-loaded), but the wrapping `.pa-with-fixed`
-// (or the `h3.pa-fileref` header) is always laid out, so spy on that.
-function filenav_section_anchor(fd) {
-    const e = fd.element, p = e.parentElement;
-    if (p && hasClass(p, "pa-with-fixed")) {
-        return p;
-    }
-    const h3 = e.previousElementSibling;
-    return h3 && hasClass(h3, "pa-fileref") ? h3 : e;
-}
+// One scroll-spy per navigator box, shared by every file in that box. The
+// decorator below grows the spy a section at a time as each file is decorated.
+const filenav_scrollspies = new Map();
 
-// The visible element to highlight for `link`: the link itself, or—if it is
-// hidden inside a collapsed directory—the summary of the nearest collapsed
-// ancestor directory that is itself visible.
-function filenav_visible_repr(link) {
-    if (link.offsetParent !== null) {
-        return link;
-    }
-    let repr = null;
-    for (let d = link.closest("details.pa-filenav-dir"); d; d = d.parentElement.closest("details.pa-filenav-dir")) {
-        const summary = d.firstElementChild;
-        if (summary && summary.nodeName === "SUMMARY" && summary.offsetParent !== null) {
-            repr = summary;
+class FilenavScrollspy {
+    constructor(box) {
+        this.box = box;
+        this.by_dst = new WeakMap();  // dst heading -> ref
+        this.dirs = new Map();        // directory <details> in nav -> {s, nvisible, visible, p}
+        this.refs = [];
+        this.connect_hint = 0;
+        this.first_visible = this.refs.length;
+        this.observer = new IntersectionObserver(this.update.bind(this), {threshold: 0});
+        for (const a of box.querySelectorAll("a.pa-filenav")) {
+            let i = this.refs.length;
+            this.refs.push({dst: null, ref: a, visible: false, i: i, p: null});
+            if (a.parentElement.nodeName === "DETAILS") {
+                this.refs[i].p = this.dir(a.parentElement);
+            }
+            let dst = Filediff.by_hash(a.hash);
+            dst && this.connect(dst);
         }
     }
-    return repr;
-}
-
-// Scroll `box` (only) so that `el` is visible within it. When a scroll is
-// needed, center `el` in the box (clamped to the scrollable range).
-function filenav_reveal(box, el) {
-    if (el.offsetParent === null || box.scrollHeight <= box.clientHeight) {
-        return;
+    static at(box) {
+        let spy = filenav_scrollspies.get(box);
+        if (!spy) {
+            spy = new FilenavScrollspy(box);
+            filenav_scrollspies.set(box, spy);
+        }
+        return spy;
     }
-    const br = box.getBoundingClientRect(), er = el.getBoundingClientRect();
-    if (er.top >= br.top && er.bottom <= br.bottom) {
-        return;
+    dir(details) {
+        let dir = this.dirs.get(details);
+        if (!dir) {
+            dir = {s: details.firstElementChild, visible: false, nvisible: 0, p: null};
+            this.dirs.set(details, dir);
+            if (details.parentElement.nodeName === "DETAILS") {
+                dir.p = this.dir(details.parentElement);
+            }
+        }
+        return dir;
     }
-    const target = box.scrollTop + (er.top - br.top) - (box.clientHeight - er.height) / 2;
-    box.scrollTop = Math.max(0, Math.min(target, box.scrollHeight - box.clientHeight));
-}
-
-function install_filenav_scrollspy(nav) {
-    const sections = [];
-    for (const a of nav.querySelectorAll(".pa-filenav")) {
-        const fd = Filediff.by_href(a.href);
-        fd && sections.push({anchor: filenav_section_anchor(fd), link: a, visible: false});
+    connect(fd) {
+        if (!fd.header_element || this.by_dst.has(fd.header_element)) {
+            return;
+        }
+        // find ref element pointing to `fd``
+        const search = "#" + fd.element.id;
+        let refidx = this.connect_hint;
+        if (refidx >= this.refs.length
+            || this.refs[refidx].ref.getAttribute("href") !== search) {
+            refidx = 0;
+            while (refidx < this.refs.length
+                   && this.refs[refidx].ref.getAttribute("href") !== search) {
+                ++refidx;
+            }
+        }
+        // connect it
+        if (refidx < this.refs.length) {
+            this.by_dst.set(fd.header_element, this.refs[refidx]);
+            this.observer.observe(fd.header_element);
+            this.connect_hint = refidx + 1;
+        }
     }
-    if (sections.length === 0) {
-        return;
-    }
-    const box = nav.closest(".pa-filenavbox") || nav;
-    // Map anchor element -> section so the IO callback can update visibility.
-    const byanchor = new Map(sections.map(s => [s.anchor, s]));
-    // Currently-highlighted representative elements, so we can clear them even
-    // when a link’s visibility (collapsed directory) changes between updates.
-    let lit = [];
-
-    function update(entries) {
+    update(entries) {
+        let min = this.refs.length, max = 0;
         for (const entry of entries) {
-            const s = byanchor.get(entry.target);
-            s && (s.visible = entry.isIntersecting);
-        }
-        const next = [];
-        let first = null;
-        for (const s of sections) {
-            if (!s.visible) {
-                continue;
-            }
-            const repr = filenav_visible_repr(s.link);
-            if (repr) {
-                next.push(repr);
-                first = first || repr;
+            const ref = this.by_dst.get(entry.target);
+            if (ref && ref.visible !== entry.isIntersecting) {
+                ref.visible = entry.isIntersecting;
+                for (let p = ref.p; p; p = p.p) {
+                    p.nvisible += entry.isIntersecting ? 1 : -1;
+                }
+                min = ref.i < min ? ref.i : min;
+                max = ref.i > max ? ref.i : max;
+                if (ref.visible && ref.i < this.first_visible) {
+                    this.first_visible = ref.i;
+                }
             }
         }
-        for (const el of lit) {
-            next.indexOf(el) < 0 && removeClass(el, "pa-filenav-active");
+        for (; min <= max; ++min) {
+            toggleClass(this.refs[min].ref, "pa-filenav-active", this.refs[min].visible);
         }
-        for (const el of next) {
-            addClass(el, "pa-filenav-active");
+        for (const dir of this.dirs.values()) {
+            if (dir.visible !== (dir.nvisible > 0)) {
+                dir.visible = dir.nvisible > 0;
+                toggleClass(dir.s, "pa-filenav-active", dir.visible);
+            }
         }
-        lit = next;
-        first && filenav_reveal(box, first);
+        while (this.first_visible < this.refs.length
+               && !this.refs[this.first_visible].visible) {
+            ++this.first_visible;
+        }
+        if (this.first_visible < this.refs.length) {
+            this.reveal(this.refs[this.first_visible]);
+        }
     }
+    reveal(ref) {
+        if (this.box.scrollHeight <= this.box.clientHeight) {
+            return;
+        }
+        let repr = ref.ref;
+        for (let p = ref.p; p && repr.offsetParent === null; p = p.p) {
+            repr = p.s;
+        }
+        if (!repr || repr.offsetParent === null) {
+            return;
+        }
+        const boxrect = this.box.getBoundingClientRect(),
+            reprrect = repr.getBoundingClientRect();
+        if (reprrect.top >= boxrect.top && reprrect.bottom <= boxrect.bottom) {
+            return;
+        }
+        const target = this.box.scrollTop
+            + (reprrect.top - boxrect.top)
+            - (this.box.clientHeight - reprrect.height) / 2;
+        this.box.scrollTop = Math.max(0, Math.min(target, this.box.scrollHeight - this.box.clientHeight));
+    }
+}
 
-    const observer = new IntersectionObserver(update, {threshold: 0});
-    for (const s of sections) {
-        observer.observe(s.anchor);
-    }
+if (window.IntersectionObserver) {
+    Filediff.add_decorator(function (fd) {
+        for (const spy of filenav_scrollspies.values()) {
+            spy.connect(fd);
+        }
+    });
 }
 
 
@@ -718,6 +750,7 @@ handle_ui.on("pa-gx", function (evt) {
 });
 
 $(Filediff.decorate_page);
+$(Filediff.register_navbox_page);
 
 
 function diffmany_dropmenu_toggle() {
