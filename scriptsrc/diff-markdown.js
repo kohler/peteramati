@@ -493,13 +493,106 @@ Filediff.define_method("unhighlight", function () {
     removeClass(elt, "pa-highlight");
 });
 
-Filediff.add_decorator(function (fd) {
-    if (hasClass(fd.element, "need-load")) {
-        /* do nothing */
-    } else if (hasClass(fd.element, "need-markdown")) {
+// Render (highlight or markdown) a single filediff, if it still needs it.
+function render_filediff(fd) {
+    if (hasClass(fd.element, "need-markdown")) {
         fd.markdown();
     } else if (hasClass(fd.element, "need-highlight")) {
         fd.highlight();
+    }
+}
+
+// Highlighting and markdown rendering are expensive. On small diffs we render
+// every file synchronously as it is decorated. On large diffs the synchronous
+// work—much of it for files far offscreen—would block the main thread for a
+// long time, so after `SYNC_RENDER_BUDGET` files we switch to an asynchronous
+// queue: visible files render first (via IntersectionObserver), and the rest of
+// the displayed files are backfilled during idle time. Collapsed files render
+// lazily, only once they are expanded and scrolled into view.
+
+const SYNC_RENDER_BUDGET = 25;
+
+const request_idle = window.requestIdleCallback
+    ? window.requestIdleCallback.bind(window)
+    : (cb) => setTimeout(cb, 1);
+
+class HighlightQueue {
+    constructor() {
+        this.jobs = new Map();      // filediff element -> Filediff (all pending)
+        this.backfill = [];         // displayed pending fds, idle-rendered in order
+        this.bfpos = 0;
+        this.idle = false;
+        // The rootMargin renders files just before they scroll into view.
+        this.observer = new IntersectionObserver(this.observed.bind(this), {rootMargin: "300px 0px"});
+    }
+    add(fd) {
+        const elt = fd.element;
+        if (this.jobs.has(elt)) {
+            return;
+        }
+        this.jobs.set(elt, fd);
+        this.observer.observe(elt);
+        // Collapsed files wait for IntersectionObserver to fire when shown; only
+        // displayed files are backfilled during idle time.
+        if (!elt.hidden) {
+            this.backfill.push(fd);
+            this.schedule();
+        }
+    }
+    process(fd) {
+        if (this.jobs.delete(fd.element)) {
+            this.observer.unobserve(fd.element);
+            render_filediff(fd);
+        }
+    }
+    observed(entries) {
+        // Privilege visible files: render them as soon as they intersect.
+        for (const entry of entries) {
+            if (entry.isIntersecting) {
+                const fd = this.jobs.get(entry.target);
+                fd && this.process(fd);
+            }
+        }
+    }
+    schedule() {
+        if (!this.idle && this.bfpos < this.backfill.length) {
+            this.idle = true;
+            request_idle(this.run.bind(this));
+        }
+    }
+    run(deadline) {
+        this.idle = false;
+        const timed = !!(deadline && deadline.timeRemaining);
+        let budget = timed ? Infinity : 12;
+        while (this.bfpos < this.backfill.length && budget > 0) {
+            this.process(this.backfill[this.bfpos]);
+            ++this.bfpos;
+            --budget;
+            if (timed && deadline.timeRemaining() <= 1) {
+                break;
+            }
+        }
+        this.schedule();
+    }
+}
+
+let highlight_queue = null, nsync_render = 0;
+
+Filediff.add_decorator(function (fd) {
+    const elt = fd.element;
+    if (hasClass(elt, "need-load")) {
+        // nothing to do
+    } else if (hasClass(elt, "need-markdown")) {
+        render_filediff(fd);
+    } else if (hasClass(elt, "need-highlight")) {
+        if (!window.IntersectionObserver
+            || (!highlight_queue && !elt.hidden
+                && ++nsync_render <= SYNC_RENDER_BUDGET)) {
+            render_filediff(fd);
+        } else {
+            highlight_queue = highlight_queue || new HighlightQueue;
+            highlight_queue.add(fd);
+        }
     }
 });
 
