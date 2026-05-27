@@ -34,6 +34,8 @@ final class DiffInfo implements Iterator {
     /** @var int */
     private $_max_lineno = 0;
     /** @var int */
+    private $_widthcode = 0;
+    /** @var int */
     private $_itpos = 0;
     /** @var DiffContext */
     private $_dctx;
@@ -116,6 +118,11 @@ final class DiffInfo implements Iterator {
      * @param ?int $lineb
      * @param string $text */
     function add($ch, $linea, $lineb, $text) {
+        if ($ch === "-") {
+            $this->_flags |= DiffConfig::F_HAS_DELETION;
+        } else if ($ch === "+") {
+            $this->_flags |= DiffConfig::F_HAS_INSERTION;
+        }
         if ($this->_flags & DiffConfig::F_TRUNCATED) {
             /* do nothing */
         } else if ($this->_diffsz === self::MAXDIFFSZ) {
@@ -126,7 +133,8 @@ final class DiffInfo implements Iterator {
             array_push($this->_diff, $ch, $linea, $lineb, $text);
             $this->_diffsz += 4;
             if ($ch === "@"
-                && ($this->_diffsz > 4 || !preg_match('/\A@@ -[01],\d+ \+[01],/', $text))) {
+                && ($this->_diffsz > 4
+                    || !preg_match('/\A@@ -[01],\d++ \+[01],/', $text))) {
                 $this->_flags |= DiffConfig::F_GAP;
             }
             if ($linea !== null && $linea > $this->_max_lineno) {
@@ -159,10 +167,23 @@ final class DiffInfo implements Iterator {
             && ($this->_known_flags & DiffConfig::F_COLLAPSE) === 0) {
             $this->_flags |= DiffConfig::F_COLLAPSE;
         }
+        if ($this->_max_lineno >= 10000) {
+            $this->_widthcode = 0x55;
+        } else if ($this->_max_lineno >= 1000) {
+            $this->_widthcode = 0x44;
+        } else {
+            $this->_widthcode = 0x33;
+        }
         if (($this->_flags & DiffConfig::F_BINARY) !== 0
-            ? preg_match('/ and \/dev\/null differ$/', $this->_diff[3])
+            ? str_contains($this->_diff[3], " and /dev/null differ")
             : $n >= 4 && $this->_diff[$n - 2] === 0) {
-            $this->_flags |= DiffConfig::F_REMOVED;
+            $this->_flags |= DiffConfig::F_FILE_DELETED;
+            $this->_widthcode &= 0xF0;
+        } else if (($this->_flags & DiffConfig::F_BINARY) !== 0
+                   ? str_contains($this->_diff[3], "/dev/null and ")
+                   : $n >= 4 && $this->_diff[$n - 3] === 0) {
+            $this->_flags |= DiffConfig::F_FILE_INSERTED;
+            $this->_widthcode &= 0x0F;
         }
         // add `@@` context line at end of diff to allow expanding file
         if ($n >= 16
@@ -206,8 +227,13 @@ final class DiffInfo implements Iterator {
     }
 
     /** @return bool */
-    function removed() {
-        return ($this->_flags & DiffConfig::F_REMOVED) !== 0;
+    function file_deleted() {
+        return ($this->_flags & DiffConfig::F_FILE_DELETED) !== 0;
+    }
+
+    /** @return bool */
+    function file_inserted() {
+        return ($this->_flags & DiffConfig::F_FILE_INSERTED) !== 0;
     }
 
     /** @return bool */
@@ -236,6 +262,16 @@ final class DiffInfo implements Iterator {
     }
 
     /** @return bool */
+    function has_deletion() {
+        return ($this->_flags & DiffConfig::F_HAS_DELETION) !== 0;
+    }
+
+    /** @return bool */
+    function has_insertion() {
+        return ($this->_flags & DiffConfig::F_HAS_INSERTION) !== 0;
+    }
+
+    /** @return bool */
     function commita_is_handout() {
         return $this->_dctx->commita_is_handout();
     }
@@ -243,6 +279,11 @@ final class DiffInfo implements Iterator {
     /** @return int */
     function max_lineno() {
         return $this->_max_lineno;
+    }
+
+    /** @return int */
+    function widthcode() {
+        return $this->_widthcode;
     }
 
     /** @param int $i

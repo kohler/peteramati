@@ -37,17 +37,14 @@ class Icons {
     }
     /** @return string */
     static function download() {
-        assert(Ht::check_stash("i-def-download"));
         return '<svg width="1em" height="1em" style="vertical-align:-0.1em" viewBox="0 0 32 32"><use href="#i-def-download"/></svg>';
     }
     /** @return string */
     static function markdown() {
-        assert(Ht::check_stash("i-def-markdown"));
         return '<svg width="1.553em" height="0.7em" viewBox="0 0 162 73"><use href="#i-def-markdown"/></svg>';
     }
     /** @return string */
     static function hide_comments() {
-        assert(Ht::check_stash("i-def-hide-comments"));
         return '<svg width="1em" height="1em" style="vertical-align:-0.2em" viewBox="0 0 480 480"><use href="#i-def-hide-comments"/></svg>';
     }
     /** @return string */

@@ -319,10 +319,10 @@ Filediff.define_method("markdown", function () {
         const lp = document.createElement("div");
         lp.className = "pa-dl pa-dlr";
         const la = document.createElement("div");
-        la.className = "pa-da";
+        la.className = e.firstChild.className;
         la.hidden = hidelm;
         const lb = document.createElement("div");
-        lb.className = "pa-db";
+        lb.className = e.firstChild.nextSibling.className;
         lb.hidden = hidelm;
 
         const lm = d.getAttribute("data-landmark");

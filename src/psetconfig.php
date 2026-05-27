@@ -1674,8 +1674,11 @@ final class DiffConfig {
     const F_TRUNCATED = 0x1000;
     const F_BINARY = 0x2000;
     const F_UNLOADED = 0x4000;
-    const F_REMOVED = 0x8000;
-    const F_GAP = 0x10000;
+    const F_GAP = 0x8000;
+    const F_HAS_DELETION = 0x10000;
+    const F_HAS_INSERTION = 0x20000;
+    const F_FILE_DELETED = 0x40000;
+    const F_FILE_INSERTED = 0x80000;
 
     /** @param ?string $match */
     function __construct($match = null) {

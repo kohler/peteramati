@@ -2585,7 +2585,38 @@ class PsetView {
         return $this->_complete_diff($diff, $dctx);
     }
 
-    private function diff_line_code($t) {
+    /** @return list<string> */
+    private function _diff_buttons(DiffInfo $dinfo, $hide_left) {
+        if ($dinfo->file_deleted()) {
+            return [];
+        }
+        $bts = $icons = [];
+        if (!$dinfo->file_inserted()) {
+            $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
+                . ($hide_left ? "" : " btn-primary")
+                . ' need-tooltip" aria-label="Diff view">±</button>';
+        }
+        if ($dinfo->markdown_allowed()) {
+            $icons[] = "markdown";
+            $bts[] = '<button type="button" class="btn ui pa-diff-toggle-markdown need-tooltip'
+                . ($hide_left && $dinfo->markdown() ? " btn-primary" : "")
+                . '" aria-label="Markdown">' . Icons::markdown() . '</button>';
+        } else if ($dinfo->language) {
+            $icons[] = "hide-comments";
+            $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-comments'
+                . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
+        }
+        if (!$dinfo->fileless()) {
+            $icons[] = "download";
+            $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $dinfo->repo_filename(), "download" => 1], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
+        }
+        if (Icons::stash_defs(...$icons)) {
+            echo Ht::unstash();
+        }
+        return $bts;
+    }
+
+    private function _diff_line_code($t) {
         while (($p = strpos($t, "\t")) !== false) {
             $t = substr($t, 0, $p)
                 . str_repeat(" ", $this->_diff_tabwidth - ($p % $this->_diff_tabwidth))
@@ -2603,20 +2634,9 @@ class PsetView {
         $only_content = !!($args["only_content"] ?? false);
         $no_heading = ($args["no_heading"] ?? false) || $only_content;
         $no_grades = ($args["only_diff"] ?? false) || $only_content;
-        $hide_left = ($args["hide_left"] ?? false) && !$only_content && !$dinfo->removed();
-
-        if (!$no_heading) {
-            $icons = ["download"];
-            if (!$dinfo->removed() && $dinfo->markdown_allowed()) {
-                $icons[] = "markdown";
-            }
-            if (!$dinfo->removed() && !$dinfo->markdown_allowed() && $dinfo->language) {
-                $icons[] = "hide-comments";
-            }
-            if (Icons::stash_defs(...$icons)) {
-                echo Ht::unstash();
-            }
-        }
+        $hide_left = ($args["hide_left"] ?? false)
+            && !$only_content
+            && $dinfo->has_insertion();
 
         $tabid = "F" . html_id_encode($file);
         if ($this->conf->multiuser_page) {
@@ -2695,21 +2715,7 @@ class PsetView {
                     $args["diffcontext"], '</span>', $a;
             }
             echo htmlspecialchars($dinfo->title ? : $file), "</a>";
-            $bts = [];
-            $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
-                . ($hide_left ? "" : " btn-primary")
-                . ' need-tooltip" aria-label="Diff view">±</button>';
-            if (!$dinfo->removed() && $dinfo->markdown_allowed()) {
-                $bts[] = '<button type="button" class="btn ui pa-diff-toggle-markdown need-tooltip'
-                    . ($hide_left && $dinfo->markdown() ? " btn-primary" : "")
-                    . '" aria-label="Markdown">' . Icons::markdown() . '</button>';
-            } else if (!$dinfo->removed() && $dinfo->language) {
-                $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-comments'
-                    . ' need-tooltip" aria-label="Hide comments">' . Icons::hide_comments() . '</button>';
-            }
-            if (!$dinfo->removed() && !$dinfo->fileless()) {
-                $bts[] = $this->hotlink(Icons::download(), "raw", ["file" => $dinfo->repo_filename(), "download" => 1], ["class" => "btn need-tooltip", "aria-label" => "Download"]);
-            }
+            $bts = $this->_diff_buttons($dinfo, $hide_left);
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';
             }
@@ -2737,9 +2743,6 @@ class PsetView {
         }
         if (!$dinfo->loaded()) {
             echo " need-load";
-        } else {
-            $maxline = max(1000, $dinfo->max_lineno()) - 1;
-            echo " pa-line-digits-", ceil(log10($maxline));
         }
         if ($dinfo->highlight()) {
             echo " need-highlight";
@@ -2850,7 +2853,8 @@ class PsetView {
         }
 
         if (!$x[2] && !$x[3]) {
-            $x[2] = $x[3] = "...";
+            $x[2] = $dinfo->file_inserted() ? "" : "...";
+            $x[3] = $dinfo->file_deleted() ? "" : "...";
         }
         if ($x[2]) {
             $ak .= " data-landmark=\"{$x[2]}\"";
@@ -2869,14 +2873,25 @@ class PsetView {
         }
 
         if ($x[0]) {
-            $f = $l[4] ?? 0;
-            echo '<div class="pa-dl', $x[0], '">',
-                '<div class="pa-da"', $ak, '></div>',
-                '<div class="pa-db"', $bk, '></div>',
-                '<div class="', $x[1],
-                ($f & DiffConfig::LINE_NONL ? ' pa-dnonl">' : '">'),
-                $this->diff_line_code($x[4]),
-                ($f & DiffConfig::LINE_NONL ? "</div></div>\n" : "\n</div></div>\n");
+            echo '<div class="pa-dl', $x[0], '">';
+            $wc = $dinfo->widthcode();
+            if ($wc === 0x33) {
+                echo '<div class="pa-da"', $ak, '></div>',
+                    '<div class="pa-db"', $bk, '></div>',
+                    '<div class="', $x[1];
+            } else {
+                echo '<div class="pa-da',
+                    (($wc & 0xF0) === 0x30 ? "" : " pa-dw" . ($wc >> 4)),
+                    '"', $ak, '></div>',
+                    '<div class="pa-db',
+                    (($wc & 0xF) === 0x3 ? "" : " pa-dw" . ($wc & 0xF)),
+                    '"', $bk, '></div>',
+                    '<div class="', $x[1], " pa-ddw", ($wc >> 4), ($wc & 0xF);
+            }
+            $nonl = ($l[4] ?? 0) & DiffConfig::LINE_NONL;
+            echo ($nonl ? ' pa-dnonl">' : '">'),
+                $this->_diff_line_code($x[4]),
+                ($nonl ? "</div></div>\n" : "\n</div></div>\n");
         }
 
         if ($bln && isset($lineanno[$bln]) && $lineanno[$bln]->warnings !== null) {

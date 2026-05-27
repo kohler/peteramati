@@ -3005,26 +3005,47 @@ h3.gdialog-userids {
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
 }
-.pa-line-digits-4 .pa-da {
+.pa-da.pa-dw0 {
+	min-width: 0;
+	width: 0;
+	padding-left: 0;
+	padding-right: 0;
+}
+.pa-da.pa-dw4 {
 	min-width: 3.5em;
 	width: 3.5em;
 }
-.pa-line-digits-4 .pa-db {
-	min-width: 4em;
-	width: 4em;
-}
-.pa-line-digits-4 .pa-dd {
-	max-width: calc(100% - 7.5em);
-}
-.pa-line-digits-5 .pa-da {
+.pa-da.pa-dw5 {
 	min-width: 4.25em;
 	width: 4.25em;
 }
-.pa-line-digits-5 .pa-db {
+.pa-db.pa-dw0 {
+	min-width: 0.5em;
+	width: 0.5em;
+	padding-left: 0;
+	padding-right: 0.5em;
+}
+.pa-db.pa-dw4 {
+	min-width: 4em;
+	width: 4em;
+}
+.pa-db.pa-dw5 {
 	min-width: 4.75em;
 	width: 4.75em;
 }
-.pa-line-digits-5 .pa-dd {
+.pa-dd.pa-ddw03, .pa-dd.pa-ddw30 {
+	max-width: calc(100% - 3.5em);
+}
+.pa-dd.pa-ddw04, .pa-dd.pa-ddw40 {
+	max-width: calc(100% - 4em);
+}
+.pa-dd.pa-ddw05, .pa-dd.pa-ddw50 {
+	max-width: calc(100% - 4.75em);
+}
+.pa-dd.pa-ddw44 {
+	max-width: calc(100% - 7.5em);
+}
+.pa-dd.pa-ddw55 {
 	max-width: calc(100% - 9em);
 }
 @media print {
