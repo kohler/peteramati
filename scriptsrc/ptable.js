@@ -1707,42 +1707,35 @@ tooltip.add_builder("pa-ptable-user", function () {
         ptconf = this.closest("form").pa__ptconf,
         su = ptconf.smap[spos];
     return {content: new Promise((resolve) => {
-        const maindiv = document.createElement("div"),
+        const userae = ptconf.make_student_ae(su),
+            ubn = $e("div", "pa-ub-n", userae),
+            ub = $e("div", "pa-ub", ubn),
             anon = ptconf.anonymous && su.anon_user;
-        maindiv.className = "d-flex align-items-center";
-        if (su.imageid && !anon) {
-            const ae = ptconf.make_student_ae(su),
-                img = document.createElement("img");
-            img.className = "pa-tinyface";
-            img.src = hoturl("face", {u: su.user, imageid: su.imageid});
-            ae.append(img);
-            maindiv.append(ae);
-        }
-        const idiv = document.createElement("div");
-        maindiv.append(idiv);
-        const userae = ptconf.make_student_ae(su);
-        userae.className += " font-weight-bold";
-        userae.append(anon ? su.anon_user : su.user);
-        idiv.append(userae);
-        if (su.x) {
-            idiv.append(" (X)");
-        } else if (!anon && su.year) {
-            idiv.append(" " + render_year(su.year));
-        }
-        idiv.append(document.createElement("br"));
-        if (!anon) {
-            const name = render_name(su, false);
-            if (name !== "") {
-                const nameae = ptconf.make_student_ae(su);
-                nameae.className = "q";
-                nameae.append(name);
-                idiv.append(nameae, document.createElement("br"));
-            }
+        userae.className += " pa-ub-u";
+        if (anon) {
+            userae.append(su.anon_user);
+        } else {
+            let name = render_name(su, false);
+            userae.append(name || su.user);
+            name && su.user && ubn.append($e("div", "pa-ub-un", "~" + su.user));
             if (su.email) {
-                idiv.append(su.email, document.createElement("br"));
+                ub.append($e("div", "pa-ub-e", $e("a", {class: "q", href: "mailto:" + su.email}, su.email)));
             }
         }
-        resolve(maindiv);
+        const tags = [];
+        if (su.x) {
+            tags.push("ⓧ");
+        } else if (!anon && su.year) {
+            tags.push(render_year(su.year));
+        }
+        tags.length && ub.append($e("div", "pa-ub-t", ...tags));
+        if (anon || !su.imageid) {
+            resolve(ub);
+        } else {
+            resolve($e("div", "pa-ubi",
+                $e("img", {class: "pa-tinyface", src: hoturl("face", {u: su.user, imageid: su.imageid})}),
+                ub));
+        }
     }), delay: 400, className: "gray small ml-2", dir: "w",
         noDelayClass: "pa-ptable-user"};
 });

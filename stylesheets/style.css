@@ -1294,6 +1294,30 @@ table#foldtag_color th {
 }
 
 
+/* user block */
+.pa-ubi {
+	display: flex;
+	align-items: center;
+}
+h2.pa-ub-u {
+	display: inline-block;
+	margin-bottom: 0;
+}
+.pa-ub-u {
+	font-weight: bold;
+}
+.pa-ub-un {
+	display: inline-block;
+	font-size: 92%;
+	opacity: 0.8;
+}
+.pa-ub-un::before {
+	content: "·";
+	padding-left: 0.5em;
+	padding-right: 0.5em;
+	opacity: 0.8;
+}
+
 /* help pages */
 ul.compact {
 	margin-top: 0.5em;

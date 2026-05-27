@@ -126,49 +126,72 @@ class ContactView {
      * @param Contact $viewer */
     static function echo_heading($user, $viewer) {
         $u = $viewer->user_linkpart($user);
-
-        if ($user !== $viewer && !$user->is_anonymous && $user->contactImageId) {
-            echo '<img class="pa-smallface float-left" src="' . Ht::escape_attr($user->conf->hoturl_raw("face", ["u" => $u, "imageid" => $user->contactImageId])) . '" />';
-        }
-
         if ($u !== null) {
-            echo '<h2 class="homeemail">', $user->conf->hotlink(Ht::escape_text($u), "index", ["u" => $u]);
-            if ($user->extension)
-                echo " (X)";
-            /*if ($viewer->privChair && $user->is_anonymous)
-                echo " ",*/
-            if ($viewer->privChair)
-                echo "&nbsp;", become_user_link($user);
-            if ($viewer->isPC
-                && !$user->is_anonymous
-                && $user->github_username
-                && $viewer->conf->opt("githubOrganization")) {
-                echo ' <button type="button" class="qo small ui js-repo-list need-tooltip" data-tooltip="List repositories" data-pa-user="', htmlspecialchars($user->github_username), '">®</button>';
-            }
-            echo '</h2>';
+            self::echo_user_block($user, $viewer, $u);
         }
-
-        if ($user !== $viewer && !$user->is_anonymous) {
-            echo '<h3>', Text::user_html($user);
-            if ($user->studentYear) {
-                if (strlen($user->studentYear) <= 2
-                    && preg_match('/\A(?:[1-9]|1[0-9]|20)\z/', $user->studentYear))
-                    echo ' &#', (9311 + $user->studentYear), ';';
-                else if (strlen($user->studentYear) === 1
-                         && $user->studentYear >= "A"
-                         && $user->studentYear <= "Z")
-                    echo ' &#', (9398 + ord($user->studentYear) - 65), ';';
-                else
-                    echo ' ', htmlspecialchars($user->studentYear);
-            }
-            echo '</h3>';
-        }
-
         if ($user->dropped) {
             ContactView::echo_group("", '<strong class="err">You have dropped the course.</strong> If this is incorrect, contact us.');
         }
-
         echo '<hr class="c" />';
+    }
+
+    static private function echo_user_block($user, $viewer, $u) {
+        $has_image = $user !== $viewer && !$user->is_anonymous && $user->contactImageId;
+        if ($has_image) {
+            echo '<div class="pa-ubi">',
+                '<img class="pa-smallface" src="',
+                    Ht::escape_attr($user->conf->hoturl_raw("face", ["u" => $u, "imageid" => $user->contactImageId])),
+                '">';
+        }
+        echo '<div class="pa-ub">';
+
+        // name row, maybe email row
+        echo '<div class="pa-ub-n"><h2 class="pa-ub-u">';
+        if ($user->is_anonymous) {
+            echo $user->conf->hotlink(Ht::escape_text($user->anon_username), "index", ["u" => $u]), '</h2></div>';
+        } else {
+            $has_name = $user->firstName !== "" || $user->lastName !== "";
+            echo $user->conf->hotlink($has_name ? Text::name_html($user) : Ht::escape_text($u), "index", ["u" => $u]), '</h2>';
+            if ($has_name) {
+                echo '<div class="pa-ub-un">~', Ht::escape_text($u), '</div>';
+            }
+            echo '</div>';
+            if ($user->email) {
+                echo '<div class="pa-e">',
+                    $user->conf->hotlink(Ht::escape_text($user->email), "mailto:{$user->email}", [], ["class" => "q"]),
+                    '</div>';
+            }
+        }
+
+        // tags row
+        $tags = [];
+        if ($user->extension) {
+            $tags[] = "ⓧ";
+        } else if ($user !== $viewer
+                   && !$user->is_anonymous
+                   && $user->studentYear) {
+            if (strlen($user->studentYear) <= 2
+                && ctype_digit($user->studentYear)
+                && !str_starts_with($user->studentYear, "0")
+                && ($y = (int) $user->studentYear) <= 20) {
+                $tags[] = "&#" . (9311 + $y) . ";";
+            } else if (strlen($user->studentYear) === 1
+                       && ($c = ord($user->studentYear)) >= 65
+                       && $c <= 90) {
+                $tags[] = "&#" . (9398 + $c - 65) . ";";
+            } else {
+                $tags[] = htmlspecialchars($user->studentYear);
+            }
+        }
+        if ($user !== $viewer
+            && $viewer->privChair) {
+            $tags[] = become_user_link($user);
+        }
+        if (!empty($tags)) {
+            echo '<div class="pa-ub-t">', join(" ", $tags), '</div>';
+        }
+
+        echo '</div>', $has_image ? '</div>' : '';
     }
 
     static function echo_group($key, $value, $notes = null, $id = null) {
@@ -518,11 +541,11 @@ class ContactView {
         } else {
             $uname = Text::analyze_name($info->user);
             if ($uname->name && $uname->email) {
-                $uname = "$uname->name <$uname->email>";
+                $uname = "{$uname->name} <{$uname->email}>";
             } else if ($uname->email) {
-                $uname = "Your Name <$uname->email>";
+                $uname = "Your Name <{$uname->email}>";
             } else if ($uname->name) {
-                $uname = "$uname->name <youremail@example.com>";
+                $uname = "{$uname->name} <youremail@example.com>";
             } else {
                 $uname = "Your Name <youremail@example.com>";
             }
