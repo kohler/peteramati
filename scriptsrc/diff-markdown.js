@@ -377,7 +377,7 @@ Filediff.define_method("unmarkdown", function () {
     const elt = this.element;
     let e = elt.firstChild;
     while (e) {
-        var n = e.nextSibling;
+        let n = e.nextSibling;
         if (hasClass(e, "pa-dlr")) {
             elt.removeChild(e);
         } else if (hasClass(e, "pa-gi") || hasClass(e, "pa-gc")) {

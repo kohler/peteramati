@@ -346,18 +346,31 @@ export class Linediff {
             $.ajax(hoturl("api/blob", args), {
                 success: function (data) {
                     if (data.ok && data.data) {
-                        const lines = data.data.replace(/\n$/, "").split("\n");
-                        for (let i = lines.length - 1; i >= 0; --i) {
-                            const t = '<div class="pa-dl pa-gc"><div class="pa-da" data-landmark="'.concat(a0 + i, '"></div><div class="pa-db" data-landmark="', b0 + i, '"></div><div class="pa-dd"></div></div>');
-                            $(t).insertAfter(e).find(".pa-dd").text(lines[i]);
+                        const str = data.data, len = str.length;
+                        let pos = 0, ins = e, line = 0;
+                        while (pos !== len) {
+                            const nl = str.indexOf("\n", pos),
+                                npos = nl < 0 ? len : nl + 1;
+                            ins.after($e("div", "pa-dl pa-gc",
+                                $e("div", {class: "pa-da", "data-landmark": a0 + line}),
+                                $e("div", {class: "pa-db", "data-landmark": b0 + line}),
+                                $e("div", "pa-dd", str.substring(pos, npos))));
+                            ins = ins.nextElementSibling;
+                            ++line;
+                            pos = npos;
                         }
-                        const next = e.nextSibling;
-                        $(e).remove();
-                        const fd = Filediff.closest(next);
-                        if (hasClass(fd.element, "pa-highlight")) {
+                        ins = e.nextSibling;
+                        e.remove();
+                        const fd = Filediff.closest(ins);
+                        if (hasClass(fd.element, "pa-markdown")) {
+                            const restore = active_scroll_anchor();
+                            fd.unmarkdown();
+                            fd.markdown();
+                            restore();
+                        } else if (hasClass(fd.element, "pa-highlight")) {
                             fd.highlight();
                         }
-                        resolve(new Linediff(next));
+                        resolve(new Linediff(ins));
                     }
                 }
             });
