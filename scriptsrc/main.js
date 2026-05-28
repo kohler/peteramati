@@ -84,16 +84,20 @@ $.fn.extend({
                 x = x.parentNode;
             }
             x = x && x.tagName ? x : window;
-            let w = $(x).geometry();
-            if (p.top < w.top + (opts.marginTop || 0) || opts.atTop) {
-                let pos = Math.max(p.top - (opts.marginTop || 0), 0);
-                if (x === window) {
-                    x.scrollTo(x.scrollX, pos);
-                } else {
-                    x.scrollTop = pos;
-                }
-            } else if (p.bottom > w.bottom - (opts.marginBottom || 0)) {
-                let pos = Math.max(p.bottom + (opts.marginBottom || 0) - w.height, 0);
+            let w = $(x).geometry(),
+                mt = opts.marginTop || 0, mb = opts.marginBottom || 0,
+                pos = null;
+            if (opts.atCenter
+                && (p.top < w.top + mt || p.bottom > w.bottom - mb)) {
+                // center the element within the visible region
+                pos = p.top - mt - (w.height - mt - mb - p.height) / 2;
+            } else if (p.top < w.top + mt || opts.atTop) {
+                pos = p.top - mt;
+            } else if (p.bottom > w.bottom - mb) {
+                pos = p.bottom + mb - w.height;
+            }
+            if (pos !== null) {
+                pos = Math.max(pos, 0);
                 if (x === window) {
                     x.scrollTo(x.scrollX, pos);
                 } else {

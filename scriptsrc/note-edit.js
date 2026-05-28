@@ -106,12 +106,19 @@ function arrowcapture(evt) {
     const key = event_key(evt), modkey = event_key.modcode(evt);
     if ((key === "ArrowUp" || key === "ArrowDown") && !modkey) {
         arrowcapture_arrow(evt, key);
+    } else if ((key === "PageUp" || key === "PageDown") && !modkey) {
+        arrowcapture_page(evt, key);
     } else if (key === "Enter" && (!modkey || modkey === event_key.META)) {
         arrowcapture_enter(evt);
     }
 }
 
-function arrowcapture_focusat(what, evt) {
+function arrowcapture_setfocus(what) {
+    const ln = curline && curline.visible_source();
+    if (ln) {
+        removeClass(ln.element, "live");
+        ln.element.tabIndex = -1;
+    }
     if (what.nodeName === "PA-LINEDIFF") {
         curline = what;
         curgrade = null;
@@ -124,8 +131,13 @@ function arrowcapture_focusat(what, evt) {
         requestAnimationFrame(() => what.select());
     }
     what.focus({preventScroll: true});
+    return what;
+}
+
+function arrowcapture_focusat(what, evt) {
+    what = arrowcapture_setfocus(what);
     const wf = what.closest(".pa-with-fixed");
-    $(what).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight} : null);
+    $(what).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight, atCenter: true} : {atCenter: true});
     evt.preventDefault();
 }
 
@@ -148,14 +160,86 @@ function arrowcapture_arrow(evt, key) {
         }
     }
     if (target) {
-        if (ln) {
-            removeClass(ln.element, "live");
-            ln.element.tabIndex = -1;
-        }
         arrowcapture_focusat(target, evt);
     } else {
         // already at the first/last navigable line; keep focus where it is
         evt.preventDefault();
+    }
+}
+
+function scroll_parent(e) {
+    let x = e.parentNode;
+    while (x && x.tagName && $(x).css("overflow-y") === "visible") {
+        x = x.parentNode;
+    }
+    return x && x.tagName ? x : window;
+}
+
+function arrowcapture_page(evt, key) {
+    const ln = curline && curline.visible_source();
+    if (!ln && !curgrade) {
+        uncapture();
+        return;
+    }
+    evt.preventDefault();
+    const start = curgrade || ln.element,
+        down = key === "PageDown",
+        x = scroll_parent(start),
+        win = x === window;
+    // record the cursor's current screen position so it stays put as text scrolls
+    const sr = start.getBoundingClientRect(),
+        anchor = sr.top + sr.height / 2;
+    // viewport geometry and current/max scroll
+    let vheight, curscroll, maxscroll;
+    if (win) {
+        vheight = window.innerHeight;
+        curscroll = window.scrollY;
+        maxscroll = document.documentElement.scrollHeight - vheight;
+    } else {
+        vheight = x.clientHeight;
+        curscroll = x.scrollTop;
+        maxscroll = x.scrollHeight - x.clientHeight;
+    }
+    const wf = start.closest(".pa-with-fixed"),
+        marginTop = wf ? wf.firstChild.offsetHeight : 0,
+        page = vheight - marginTop,
+        want = curscroll + (down ? page : -page),
+        pos = Math.max(0, Math.min(want, maxscroll)),
+        atbound = pos !== want;
+    if (win) {
+        window.scrollTo(window.scrollX, pos);
+    } else {
+        x.scrollTop = pos;
+    }
+    // highlight the navigable line now at the cursor's old screen position, so
+    // paging advances by exactly one screenful of lines with no gaps. If the
+    // scroll clamped at an edge, advance all the way to the extreme line.
+    const flags = Linediff.ANYFILE + Linediff.GRADES + (down ? 0 : Linediff.BACKWARD);
+    let target = null, bestdist = Infinity;
+    for (let lnx of Linediff.all(start, flags)) {
+        let el;
+        if (lnx.nodeName !== "PA-LINEDIFF") {
+            el = lnx;
+        } else if (lnx.element !== start && lnx.is_visible() && lnx.is_source()) {
+            el = lnx.element;
+        } else {
+            continue;
+        }
+        if (atbound) {
+            target = lnx; // keep going; end up at the last navigable line
+            continue;
+        }
+        const r = el.getBoundingClientRect(),
+            dist = Math.abs(r.top + r.height / 2 - anchor);
+        if (dist <= bestdist) {
+            bestdist = dist;
+            target = lnx;
+        } else {
+            break; // matched the old screen position; candidates only get farther
+        }
+    }
+    if (target) {
+        arrowcapture_setfocus(target);
     }
 }
 
