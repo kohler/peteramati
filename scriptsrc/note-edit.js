@@ -136,8 +136,9 @@ function arrowcapture_setfocus(what) {
 
 function arrowcapture_focusat(what, evt) {
     what = arrowcapture_setfocus(what);
-    const wf = what.closest(".pa-with-fixed");
-    $(what).scrollIntoView(wf ? {marginTop: wf.firstChild.offsetHeight, atCenter: true} : {atCenter: true});
+    const wf = what.closest(".pa-filediff-ctr"),
+        marginTop = wf && wf.firstChild.nodeName === "H3" ? wf.firstChild.offsetHeight : 0;
+    $(what).scrollIntoView({marginTop: marginTop, atCenter: true});
     evt.preventDefault();
 }
 
@@ -200,8 +201,8 @@ function arrowcapture_page(evt, key) {
         curscroll = x.scrollTop;
         maxscroll = x.scrollHeight - x.clientHeight;
     }
-    const wf = start.closest(".pa-with-fixed"),
-        marginTop = wf ? wf.firstChild.offsetHeight : 0,
+    const wf = start.closest(".pa-filediff-ctr"),
+        marginTop = wf && wf.firstChild.nodeName === "H3" ? wf.firstChild.offsetHeight : 0,
         page = vheight - marginTop,
         want = curscroll + (down ? page : -page),
         pos = Math.max(0, Math.min(want, maxscroll)),

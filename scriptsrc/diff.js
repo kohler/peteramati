@@ -3,7 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { ImmediatePromise } from "./utils.js";
-import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui, $e, with_scroll_anchor } from "./ui.js";
+import { hasClass, addClass, removeClass, toggleClass, handle_ui, $e } from "./ui.js";
 import { dropmenu } from "./dropmenu.js";
 import { hoturl } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
@@ -112,7 +112,10 @@ export class Filediff {
         if (show == null) {
             show = this.element.hidden;
         }
-        fold61(this.element, this.header_element, show);
+        this.element.hidden = !show;
+        const h3 = this.header_element;
+        h3 && h3.firstChild.setAttribute("aria-expanded", show ? "true" : "false");
+        toggleClass(this.element.closest(".pa-filediff-ctr"), "pa-filediff-open", show);
     }
     toggle_show_left(show) {
         if (show == null) {
@@ -503,10 +506,9 @@ export class Linediff {
 handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
         fd = Filediff.by_hash(this.hash),
-        show = fd.element.hidden,
-        direction = evt.metaKey ? true : show;
+        show = fd.element.hidden;
     $es.each(function () {
-        Filediff.by_hash(this.hash).load().then(fd => fd.toggle(direction));
+        Filediff.by_hash(this.hash).load().then(fd => fd.toggle(show));
     });
     if (!evt.metaKey) {
         $.post(hoturl("=api/diffconfig", {psetinfo: fd.element, file: fd.file, collapse: show ? 0 : 1}));
@@ -569,15 +571,15 @@ document.addEventListener("toggle", function (evt) {
     if (!fds.length) {
         return;
     }
-    with_scroll_anchor(fds[0].element, fds[fds.length - 1].element, () => {
-        for (const fd of fds) {
-            if (open && hasClass(fd.element, "need-load")) {
-                fd.load().then(() => { fd.toggle(true); });
-            } else {
-                fd.toggle(open);
-            }
+    const restore = active_scroll_anchor();
+    for (const fd of fds) {
+        if (open && hasClass(fd.element, "need-load")) {
+            fd.load().then(() => { fd.toggle(true); });
+        } else {
+            fd.toggle(open);
         }
-    });
+    }
+    restore();
 }, true);
 
 // Scroll-spy: as the document scrolls, highlight the file navigator entries for

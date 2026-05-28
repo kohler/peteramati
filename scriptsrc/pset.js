@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2024 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { handle_ui, fold61, addClass, hasClass, $e } from "./ui.js";
+import { handle_ui, addClass, hasClass, $e } from "./ui.js";
 import { event_key } from "./ui-key.js";
 import { hoturl } from "./hoturl.js";
 import { escape_entities } from "./encoders.js";
@@ -52,7 +52,9 @@ handle_ui.on("js-repo-list", function (event) {
 });
 
 handle_ui.on("js-pset-viewoptions", function () {
-    fold61(this.nextSibling, this.parentNode);
+    const vo = document.getElementById("viewoptions");
+    vo.hidden = !vo.hidden;
+    this.setAttribute("aria-expanded", vo.hidden ? "false" : "true");
 });
 
 handle_ui.on("js-pset-setgrader", function () {

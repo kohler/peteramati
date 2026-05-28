@@ -94,6 +94,8 @@ class PsetView {
 
     /** @var bool */
     private $need_format = false;
+    /** @var bool */
+    private $_diff_printed = false;
 
     const ERROR_NOTRUN = 1;
     const ERROR_LOGMISSING = 2;
@@ -2704,14 +2706,21 @@ class PsetView {
                 }
             }
         }
+        $bts = $no_heading ? [] : $this->_diff_buttons($dinfo, $hide_left);
+
+        echo '<div class="pa-dg pa-filediff-ctr',
+            $expand ? " pa-filediff-open" : "",
+            $this->_diff_printed ? "" : " pa-filediff-first",
+            '">';
+        $this->_diff_printed = true;
 
         if (!$no_heading) {
-            $bts = $this->_diff_buttons($dinfo, $hide_left);
-            echo '<div class="pa-dg pa-with-fixed">',
-                // NB Javascript depend on `h3` followed by `span`s and then `a`
-                '<h3 class="pa-fileref">';
-            $a = "<a class=\"q ui pa-diff-unfold\" href=\"#{$tabid}\">";
-            echo $a, foldarrow($expand && $dinfo->loaded());
+            // NB Javascript depend on `h3` followed by `span`s and then `a`
+            echo '<h3 class="pa-fileref">';
+            $a = "<a class=\"q ui pa-diff-unfold\" href=\"#{$tabid}\" aria-expanded=\""
+                . ($expand ? "true" : "false")
+                . "\" aria-controls=\"{$tabid}\">";
+            echo $a, foldarrow(null);
             if ($args["diffcontext"] ?? false) {
                 echo '</a><span class="pa-fileref-context">',
                     $args["diffcontext"], '</span>', $a;
@@ -2724,7 +2733,7 @@ class PsetView {
             echo '</h3>';
         }
 
-        echo '<div id="', $tabid, '" class="pa-filediff pa-dg';
+        echo '<div id="', $tabid, '" class="pa-dg pa-filediff';
         if ($hide_left) {
             echo " pa-hide-left";
         }
@@ -2753,7 +2762,7 @@ class PsetView {
         }
         echo ' need-decorate"';
 
-        if (!$expand || !$dinfo->loaded()) {
+        if (!$expand) {
             echo " hidden";
         }
         if ($dinfo->language) {
@@ -2782,11 +2791,7 @@ class PsetView {
         if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
             echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $dinfo->repo_filename()])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
         }
-        echo '</div>'; // end div.pa-filediff#F_...
-        if (!$no_heading) {
-            echo '</div>'; // end div.pa-dg.pa-with-fixed
-        }
-        echo "\n";
+        echo "</div></div>\n"; // end div.pa-filediff#F_... and div.pa-dg.pa-filediff-ctr
         if (!$only_content && $this->need_format) {
             echo "<script>\$pa.render_text_page()</script>\n";
             $this->need_format = false;
@@ -2998,6 +3003,7 @@ class PsetView {
             echo '"></div>';
         }
         echo '</div><div class="pa-dg">';
+        $this->_diff_printed = false;
     }
 
     /** @param int $flags */

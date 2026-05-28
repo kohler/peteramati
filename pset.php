@@ -617,9 +617,11 @@ class PsetRequest {
         // view options
         $fold_viewoptions = !isset($this->qreq->tab) && !isset($this->qreq->wdiff);
         $value .= '<div class="pa-viewoptions">'
-            . '<button type="button" class="q ui js-pset-viewoptions">'
-            . foldarrow(!$fold_viewoptions)
-            . 'options</button><span style="padding-left:1em"'
+            . '<button type="button" class="q ui js-pset-viewoptions" aria-controls="viewoptions" aria-expanded="'
+            . ($fold_viewoptions ? "false" : "true")
+            . '">'
+            . foldarrow(null)
+            . 'options</button><span id="viewoptions" style="padding-left:1em"'
             . ($fold_viewoptions ? ' hidden' : '') . '>tab width:';
         foreach ([2, 4, 8] as $i) {
             $value .= '&nbsp;<a href="' . Ht::escape_attr($this->conf->selfurl($this->qreq, ["tab" => $i], Conf::HOTURL_RAW)) . '"'

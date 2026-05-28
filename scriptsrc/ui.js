@@ -134,8 +134,6 @@ document.addEventListener("focusin", function (event) {
 });
 
 
-let pause_scroll_anchor = 0;
-
 export function fold61(sel, arrowholder, direction) {
     let hidden;
     if (direction == null) {
@@ -150,7 +148,7 @@ export function fold61(sel, arrowholder, direction) {
     // the viewport top the reflow happens in view and needs no correction.)
     // Callers folding many elements at once pass `noscroll` and apply a single
     // correction themselves, to avoid per-element layout thrash.
-    const r0 = pause_scroll_anchor > 0 ? null : sel.getBoundingClientRect();
+    const r0 = sel.getBoundingClientRect();
     sel.hidden = hidden;
     if (arrowholder) {
         const fa = arrowholder.querySelector("span.foldarrow");
@@ -166,47 +164,6 @@ export function fold61(sel, arrowholder, direction) {
         }
     }
     return false;
-}
-
-
-function find_scroll_anchor(elt, direction) {
-    const prop = direction > 0 ? "nextElementSibling" : "previousElementSibling";
-    while (elt && !elt[prop]) {
-        elt = elt.parentElement;
-    }
-    elt = elt && elt[prop];
-    while (elt && elt.getClientRects().length === 0) {
-        elt = elt[prop] || elt.parentElement;
-    }
-    return elt;
-}
-
-export function with_scroll_anchor(top, bottom, callback) {
-    // Anchor scroll position
-    ++pause_scroll_anchor;
-    const a0 = find_scroll_anchor(top, -1),
-        a0pos = a0 ? a0.getBoundingClientRect().bottom : 0,
-        a1 = find_scroll_anchor(bottom, 1),
-        a1pos = a1 ? a1.getBoundingClientRect().top : 0;
-
-    // Change DOM according to `callback`
-    let exc;
-    try {
-        callback();
-    } catch (e) {
-        exc = e;
-    }
-
-    // Recover scroll position
-    --pause_scroll_anchor;
-    if (a1 && a1pos <= document.documentElement.clientHeight) {
-        window.scrollBy(0, Math.round(a1.getBoundingClientRect().top) - Math.round(a1pos));
-    } else if (a0 && a0pos < 0) {
-        window.scrollBy(0, Math.min(0, Math.round(a0.getBoundingClientRect().bottom)));
-    }
-    if (exc) {
-        throw exc;
-    }
 }
 
 
