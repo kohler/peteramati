@@ -2995,18 +2995,6 @@ h3.gdialog-userids {
 .pa-filediff.need-load {
 	margin-bottom: 0;
 }
-@media screen and (min-width: 800px) {
-.pa-filediff {
-	 margin-left: 32px;
-}
-.pa-pv > .pa-filediff {
-	margin-left: 0;
-}
-.pa-gradebox {
-	position: relative;
-	left: -1rem;
-}
-}
 
 .pa-dl {
 	display: flex;
