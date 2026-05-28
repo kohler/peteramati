@@ -9,7 +9,10 @@ class Icons {
     static function svg_contents($name) {
         switch ($name) {
         case "download":
-            return '<path d="M14.7 3.5h3.6L18 17l5.5-6.5 3 3-10 9-10-9 3-3L15 17z" fill="currentColor"/><path d="M31 23.3c0 2.7-2 4.2-4 4.2H5c-2 0-4-1.5-4-4V18h2.5v5c0 1.5 1 2 2.5 2h20c1.5 0 2.5-.5 2.5-2v-5H31v5.3z" fill="currentColor"/>';
+            return '<path d="M29.4 10h7.2L36 40l11-13 6 6-20 18-20-18 6-6L30 40z" fill="currentColor"/><path d="M60.5 52.6c0 5.4-4 8.4-8 8.4H11.5c-4 0-8-3-8-8V42h5v10c0 3 2 4 5 4h37c3 0 5-1 5-4v-10H60.5v10.6z" fill="currentColor"/>';
+        case "plusminus":
+            // "+" cross over a "−" bar, centered (PLUS-MINUS SIGN)
+            return '<path d="M28.8 5h6.4v15.8h15.8v6.4h-15.8v15.8h-6.4v-15.8h-15.8v-6.4h15.8zM13 51h38v6.4h-38z" fill="currentColor"/>';
         case "markdown":
             return '<path d="M4 70V2h20l20 25L64 2h20v68H64V31L44 56 24 31v39zm125 0L99 37h20V2h20v35h20z" fill="currentColor"/>';
         case "hide-comments":
@@ -37,7 +40,11 @@ class Icons {
     }
     /** @return string */
     static function download() {
-        return '<svg width="1em" height="1em" style="vertical-align:-0.1em" viewBox="0 0 32 32"><use href="#i-def-download"/></svg>';
+        return '<svg class="licon" width="1em" height="1em" viewBox="0 0 64 64"><use href="#i-def-download"/></svg>';
+    }
+    /** @return string */
+    static function plusminus() {
+        return '<svg class="licon" width="1em" height="1em" viewBox="0 0 64 64"><use href="#i-def-plusminus"/></svg>';
     }
     /** @return string */
     static function markdown() {

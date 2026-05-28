@@ -2592,9 +2592,10 @@ class PsetView {
         }
         $bts = $icons = [];
         if (!$dinfo->file_inserted()) {
+            $icons[] = "plusminus";
             $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
                 . ($hide_left ? "" : " btn-primary")
-                . ' need-tooltip" aria-label="Diff view">±</button>';
+                . ' need-tooltip" aria-label="Diff view">' . Icons::plusminus() . '</button>';
         }
         if ($dinfo->markdown_allowed()) {
             $icons[] = "markdown";
