@@ -276,6 +276,91 @@ function uncapture() {
     $(document).off(".pa-linenote");
 }
 
+function line_at_viewport_fraction(frac, vh) {
+    const vw = window.innerWidth || document.documentElement.clientWidth,
+        y = Math.round(vh * frac);
+    for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const el = document.elementFromPoint(Math.round(vw * fx), y),
+            dl = el ? el.closest(".pa-dl") : null;
+        if (dl) {
+            const ln = new Linediff(dl);
+            if (ln.is_visible()) {
+                return ln;
+            }
+        }
+    }
+    return null;
+}
+
+function adjacent_visible_source(ln, backward) {
+    for (const lnx of Linediff.all(ln, backward ? Linediff.BACKWARD : 0)) {
+        if (lnx.element !== ln.element && lnx.is_visible() && lnx.is_source()) {
+            return lnx;
+        }
+    }
+    return null;
+}
+
+function make_live(ln) {
+    const cur = document.querySelector(".pa-dl.live");
+    if (cur && cur !== ln.element) {
+        removeClass(cur, "live");
+        cur.tabIndex = -1;
+    }
+    curline = ln;
+    curgrade = null;
+    addClass(ln.element, "live");
+    ln.element.tabIndex = 0;
+    ln.element.focus({preventScroll: true});
+}
+
+// Capture the current logical scroll position and return a closure that
+// restores it. Use around diff display toggles (markdown, hide-left, comments),
+// which show or hide lines and change line heights, making the viewport jump
+// when content above the fold changes size: call `active_scroll_anchor()`
+// before the toggle and invoke the returned closure afterward. The anchor is
+// the live line if one is on screen, otherwise the line about 15% down the
+// viewport. If the toggle hides the anchor line, the closure re-anchors to the
+// nearest following visible line — transferring liveness to it if the anchor
+// was live.
+export function active_scroll_anchor() {
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+
+    let anchor = null, anchor_is_live = false;
+    const liveel = document.querySelector(".pa-dl.live");
+    if (liveel) {
+        const r = liveel.getBoundingClientRect();
+        if (r.top < vh && r.bottom > 0) {
+            anchor = new Linediff(liveel);
+            anchor_is_live = true;
+        }
+    }
+    if (!anchor) {
+        anchor = line_at_viewport_fraction(0.15, vh);
+    }
+    const anchor_top = anchor ? anchor.element.getBoundingClientRect().top : 0;
+
+    return function () {
+        if (!anchor) {
+            return;
+        }
+        let target = anchor;
+        if (!anchor.is_visible()) {
+            const next = adjacent_visible_source(anchor, false);
+            if (next) {
+                target = next;
+                anchor_is_live && make_live(next);
+            } else {
+                target = adjacent_visible_source(anchor, true);
+            }
+        }
+        if (target && target.is_visible()) {
+            const delta = Math.round(target.element.getBoundingClientRect().top - anchor_top);
+            delta && window.scrollBy(0, delta);
+        }
+    };
+}
+
 function unedit(note) {
     const done = note.render(true),
         ctr = curline && curline.visible_source();

@@ -7,6 +7,7 @@ import { hasClass, addClass, removeClass, toggleClass, fold61, handle_ui, $e, wi
 import { dropmenu } from "./dropmenu.js";
 import { hoturl } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
+import { active_scroll_anchor } from "./note-edit.js";
 
 
 const BACKWARD = 1;
@@ -514,14 +515,18 @@ handle_ui.on("pa-diff-unfold", function (evt) {
 
 handle_ui.on("pa-diff-toggle-hide-left", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-hide-left") : $(this),
-        show = hasClass(Filediff.referenced(this).element, "pa-hide-left");
+        show = hasClass(Filediff.referenced(this).element, "pa-hide-left"),
+        restore = active_scroll_anchor();
     $es.each(function () { Filediff.referenced(this).toggle_show_left(show); });
+    restore();
 });
 
 handle_ui.on("pa-diff-toggle-hide-comments", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-hide-comments") : $(this),
-        show = hasClass(Filediff.referenced(this).element, "pa-hide-comments");
+        show = hasClass(Filediff.referenced(this).element, "pa-hide-comments"),
+        restore = active_scroll_anchor();
     $es.each(function () { Filediff.referenced(this).toggle_show_comments(show); });
+    restore();
 });
 
 handle_ui.on("pa-filenav", function () {

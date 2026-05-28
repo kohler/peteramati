@@ -3,6 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { Filediff } from "./diff.js";
+import { active_scroll_anchor } from "./note-edit.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
 import { hoturl } from "./hoturl.js";
 import { markdownit_minihtml } from "./markdown-minihtml.js";
@@ -600,7 +601,8 @@ Filediff.add_decorator(function (fd) {
 handle_ui.on("pa-diff-toggle-markdown", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-toggle-markdown") : $(this),
         fd = Filediff.referenced(this),
-        show = !hasClass(fd.element, "pa-markdown");
+        show = !hasClass(fd.element, "pa-markdown"),
+        restore = active_scroll_anchor();
     $es.each(function () {
         const fd = Filediff.referenced(this),
             shown = hasClass(fd.element, "pa-markdown");
@@ -611,6 +613,7 @@ handle_ui.on("pa-diff-toggle-markdown", function (evt) {
         }
         toggleClass(this, "btn-primary", show);
     });
+    restore();
     if (!evt.metaKey) {
         $.post(hoturl("=api/diffconfig", {psetinfo: fd.element}),
             {file: fd.file, markdown: show ? 1 : 0});
