@@ -3,9 +3,18 @@
 /* Peteramati and HotCRP are Copyright (c) 2006-2019 Eddie Kohler and Regents of the UC */
 /* See LICENSE for open-source distribution terms */
 
+@layer theme;
+
+@layer theme {
+:root {
+	--pa-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+}
+
 /* generic styles */
-html {
+:root {
 	box-sizing: border-box;
+
 }
 *, *:before, *:after {
 	box-sizing: inherit;
@@ -100,7 +109,7 @@ html, .text-default {
 	font-family: serif;
 }
 code, kbd, pre, samp, .text-monospace {
-	font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-family: var(--pa-mono);
 	font-size: 90%;
 }
 select, button {
@@ -156,8 +165,9 @@ h3 {
 .hdr-actions {
 	display: inline-block;
 	margin-left: 1.5rem;
-	font-size: 1rem;
+	font-size: 0.75rem;
 	font-weight: normal;
+	align-self: center;
 }
 
 /* Tab bar */
@@ -938,7 +948,7 @@ a.closebtn {
 	opacity: 0.6;
 }
 button, .btn {
-	padding: 2px 7px 3px;
+	padding: 0.125em 0.4375em 0.125em;
 	margin: 0;
 }
 select, button, .btn, button.btn-t:hover {
@@ -957,7 +967,7 @@ button.btn-t {
 	border-style: solid;
 	border-color: rgba(181, 181, 181, 0);
 	background: none;
-	padding: 2px 2px 3px;
+	padding: 0.125em;
 }
 .btnbox > .btn-t, .tabbox > .btn-t {
 	border-width: 1px;
@@ -1603,7 +1613,7 @@ span.textlite {
 	background: #fcfcfc;
 }
 input.textlite-tt, textarea.tt {
-	font-family: monospace;
+	font-family: var(--pa-mono);
 }
 .papertext {
 	width: 96%;
@@ -2561,7 +2571,7 @@ td.mhcb {
 }
 .mhdp {
 	font-size: smaller;
-	font-family: monospace;
+	font-family: var(--pa-mono);
 }
 .mhpad {
 	padding: 4px;
@@ -2969,6 +2979,8 @@ h3.gdialog-userids {
 	padding-left: 24px;
 	padding-right: 24px;
 	margin: 0 0 0.5rem -24px;
+	font-family: var(--pa-mono);
+	font-size: 100%;
 }
 @media print {
 .pa-fileref {
@@ -3263,7 +3275,7 @@ h3.gdialog-userids {
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
-	font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-family: var(--pa-mono);
 	line-height: 1.65;
 	font-size: 87.5%;
 }
@@ -3276,7 +3288,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	white-space: pre-wrap;
 }
 .format2 {
-	font-family: Menlo, "Liberation Mono", Consolas, Courier, monospace;
+	font-family: var(--pa-mono);
 	line-height: 1.5;
 	white-space: pre-wrap;
 }

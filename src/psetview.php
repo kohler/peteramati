@@ -2705,6 +2705,7 @@ class PsetView {
         }
 
         if (!$no_heading) {
+            $bts = $this->_diff_buttons($dinfo, $hide_left);
             echo '<div class="pa-dg pa-with-fixed">',
                 // NB Javascript depend on `h3` followed by `span`s and then `a`
                 '<h3 class="pa-fileref">';
