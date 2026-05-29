@@ -336,37 +336,9 @@ export class Linediff {
             psetinfo: this.element, file: this.file, fromline: b0
         };
         m[3] !== "" && (args.linecount = +m[3]);
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
             $.ajax(hoturl("api/blob", args), {
-                success: function (data) {
-                    if (data.ok && data.data) {
-                        const str = data.data, len = str.length;
-                        let pos = 0, ins = e, line = 0;
-                        while (pos !== len) {
-                            const nl = str.indexOf("\n", pos),
-                                npos = nl < 0 ? len : nl + 1;
-                            ins.after($e("div", "pa-dl pa-gc",
-                                $e("div", {class: "pa-da", "data-landmark": a0 + line}),
-                                $e("div", {class: "pa-db", "data-landmark": b0 + line}),
-                                $e("div", "pa-dd", str.substring(pos, npos))));
-                            ins = ins.nextElementSibling;
-                            ++line;
-                            pos = npos;
-                        }
-                        ins = e.nextSibling;
-                        e.remove();
-                        const fd = Filediff.closest(ins);
-                        if (hasClass(fd.element, "pa-markdown")) {
-                            const restore = active_scroll_anchor();
-                            fd.unmarkdown();
-                            fd.markdown();
-                            restore();
-                        } else if (hasClass(fd.element, "pa-highlight")) {
-                            fd.highlight();
-                        }
-                        resolve(new Linediff(ins));
-                    }
-                }
+                success: data => expand_context_at(e, data, a0, b0, resolve, reject)
             });
         });
     }
@@ -509,6 +481,44 @@ export class Linediff {
     }
 }
 
+function expand_context_at(e, data, a0, b0, resolve, reject) {
+    if (!data.ok || !data.data) {
+        reject(null);
+        return;
+    }
+    const str = data.data, len = str.length,
+        widthcode = +e.parentElement.getAttribute("data-pa-widthcode");
+    let pos = 0, ins = e, line = 0;
+    while (pos !== len) {
+        const nl = str.indexOf("\n", pos),
+            npos = nl < 0 ? len : nl + 1;
+        ins.after($e("div", "pa-dl pa-gc",
+            $e("div", {class: "pa-da", "data-landmark": a0 + line}),
+            $e("div", {class: "pa-db", "data-landmark": b0 + line}),
+            $e("div", "pa-dd", str.substring(pos, npos))));
+        ins = ins.nextElementSibling;
+        if (widthcode) {
+            const bc = widthcode % 10, ac = widthcode - bc;
+            ac === 30 || addClass(ins.firstChild, "pa-dw" + (ac / 10));
+            bc === 3 || addClass(ins.firstChild.nextSibling, "pa-dw" + bc);
+            addClass(ins.lastChild, "pa-dw" + widthcode);
+        }
+        ++line;
+        pos = npos;
+    }
+    ins = e.nextSibling;
+    e.remove();
+    const fd = Filediff.closest(ins);
+    if (hasClass(fd.element, "pa-markdown")) {
+        const restore = active_scroll_anchor();
+        fd.unmarkdown();
+        fd.markdown();
+        restore();
+    } else if (hasClass(fd.element, "pa-highlight")) {
+        fd.highlight();
+    }
+    resolve(new Linediff(ins));
+}
 
 handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),

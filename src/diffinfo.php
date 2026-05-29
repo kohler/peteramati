@@ -168,22 +168,22 @@ final class DiffInfo implements Iterator {
             $this->_flags |= DiffConfig::F_COLLAPSE;
         }
         if ($this->_max_lineno >= 10000) {
-            $this->_widthcode = 0x55;
+            $this->_widthcode = 55;
         } else if ($this->_max_lineno >= 1000) {
-            $this->_widthcode = 0x44;
+            $this->_widthcode = 44;
         } else {
-            $this->_widthcode = 0x33;
+            $this->_widthcode = 33;
         }
         if (($this->_flags & DiffConfig::F_BINARY) !== 0
             ? str_contains($this->_diff[3], " and /dev/null differ")
             : $n >= 4 && $this->_diff[$n - 2] === 0) {
             $this->_flags |= DiffConfig::F_FILE_DELETED;
-            $this->_widthcode &= 0xF0;
+            $this->_widthcode -= $this->_widthcode % 10;
         } else if (($this->_flags & DiffConfig::F_BINARY) !== 0
                    ? str_contains($this->_diff[3], "/dev/null and ")
                    : $n >= 4 && $this->_diff[$n - 3] === 0) {
             $this->_flags |= DiffConfig::F_FILE_INSERTED;
-            $this->_widthcode &= 0x0F;
+            $this->_widthcode %= 10;
         }
         // add `@@` context line at end of diff to allow expanding file
         if ($n >= 16

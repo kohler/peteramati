@@ -2778,6 +2778,9 @@ class PsetView {
                 }
             }
         }
+        if (($widthcode = $dinfo->widthcode()) !== 33) {
+            echo ' data-pa-widthcode="', $widthcode, '"';
+        }
         echo '>'; // end div#F_...
         if ($has_grade_range) {
             echo '<div class="pa-dg pa-with-sidebar"><div class="pa-sidebar">',
@@ -2887,18 +2890,20 @@ class PsetView {
         if ($x[0]) {
             echo '<div class="pa-dl', $x[0], '">';
             $wc = $dinfo->widthcode();
-            if ($wc === 0x33) {
+            if ($wc === 33) {
                 echo '<div class="pa-da"', $ak, '></div>',
                     '<div class="pa-db"', $bk, '></div>',
                     '<div class="', $x[1];
             } else {
+                $bc = $wc % 10;
+                $ac = $wc - $bc;
                 echo '<div class="pa-da',
-                    (($wc & 0xF0) === 0x30 ? "" : " pa-dw" . ($wc >> 4)),
+                    ($ac === 30 ? "" : " pa-dw" . ($ac / 10)),
                     '"', $ak, '></div>',
                     '<div class="pa-db',
-                    (($wc & 0xF) === 0x3 ? "" : " pa-dw" . ($wc & 0xF)),
+                    ($bc === 3 ? "" : " pa-dw" . $bc),
                     '"', $bk, '></div>',
-                    '<div class="', $x[1], " pa-ddw", ($wc >> 4), ($wc & 0xF);
+                    '<div class="', $x[1], " pa-dw", $wc;
             }
             $nonl = ($l[4] ?? 0) & DiffConfig::LINE_NONL;
             echo ($nonl ? ' pa-dnonl">' : '">'),

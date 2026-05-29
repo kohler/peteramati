@@ -276,7 +276,9 @@ Filediff.define_method("markdown", function () {
         return;
     }
     const hidelm = hasClass(elt, "pa-hide-landmarks"),
-        drclass = hidelm ? "pa-dr pa-dhlm" : "pa-dr";
+        widthcode = +elt.getAttribute("data-pa-widthcode"),
+        drclass = (hidelm ? "pa-dx pa-dhlm pa-dr" : "pa-dx pa-dr") +
+            (widthcode ? ` pa-dw${widthcode}` : "");
     // collect content
     let e = elt.firstChild, l = [], lineno = 1;
     while (e) {
