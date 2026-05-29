@@ -513,10 +513,15 @@ export class Linediff {
 handle_ui.on("pa-diff-unfold", function (evt) {
     const $es = evt.metaKey ? $(".pa-diff-unfold") : $(this),
         fd = Filediff.by_hash(this.hash),
-        show = fd.element.hidden;
+        show = fd.element.hidden,
+        atop = this.parentElement.getBoundingClientRect().top;
     $es.each(function () {
         Filediff.by_hash(this.hash).load().then(fd => fd.toggle(show));
     });
+    if (atop !== null) {
+        const delta = Math.round(this.parentElement.getBoundingClientRect().top - atop);
+        delta && window.scrollBy(0, delta);
+    }
     if (!evt.metaKey) {
         $.post(hoturl("=api/diffconfig", {psetinfo: fd.element, file: fd.file, collapse: show ? 0 : 1}));
     }

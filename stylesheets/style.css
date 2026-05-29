@@ -2982,6 +2982,8 @@ h3.gdialog-userids {
 	font-family: var(--pa-mono);
 	font-size: 100%;
 	margin-bottom: 0;
+	border: 1px solid transparent;
+	padding-left: 0.35em;
 }
 @media print {
 .pa-fileref {
@@ -2993,7 +2995,6 @@ h3.gdialog-userids {
 	border: 1px solid var(--pa-diff-border);
 	border-top-left-radius: 4px;
 	border-top-right-radius: 4px;
-	padding: 0.35em;
 }
 .hdr-actions {
 	display: none;
@@ -3204,9 +3205,6 @@ h3.gdialog-userids {
 	display: block;
 	padding-right: 0.8rem;
 	font-size: 90%;
-}
-.pa-sidebar > .pa-gradebox:first-child {
-	margin-top: 2.125rem;
 }
 @media screen and (max-width: 1024px), print {
 .pa-sidebar {
@@ -3468,7 +3466,8 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	padding-bottom: 0;
 	max-height: 25vh;
 	overflow: auto;
-	background: #f8f8f8;
+	border: 0;
+	background: none;
 }
 .pa-filenav-list {
 	margin-top: 0.65rem;
@@ -3557,7 +3556,6 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	color: white;
 }
 .pa-runner, .pa-runconfig {
-	font-size: 9pt;
 	font-weight: 500;
 }
 .pa-run {

@@ -203,20 +203,13 @@ function arrowcapture_page(evt, key) {
     }
     const wf = start.closest(".pa-filediff-ctr"),
         marginTop = wf && wf.firstChild.nodeName === "H3" ? wf.firstChild.offsetHeight : 0,
-        page = vheight - marginTop,
-        want = curscroll + (down ? page : -page),
-        pos = Math.max(0, Math.min(want, maxscroll)),
-        atbound = pos !== want;
-    if (win) {
-        window.scrollTo(window.scrollX, pos);
-    } else {
-        x.scrollTop = pos;
-    }
-    // highlight the navigable line now at the cursor's old screen position, so
-    // paging advances by exactly one screenful of lines with no gaps. If the
-    // scroll clamped at an edge, advance all the way to the extreme line.
+        goal = (vheight - marginTop) * (down ? 1 : -1); // screen distance to advance
+    // Find the navigable line about one screenful away, measuring each line's
+    // screen offset from the cursor. Picking the line first (rather than
+    // scrolling a fixed amount and snapping) keeps the highlight from drifting:
+    // we scroll by exactly the offset to that line, so it lands back on `anchor`.
     const flags = Linediff.ANYFILE + Linediff.GRADES + (down ? 0 : Linediff.BACKWARD);
-    let target = null, bestdist = Infinity;
+    let target = null, targetdelta = 0, bestdist = Infinity;
     for (let lnx of Linediff.all(start, flags)) {
         let el;
         if (lnx.nodeName !== "PA-LINEDIFF") {
@@ -226,22 +219,27 @@ function arrowcapture_page(evt, key) {
         } else {
             continue;
         }
-        if (atbound) {
-            target = lnx; // keep going; end up at the last navigable line
-            continue;
-        }
         const r = el.getBoundingClientRect(),
-            dist = Math.abs(r.top + r.height / 2 - anchor);
+            delta = r.top + r.height / 2 - anchor,
+            dist = Math.abs(delta - goal);
         if (dist <= bestdist) {
             bestdist = dist;
             target = lnx;
+            targetdelta = delta;
         } else {
-            break; // matched the old screen position; candidates only get farther
+            break; // |delta - goal| only grows from here
         }
     }
-    if (target) {
-        arrowcapture_setfocus(target);
+    if (!target) {
+        return; // already at the first/last navigable line
     }
+    const pos = Math.max(0, Math.min(curscroll + targetdelta, maxscroll));
+    if (win) {
+        window.scrollTo(window.scrollX, pos);
+    } else {
+        x.scrollTop = pos;
+    }
+    arrowcapture_setfocus(target);
 }
 
 function arrowcapture_enter(evt) {
