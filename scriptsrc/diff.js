@@ -593,14 +593,18 @@ document.addEventListener("toggle", function (evt) {
     if (!fds.length) {
         return;
     }
-    const restore = active_scroll_anchor();
+    const restore = active_scroll_anchor(), updates = [];
     for (const fd of fds) {
         if (open && hasClass(fd.element, "need-load")) {
             fd.load().then(() => { fd.toggle(true); });
         } else {
             fd.toggle(open);
         }
+        updates.push({file: fd.file, collapse: !open});
     }
+    $.ajax(hoturl("=api/diffconfig", {psetinfo: fds[0].element}), {
+        type: "POST", cache: false, data: {json: JSON.stringify(updates)}
+    });
     restore();
 }, true);
 

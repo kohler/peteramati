@@ -117,8 +117,52 @@ class Repo_API {
         }
         if (empty($vbr) && !$user->isPC) {
             return ["ok" => false, "error" => "Permission denied"];
-        } else {
-            return ["ok" => true, "branches" => $vbr];
+        }
+        return ["ok" => true, "branches" => $vbr];
+    }
+
+    static private function diffconfig_file(&$diffs, $pset, $obj, $need_file) {
+        $file = $obj->file ?? null;
+        if ($file === null ? $need_file : !is_string($file)) {
+            throw new Error("Bad `file`");
+        }
+        $file = str_replace("\\*", ".*", preg_quote($file));
+        $baseline = $pset->baseline_diffconfig($file);
+        $is_qreq = $obj instanceof Qrequest;
+        $dx = [];
+        if ($is_qreq ? isset($obj->markdown) : property_exists($obj, "markdown")) {
+            if (($obj->markdown ?? "") === "") {
+                $dx["markdown"] = null;
+            } else if (($b = friendly_boolean($obj->markdown)) !== null) {
+                $dx["markdown"] = $b === $baseline->markdown() ? null : $b;
+            } else {
+                throw new Error("Bad `markdown`");
+            }
+        }
+        if ($is_qreq ? isset($obj->collapse) : property_exists($obj, "collapse")) {
+            if (($obj->collapse ?? "") === "") {
+                $dx["collapse"] = null;
+            } else if (($b = friendly_boolean($obj->collapse)) !== null) {
+                $dx["collapse"] = $b === $baseline->collapse() ? null : $b;
+            } else {
+                throw new Error("Bad `collapse`");
+            }
+        }
+        if ($is_qreq ? isset($qreq->tabwidth) : property_exists($obj, "tabwidth")) {
+            if (($obj->tabwidth ?? "") === "") {
+                $dx["tabwidth"] = null;
+            } else if (($tw = cvtint($qreq->tabwidth)) >= 0 && $tw < 16) {
+                if ($tw === 0 || $tw === ($baseline->tabwidth ?? 4)) {
+                    $dx["tabwidth"] = null;
+                } else {
+                    $dx["tabwidth"] = $tw;
+                }
+            } else {
+                throw new Error("Bad `tabwidth`");
+            }
+        }
+        if (!empty($dx)) {
+            $diffs[$file] = $dx;
         }
     }
 
@@ -132,44 +176,34 @@ class Repo_API {
             return $err;
         }
         if ($qreq->is_post()) {
-            $file = str_replace("\\*", ".*", $qreq->file ?? "*");
-            $baseline = $api->pset->baseline_diffconfig($file);
-            $diff = [];
-            if (isset($qreq->markdown)) {
-                if ($qreq->markdown === "") {
-                    $diff["markdown"] = null;
-                } else if (($b = friendly_boolean($qreq->markdown)) !== null) {
-                    $diff["markdown"] = $b;
+            $diffs = [];
+            try {
+                if (isset($qreq->json)) {
+                    $js = json_decode($qreq->json);
+                    if (!is_array($js)) {
+                        throw new Error("Bad `json`");
+                    }
+                    foreach ($js as $jx) {
+                        if (!is_object($jx)) {
+                            throw new Error("Bad `json`");
+                        }
+                        self::diffconfig_file($diffs, $api->pset, $jx, true);
+                    }
                 } else {
-                    return ["ok" => false, "error" => "Bad `markdown`."];
+                    self::diffconfig_file($diffs, $api->pset, $qreq, false);
                 }
+            } catch (Error $err) {
+                return ["ok" => false, "error" => $err->getMessage()];
             }
-            if (isset($qreq->collapse)) {
-                if ($qreq->collapse === "") {
-                    $diff["collapse"] = null;
-                } else if (($b = friendly_boolean($qreq->collapse)) !== null) {
-                    $diff["collapse"] = $b;
-                } else {
-                    return ["ok" => false, "error" => "Bad `collapse`."];
-                }
-            }
-            if (isset($qreq->tabwidth)) {
-                if ($qreq->tabwidth === "" || $qreq->tabwidth === "0") {
-                    $diff["tabwidth"] = null;
-                } else if (($i = cvtint($qreq->tabwidth)) > 0 && $i < 16) {
-                    $diff["tabwidth"] = $i;
-                } else {
-                    return ["ok" => false, "error" => "Bad `tabwidth`."];
-                }
-            }
-            if (!empty($diff)) {
+            if (!empty($diffs)) {
                 $gr = $info->grading_commit();
                 if (!$gr || $gr->commitat === $api->commit->commitat) {
-                    $info->update_repository_notes(["diffs" => [$file => $diff]]);
-                    $info->update_commit_notes(["diffs" => [$file => array_fill_keys(array_keys($diff), null)]]);
-                } else {
-                    $info->update_commit_notes(["diffs" => [$file => $diff]]);
+                    $info->update_repository_notes(["diffs" => $diffs]);
+                    $diffs = array_map(function ($dx) {
+                        return array_fill_keys(array_keys($dx), null);
+                    }, $diffs);
                 }
+                $info->update_commit_notes(["diffs" => $diffs]);
             }
         }
         return ["ok" => true];

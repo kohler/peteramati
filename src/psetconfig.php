@@ -1851,6 +1851,16 @@ final class DiffConfig {
         }
     }
 
+    /** @return bool */
+    function markdown() {
+        return ($this->flags & self::F_MARKDOWN) !== 0;
+    }
+
+    /** @return bool */
+    function collapse() {
+        return ($this->flags & self::F_COLLAPSE) !== 0;
+    }
+
     /** @return ?bool */
     function collapse_default() {
         if (($this->known_flags & self::F_COLLAPSE_DEFAULT) === 0) {
