@@ -7,7 +7,7 @@
 
 @layer theme {
 :root {
-	--pa-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	--pa-mono-ff: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	--pa-diff-border: #e0e0f0;
 	--pa-diff-header-bg: #e8e8f8;
 }
@@ -111,7 +111,7 @@ html, .text-default {
 	font-family: serif;
 }
 code, kbd, pre, samp, .text-monospace {
-	font-family: var(--pa-mono);
+	font-family: var(--pa-mono-ff, monospace);
 	font-size: 90%;
 }
 select, button {
@@ -1608,7 +1608,7 @@ span.textlite {
 	background: #fcfcfc;
 }
 input.textlite-tt, textarea.tt {
-	font-family: var(--pa-mono);
+	font-family: var(--pa-mono-ff, monospace);
 }
 .papertext {
 	width: 96%;
@@ -2566,7 +2566,7 @@ td.mhcb {
 }
 .mhdp {
 	font-size: smaller;
-	font-family: var(--pa-mono);
+	font-family: var(--pa-mono-ff, monospace);
 }
 .mhpad {
 	padding: 4px;
@@ -2979,7 +2979,7 @@ h3.gdialog-userids {
 	margin-top: 0;
 }
 .pa-fileref {
-	font-family: var(--pa-mono);
+	font-family: var(--pa-mono-ff, monospace);
 	font-size: 100%;
 	margin-bottom: 0;
 	border: 1px solid transparent;
@@ -3037,17 +3037,19 @@ h3.gdialog-userids {
 .pa-da::before, .pa-db::before {
 	content: attr(data-landmark);
 }
-.pa-dd, .pa-dx, .pa-dcx {
-	padding-left: 0.65em;
-}
 .pa-dd, .pa-dx {
 	flex: 1 1 auto;
 	max-width: calc(100% - 6em);
-	white-space: pre-wrap;
 	overflow-wrap: break-word;
 	border-left: 1px solid var(--pa-diff-border);
 }
-.pa-dd.pa-dhlm, .pa-dx.pa-dhlm {
+.pa-dd, .pa-dx, .pa-dcx {
+	padding-left: 0.65em;
+}
+.pa-dd {
+	white-space: pre-wrap;
+}
+.pa-dhlm {
 	border-left: 0 none;
 }
 .pa-dw0 {
@@ -3116,7 +3118,13 @@ h3.gdialog-userids {
 }
 
 .pa-dr {
+	font-family: var(--pa-markdown-ff, serif);
+	font-size: var(--pa-markdown-fs, 100%);
 	overflow-wrap: break-word;
+}
+.pa-dx.pa-dr {
+	font-family: var(--pa-markdown-diff-ff, var(--pa-markdown-ff, serif));
+	font-size: var(--pa-markdown-diff-fs, var(--pa-markdown-fs, 100%));
 }
 .pa-dr h1, .pa-dr h2, .pa-dr h3, .pa-dr h4, .pa-dr h5, .pa-dr h6 {
 	display: block;
@@ -3286,12 +3294,13 @@ h3.gdialog-userids {
 }
 code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-noteref, .pa-gradeboxref, .pa-warnbox {
-	font-family: var(--pa-mono);
+	font-family: var(--pa-mono-ff, monospace);
 	line-height: 1.65;
 	font-size: 87.5%;
 }
 .pa-note {
-	font-family: Charter, Georgia, serif;
+	font-family: var(--pa-note-ff, var(--pa-markdown-ff, serif));
+	font-size: var(--pa-note-fs, var(--pa-markdown-fs, 100%));
 	font-variant-numeric: lining-nums;
 	line-height: 1.35;
 }
@@ -3299,7 +3308,7 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 	white-space: pre-wrap;
 }
 .format2 {
-	font-family: var(--pa-mono);
+	font-family: var(--pa-mono-ff, monospace);
 	line-height: 1.5;
 	white-space: pre-wrap;
 }
