@@ -989,7 +989,7 @@ class PsetRequest {
                 if ($this->info->can_edit_scores() && !$this->pset->has_grade_landmark_range) {
                     $sbflags |= PsetView::SIDEBAR_GRADELIST | PsetView::SIDEBAR_GRADELIST_LINKS;
                 }
-                if (count($diff) > 2) {
+                if (count($diff) > 1) {
                     $sbflags |= PsetView::SIDEBAR_FILENAV;
                 }
                 $this->info->print_sidebar_open($sbflags, $diff);

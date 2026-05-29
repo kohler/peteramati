@@ -150,7 +150,7 @@ class DiffMany_Page {
                     $sbflags |= PsetView::SIDEBAR_GRADELIST | PsetView::SIDEBAR_GRADELIST_LINKS;
                     $want_grades = true;
                 }
-                if (count($diff) > 2) {
+                if (count($diff) > 1) {
                     $sbflags |= PsetView::SIDEBAR_FILENAV;
                 }
                 $info->print_sidebar_open($sbflags, $diff);
