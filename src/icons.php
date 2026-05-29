@@ -52,7 +52,7 @@ class Icons {
     }
     /** @return string */
     static function hide_comments() {
-        return '<svg width="1em" height="1em" style="vertical-align:-0.2em" viewBox="0 0 480 480"><use href="#i-def-hide-comments"/></svg>';
+        return '<svg width="1em" height="1em" style="vertical-align:-0.15em" viewBox="0 0 480 480"><use href="#i-def-hide-comments"/></svg>';
     }
     /** @return string */
     static function ui_copy() {

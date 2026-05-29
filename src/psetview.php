@@ -2708,11 +2708,13 @@ class PsetView {
         }
         $bts = $no_heading ? [] : $this->_diff_buttons($dinfo, $hide_left);
 
-        echo '<div class="pa-dg pa-filediff-ctr',
-            $expand ? " pa-filediff-open" : "",
-            $this->_diff_printed ? "" : " pa-filediff-first",
-            '">';
-        $this->_diff_printed = true;
+        if (!$only_content) {
+            echo '<div class="pa-dg pa-filediff-ctr',
+                $expand ? " pa-filediff-open" : "",
+                $this->_diff_printed ? "" : " pa-filediff-first",
+                '">';
+            $this->_diff_printed = true;
+        }
 
         if (!$no_heading) {
             // NB Javascript depend on `h3` followed by `span`s and then `a`
@@ -2791,13 +2793,16 @@ class PsetView {
         if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
             echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $dinfo->repo_filename()])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
         }
-        echo "</div></div>\n"; // end div.pa-filediff#F_... and div.pa-dg.pa-filediff-ctr
-        if (!$only_content && $this->need_format) {
-            echo "<script>\$pa.render_text_page()</script>\n";
-            $this->need_format = false;
-        }
-        if (!$only_content && ($dinfo->highlight() || ($hide_left && $dinfo->markdown()))) {
-            echo "<script>\$pa.decorate_diff_page()</script>\n";
+        echo "</div>"; // end div.pa-filediff#F_...
+        if (!$only_content) {
+            echo "</div>\n"; // end div.pa-dg.pa-filediff-ctr
+            if ($this->need_format) {
+                echo "<script>\$pa.render_text_page()</script>\n";
+                $this->need_format = false;
+            }
+            if ($dinfo->highlight() || ($hide_left && $dinfo->markdown())) {
+                echo "<script>\$pa.decorate_diff_page()</script>\n";
+            }
         }
     }
 
