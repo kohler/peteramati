@@ -13,7 +13,12 @@ import { ftext, render_onto } from "./render.js";
 import { tooltip } from "./tooltip.js";
 
 
-let curline, curgrade, down_event, scrolled_x, scrolled_y, scrolled_at;
+let curline, curgrade, down_event, capture_scroll_at;
+
+// A `scroll` event within this many ms of one of our own programmatic scrolls
+// (or of opening capture) is treated as ours — or as follow-on reflow from an
+// animation/height change — rather than a deliberate user scroll.
+const CAPTURE_SCROLL_GRACE = 300;
 
 function locate(e) {
     while (e && e.tagName !== "TEXTAREA" && e.tagName !== "A") {
@@ -79,22 +84,12 @@ function render_form($tr, note, transition) {
     }
 }
 
-function set_scrolled_at(evt) {
-    if (evt && evt.screenX != null) {
-        scrolled_at = evt.timeStamp;
-        scrolled_x = evt.screenX;
-        scrolled_y = evt.screenY;
-    }
-}
-
 function arrowcapture(evt) {
-    if ((evt.type === "mousemove"
-         && scrolled_at
-         && (evt.timeStamp - scrolled_at <= 500
-             || (Math.abs(evt.screenX - scrolled_x) <= 1
-                 && Math.abs(evt.screenY - scrolled_y) <= 1)))
-        || ((evt.type === "keydown" || evt.type === "keyup")
-            && event_key.is_modifier(evt))) {
+    if ((evt.type === "keydown"
+         && event_key.is_modifier(evt))
+        || (evt.type === "scroll"
+            && capture_scroll_at
+            && performance.now() - capture_scroll_at <= CAPTURE_SCROLL_GRACE)) {
         return;
     }
 
@@ -114,16 +109,25 @@ function arrowcapture(evt) {
 }
 
 function arrowcapture_setfocus(what) {
+    if (what.nodeName === "DIV"
+        && hasClass(what, "pa-dl")) {
+        what = Linediff.closest(what);
+    }
+    if (what.nodeName === "PA-LINEDIFF"
+        && curline
+        && curline.element === what.element) {
+        return;
+    }
     const ln = curline && curline.visible_source();
     if (ln) {
-        removeClass(ln.element, "live");
+        removeClass(ln.element, "pa-dllive");
         ln.element.tabIndex = -1;
     }
     if (what.nodeName === "PA-LINEDIFF") {
         curline = what;
         curgrade = null;
         what = what.element;
-        addClass(what, "live");
+        addClass(what, "pa-dllive");
         what.tabIndex = 0;
     } else {
         curline = null;
@@ -138,6 +142,7 @@ function arrowcapture_focusat(what, evt) {
     what = arrowcapture_setfocus(what);
     const wf = what.closest(".pa-filediff-ctr"),
         marginTop = wf && wf.firstChild.nodeName === "H3" ? wf.firstChild.offsetHeight : 0;
+    capture_scroll_at = performance.now();
     $(what).scrollIntoView({marginTop: marginTop, atCenter: true});
     evt.preventDefault();
 }
@@ -239,6 +244,7 @@ function arrowcapture_page(evt, key) {
     } else {
         x.scrollTop = pos;
     }
+    capture_scroll_at = performance.now();
     arrowcapture_setfocus(target);
 }
 
@@ -251,41 +257,41 @@ function arrowcapture_enter(evt) {
     curline = ln;
     curgrade = null;
     evt.preventDefault();
-    set_scrolled_at(evt);
+    capture_scroll_at = performance.now();
     make_linenote();
 }
 
 function capture(tr, keydown) {
     if (!hasClass(tr, "pa-gw")) {
-        addClass(tr, "live");
+        addClass(tr, "pa-dllive");
         tr.tabIndex = 0;
         tr.focus();
     }
     $(".pa-filediff").removeClass("live");
+    capture_scroll_at = performance.now();
     $(document).off(".pa-linenote");
-    $(document).on((keydown ? "keydown.pa-linenote " : "") + "mousemove.pa-linenote mousedown.pa-linenote", arrowcapture);
+    $(window).off(".pa-linenote");
+    $(document).on((keydown ? "keydown.pa-linenote " : "") + "mousedown.pa-linenote", arrowcapture);
+    $(window).on("scroll.pa-linenote", arrowcapture);
 }
 
 function uncapture() {
-    for (const tr of document.querySelectorAll(".pa-dl.live")) {
-        removeClass(tr, "live");
+    for (const tr of document.querySelectorAll(".pa-dllive")) {
+        removeClass(tr, "pa-dllive");
         tr.tabIndex = -1;
     }
     $(".pa-filediff").addClass("live");
     $(document).off(".pa-linenote");
+    $(window).off(".pa-linenote");
 }
 
 function line_at_viewport_fraction(frac, vh) {
     const vw = window.innerWidth || document.documentElement.clientWidth,
         y = Math.round(vh * frac);
     for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
-        const el = document.elementFromPoint(Math.round(vw * fx), y),
-            dl = el ? el.closest(".pa-dl") : null;
-        if (dl) {
-            const ln = new Linediff(dl);
-            if (ln.is_visible()) {
-                return ln;
-            }
+        const el = document.elementFromPoint(Math.round(vw * fx), y);
+        if (el && el.closest(".pa-filediff-ctr")) {
+            return el.closest(".pa-dl") || el;
         }
     }
     return null;
@@ -293,71 +299,79 @@ function line_at_viewport_fraction(frac, vh) {
 
 function adjacent_visible_source(ln, backward) {
     for (const lnx of Linediff.all(ln, backward ? Linediff.BACKWARD : 0)) {
-        if (lnx.element !== ln.element && lnx.is_visible() && lnx.is_source()) {
-            return lnx;
+        if (lnx.element !== ln && lnx.is_visible() && lnx.is_source()) {
+            return lnx.element;
         }
     }
     return null;
 }
 
-function make_live(ln) {
-    const cur = document.querySelector(".pa-dl.live");
-    if (cur && cur !== ln.element) {
-        removeClass(cur, "live");
-        cur.tabIndex = -1;
-    }
-    curline = ln;
-    curgrade = null;
-    addClass(ln.element, "live");
-    ln.element.tabIndex = 0;
-    ln.element.focus({preventScroll: true});
-}
-
 // Capture the current logical scroll position and return a closure that
-// restores it. Use around diff display toggles (markdown, hide-left, comments),
-// which show or hide lines and change line heights, making the viewport jump
-// when content above the fold changes size: call `active_scroll_anchor()`
-// before the toggle and invoke the returned closure afterward. The anchor is
-// the live line if one is on screen, otherwise the line about 15% down the
-// viewport. If the toggle hides the anchor line, the closure re-anchors to the
-// nearest following visible line — transferring liveness to it if the anchor
-// was live.
+// restores it. Use around diff display toggles (markdown, hide-left, comments,
+// collapsing files), which show or hide lines and change line heights, making
+// the viewport jump when content above the fold changes size: call
+// `active_scroll_anchor()` before the toggle and invoke the returned closure
+// afterward. The primary anchor is the live line if one is on screen, otherwise
+// the line about 15% down the viewport; while visible, it is held at its
+// original screen position. If the toggle hides it (e.g. its file was
+// collapsed), liveness moves to the nearest following visible line and the
+// topmost still-visible reference line is held fixed instead — keeping visible
+// content put rather than pulling distant content up to the anchor.
 export function active_scroll_anchor() {
     const vh = window.innerHeight || document.documentElement.clientHeight;
 
-    let anchor = null, anchor_is_live = false;
-    const liveel = document.querySelector(".pa-dl.live");
+    let anchorel = null, anchor_is_live = false;
+    const liveel = document.querySelector(".pa-dllive");
     if (liveel) {
         const r = liveel.getBoundingClientRect();
         if (r.top < vh && r.bottom > 0) {
-            anchor = new Linediff(liveel);
+            anchorel = liveel;
             anchor_is_live = true;
         }
     }
-    if (!anchor) {
-        anchor = line_at_viewport_fraction(0.15, vh);
+    anchorel = anchorel || line_at_viewport_fraction(0.15, vh);
+    if (!anchorel) {
+        return function () {};
     }
-    const anchor_top = anchor ? anchor.element.getBoundingClientRect().top : 0;
 
+    let anchorel2 = null;
+    if (anchorel && hasClass(anchorel, "pa-dlr")) {
+        anchorel2 = anchorel.nextSibling;
+    }
+
+    const anchor_top = anchorel.getBoundingClientRect().top;
     return function () {
-        if (!anchor) {
-            return;
+        if (!anchorel.parentElement) {
+            anchorel = anchorel2;
         }
-        let target = anchor;
-        if (!anchor.is_visible()) {
-            const next = adjacent_visible_source(anchor, false);
-            if (next) {
-                target = next;
-                anchor_is_live && make_live(next);
+        if (!anchorel.offsetParent) {
+            if (hasClass(anchorel, "pa-dl")
+                && anchorel.parentElement.offsetParent) {
+                anchorel = adjacent_visible_source(anchorel, true)
+                    || adjacent_visible_source(anchorel, false);
             } else {
-                target = adjacent_visible_source(anchor, true);
+                while (!anchorel.offsetParent) {
+                    anchorel = anchorel.parentElement;
+                }
             }
         }
-        if (target && target.is_visible()) {
-            const delta = Math.round(target.element.getBoundingClientRect().top - anchor_top);
-            delta && window.scrollBy(0, delta);
+        if (anchorel) {
+            const delta = Math.round(anchorel.getBoundingClientRect().top - anchor_top);
+            if (delta) {
+                capture_scroll_at = performance.now();
+                window.scrollBy(0, delta);
+            }
         }
-    };
+        if (anchor_is_live) {
+            if (anchorel && hasClass(anchorel, "pa-dl")) {
+                arrowcapture_setfocus(anchorel);
+            } else {
+                const live = document.querySelector(".pa-dllive");
+                live && removeClass(live, "pa-dllive");
+                curline = null;
+            }
+        }
+    }
 }
 
 function unedit(note) {
@@ -449,7 +463,7 @@ function pa_linenote(event) {
 
 function make_linenote(event) {
     const note = Note.near(curline), tr = note.force_element();
-    set_scrolled_at(event);
+    capture_scroll_at = performance.now();
     if (hasClass(tr, "editing")) {
         if (unedit(note)) {
             event && event.stopPropagation();

@@ -3356,10 +3356,10 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-hide-comments .pa-gi .hljs-comment {
 	display: none;
 }
-.live .pa-gi:hover, .pa-dl.live {
+.live .pa-gi:hover, .pa-dl.pa-dllive {
 	background-color: #f8eec7;
 }
-.pa-dl.live:focus-visible {
+.pa-dllive:focus-visible {
 	outline: none;
 }
 .pa-gx:hover {

@@ -564,49 +564,6 @@ handle_ui.on("pa-filenav-all", function () {
     }
 });
 
-function filenav_dir_collect(container, recurse, fds) {
-    for (let e = container.firstElementChild; e; e = e.nextElementSibling) {
-        if (hasClass(e, "pa-filenav")) {
-            const fd = Filediff.by_href(e.href);
-            fd && fds.push(fd);
-        } else if (hasClass(e, "pa-filenav-dir") && recurse) {
-            filenav_dir_collect(e, recurse, fds);
-        }
-    }
-}
-
-// Folding a filenav directory folds the matching diffs to match. The `toggle`
-// event does not bubble, so listen in the capture phase.
-document.addEventListener("toggle", function (evt) {
-    const details = evt.target;
-    if (!hasClass(details, "pa-filenav-dir")) {
-        return;
-    }
-    // Workaround: Safari (2026) fires `toggle` on initial page load. Don't process it
-    const initial_open = details.hasAttribute("data-initial-open"), open = details.open;
-    initial_open && details.removeAttribute("data-initial-open");
-    if (open && initial_open) {
-        return;
-    }
-    const fds = [];
-    filenav_dir_collect(details, !open, fds);
-    if (!fds.length) {
-        return;
-    }
-    const restore = active_scroll_anchor(), updates = [];
-    for (const fd of fds) {
-        if (open && hasClass(fd.element, "need-load")) {
-            fd.load().then(() => { fd.toggle(true); });
-        } else {
-            fd.toggle(open);
-        }
-        updates.push({file: fd.file, collapse: !open});
-    }
-    $.ajax(hoturl("=api/diffconfig", {psetinfo: fds[0].element}), {
-        type: "POST", cache: false, data: {json: JSON.stringify(updates)}
-    });
-    restore();
-}, true);
 
 // Scroll-spy: as the document scrolls, highlight the file navigator entries for
 // every file currently intersecting the viewport, and keep the topmost such
@@ -615,6 +572,7 @@ document.addEventListener("toggle", function (evt) {
 // One scroll-spy per navigator box, shared by every file in that box. The
 // decorator below grows the spy a section at a time as each file is decorated.
 const filenav_scrollspies = new Map();
+let filenav_reveal_paused = 0;
 
 class FilenavScrollspy {
     constructor(box) {
@@ -710,7 +668,8 @@ class FilenavScrollspy {
         }
     }
     reveal(ref) {
-        if (this.box.scrollHeight <= this.box.clientHeight) {
+        if (this.box.scrollHeight <= this.box.clientHeight
+            || filenav_reveal_paused > 0) {
             return;
         }
         let repr = ref.ref;
@@ -739,6 +698,53 @@ if (window.IntersectionObserver) {
         }
     });
 }
+
+
+function filenav_dir_collect(container, recurse, fds) {
+    for (let e = container.firstElementChild; e; e = e.nextElementSibling) {
+        if (hasClass(e, "pa-filenav")) {
+            const fd = Filediff.by_href(e.href);
+            fd && fds.push(fd);
+        } else if (hasClass(e, "pa-filenav-dir") && recurse) {
+            filenav_dir_collect(e, recurse, fds);
+        }
+    }
+}
+
+// Folding a filenav directory folds the matching diffs to match. The `toggle`
+// event does not bubble, so listen in the capture phase.
+document.addEventListener("toggle", function (evt) {
+    const details = evt.target;
+    if (!hasClass(details, "pa-filenav-dir")) {
+        return;
+    }
+    // Workaround: Safari (2026) fires `toggle` on initial page load. Don't process it
+    const initial_open = details.hasAttribute("data-initial-open"), open = details.open;
+    initial_open && details.removeAttribute("data-initial-open");
+    if (open && initial_open) {
+        return;
+    }
+    const fds = [];
+    filenav_dir_collect(details, !open, fds);
+    if (!fds.length) {
+        return;
+    }
+    const restore = active_scroll_anchor(), updates = [];
+    ++filenav_reveal_paused;
+    for (const fd of fds) {
+        if (open && hasClass(fd.element, "need-load")) {
+            fd.load().then(() => { fd.toggle(true); });
+        } else {
+            fd.toggle(open);
+        }
+        updates.push({file: fd.file, collapse: !open});
+    }
+    $.ajax(hoturl("=api/diffconfig", {psetinfo: fds[0].element}), {
+        type: "POST", cache: false, data: {json: JSON.stringify(updates)}
+    });
+    restore();
+    --filenav_reveal_paused;
+}, true);
 
 
 function goto_hash(hash) {
