@@ -156,32 +156,40 @@ static std::string path_parentdir(const std::string& path) {
     return path.substr(0, npos);
 }
 
+// Return a shell-safe rendering of `argument`. An argument made up entirely of
+// "safe" characters is returned verbatim (no quoting); anything else is wrapped
+// in single quotes. Examples: `a`→`a`; `a b`→`'a b'`; `a'b`→`'a'\''b'`.
 static std::string shell_quote(const std::string& argument) {
-    std::string quoted;
-    size_t last = 0;
+    std::string quoted;         // quoted string prefix (if quotes required)
+    size_t emit_from = 0;       // first index not yet appended to `quoted`
     for (size_t pos = 0; pos != argument.length(); ++pos) {
-        if ((pos == 0 && argument[pos] == '~')
-            || !(isalnum((unsigned char) argument[pos])
-                 || argument[pos] == '_'
-                 || argument[pos] == '-'
-                 || argument[pos] == '~'
-                 || argument[pos] == '.'
-                 || argument[pos] == '/')) {
-            if (quoted.empty()) {
-                quoted = "'";
-            }
-            if (argument[pos] == '\'') {
-                quoted += argument.substr(last, pos - last) + "'\\''";
-                last = pos + 1;
-            }
+        // skip safe characters
+        if (isalnum((unsigned char) argument[pos])
+            || argument[pos] == '_'
+            || argument[pos] == '-'
+            || argument[pos] == '.'
+            || argument[pos] == '/'
+            || (argument[pos] == '~' && pos != 0)) {
+            continue;
+        }
+        // otherwise, quotes required
+        if (quoted.empty()) {
+            quoted = "'";
+        }
+        // a single quote cannot appear inside a '...' span: flush the
+        // pending run, then close/escape/reopen the quote as '\''
+        if (argument[pos] == '\'') {
+            quoted += argument.substr(emit_from, pos - emit_from) + "'\\''";
+            emit_from = pos + 1;
         }
     }
     if (quoted.empty()) {
+        // no special characters: use argument as-is
         return argument;
-    } else {
-        quoted += argument.substr(last) + "'";
-        return quoted;
     }
+    // flush the trailing run and close the open quote
+    quoted += argument.substr(emit_from) + "'";
+    return quoted;
 }
 
 
