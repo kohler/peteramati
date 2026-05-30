@@ -41,6 +41,7 @@
 #include <sys/signalfd.h>
 #include <sys/sysmacros.h>
 #include <sys/syscall.h>
+#include <sys/prctl.h>
 #elif __APPLE__
 #include <sys/param.h>
 #include <sys/ucred.h>
@@ -2263,7 +2264,7 @@ void jailownerinfo::set_foreground(bool foreground) {
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
-    sprintf(homebuf, "HOME=%s", owner_home_.c_str());
+    snprintf(homebuf, sizeof(homebuf), "HOME=%s", owner_home_.c_str());
     const char* path = "PATH=/usr/local/bin:/bin:/usr/bin";
     const char* lang = "LANG=C";
     const char* term = nullptr;
@@ -2496,6 +2497,11 @@ int jailownerinfo::exec_go() {
         fprintf(verbosefile, "su %s\n", uid_to_name(owner_));
     }
     if (!dryrun) {
+        // drop all supplementary groups while still privileged;
+        // setgroups(2) needs euid 0, which we still have here
+        if (setgroups(0, nullptr) != 0) {
+            perror_die("setgroups");
+        }
         // change effective uid/gid, but save root for later
         if (setresgid(group_, group_, ROOT) != 0) {
             perror_die("setresgid");
@@ -2588,6 +2594,15 @@ int jailownerinfo::exec_go() {
 #else
             close(sigpipe[0]);
             close(sigpipe[1]);
+#endif
+
+            // prevent the exec'd program from acquiring new
+            // privileges (e.g. via a setuid binary in the jail);
+            // preserved across execve
+#if __linux__
+            if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
+                perror_die("prctl(PR_SET_NO_NEW_PRIVS)");
+            }
 #endif
 
             // reduce privileges permanently
