@@ -10,7 +10,7 @@ import { Linediff } from "./diff.js";
 import { Note } from "./note.js";
 import { GradeSheet } from "./gradeentry.js";
 import { ftext, render_onto } from "./render.js";
-import { tooltip } from "./tooltip.js";
+import { tooltip, global_tooltip } from "./tooltip.js";
 
 
 let curline, curgrade, down_event, capture_scroll_at;
@@ -360,6 +360,7 @@ export function active_scroll_anchor() {
             if (delta) {
                 capture_scroll_at = performance.now();
                 window.scrollBy(0, delta);
+                global_tooltip && global_tooltip.reposition();
             }
         }
         if (anchor_is_live) {

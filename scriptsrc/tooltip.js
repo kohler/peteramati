@@ -36,7 +36,7 @@ if (window.devicePixelRatio && window.devicePixelRatio > 1) {
 }
 
 function to_rgba(c) {
-    var m = c.match(/^rgb\((.*)\)$/);
+    const m = c.match(/^rgb\((.*)\)$/);
     return m ? "rgba(" + m[1] + ", 1)" : c;
 }
 
@@ -71,12 +71,13 @@ export function Bubble(content, bubopt) {
     if (!bubopt && content && typeof content === "object") {
         bubopt = content;
         content = bubopt.content;
-    } else if (!bubopt)
+    } else if (!bubopt) {
         bubopt = {};
-    else if (typeof bubopt === "string")
+    } else if (typeof bubopt === "string") {
         bubopt = {color: bubopt};
+    }
 
-    var nearpos = null, dirspec = bubopt.dir, dir = null,
+    let nearpos = null, dir = null, dirspec = bubopt.dir,
         color = bubopt.color ? " " + bubopt.color : "";
 
     let bubdiv = document.createElement("div");
@@ -95,12 +96,11 @@ export function Bubble(content, bubopt) {
     if (bubopt["pointer-events"]) {
         $(bubdiv).css({"pointer-events": bubopt["pointer-events"]});
     }
-    var bubch = bubdiv.childNodes;
-    var sizes = null;
-    var divbw = null;
+    const bubch = bubdiv.childNodes;
+    let sizes = null, divbw = null;
 
     function change_tail_direction() {
-        var bw = [0, 0, 0, 0], trw = sizes[1], trh = sizes[0] / 2;
+        const bw = [0, 0, 0, 0], trw = sizes[1], trh = sizes[0] / 2;
         divbw = parseFloat($(bubdiv).css(cssborder(dir, "Width")));
         divbw !== divbw && (divbw = 0); // eliminate NaN
         bw[dir^1] = bw[dir^3] = trh + "px";
@@ -110,57 +110,60 @@ export function Bubble(content, bubopt) {
         bw[dir^2] = trw + "px";
         bubch[2].style.borderWidth = bw.join(" ");
 
-        for (var i = 1; i <= 3; ++i)
+        for (let i = 1; i <= 3; ++i) {
             bubch[0].style[lcdir[dir^i]] = bubch[2].style[lcdir[dir^i]] = "";
+        }
         bubch[0].style[lcdir[dir]] = (-trw - divbw) + "px";
         // Offset the inner triangle so that the border width in the diagonal
         // part of the tail, is visually similar to the border width
-        var trdelta = (divbw / trh) * Math.sqrt(trw * trw + trh * trh);
+        const trdelta = (divbw / trh) * Math.sqrt(trw * trw + trh * trh);
         bubch[2].style[lcdir[dir]] = (-trw - divbw + trdelta) + "px";
 
-        for (i = 0; i < 3; i += 2)
+        for (let i = 0; i < 3; i += 2) {
             bubch[i].style.borderLeftColor = bubch[i].style.borderRightColor =
             bubch[i].style.borderTopColor = bubch[i].style.borderBottomColor = "transparent";
+        }
 
-        var yc = to_rgba($(bubdiv).css("backgroundColor")).replace(/([\d.]+)\)/, function (s, p1) {
+        const yc = to_rgba($(bubdiv).css("backgroundColor")).replace(/([\d.]+)\)/, function (s, p1) {
             return (0.75 * p1 + 0.25) + ")";
         });
         bubch[0].style[cssbc(dir^2)] = $(bubdiv).css(cssbc(dir));
         bubch[2].style[cssbc(dir^2)] = yc;
     }
 
-    function constrainmid(nearpos, wpos, ds, ds2) {
-        var z0 = nearpos[lcdir[ds]], z1 = nearpos[lcdir[ds^2]],
-            z = (1 - ds2) * z0 + ds2 * z1;
+    function constrainmid(wpos, ds, ds2) {
+        const z0 = nearpos[lcdir[ds]], z1 = nearpos[lcdir[ds^2]];
+        let z = (1 - ds2) * z0 + ds2 * z1;
         z = Math.max(z, Math.min(z1, wpos[lcdir[ds]] + SPACE));
         return Math.min(z, Math.max(z0, wpos[lcdir[ds^2]] - SPACE));
     }
 
     function constrain(za, wpos, bpos, ds, ds2, noconstrain) {
-        var z0 = wpos[lcdir[ds]], z1 = wpos[lcdir[ds^2]],
-            bdim = bpos[szdir[ds&1]],
-            z = za - ds2 * bdim;
-        if (!noconstrain && z < z0 + SPACE)
+        const z0 = wpos[lcdir[ds]], z1 = wpos[lcdir[ds^2]],
+            bdim = bpos[szdir[ds&1]];
+        let z = za - ds2 * bdim;
+        if (!noconstrain && z < z0 + SPACE) {
             z = Math.min(za - sizes[0], z0 + SPACE);
-        else if (!noconstrain && z + bdim > z1 - SPACE)
+        } else if (!noconstrain && z + bdim > z1 - SPACE) {
             z = Math.max(za + sizes[0] - bdim, z1 - SPACE - bdim);
+        }
         return z;
     }
 
     function bpos_wconstraint(wpos, ds) {
-        var xw = Math.max(ds === 3 ? 0 : nearpos.left - wpos.left,
-                          ds === 1 ? 0 : wpos.right - nearpos.right);
-        if ((ds === "h" || ds === 1 || ds === 3) && xw > 100)
+        const xw = Math.max(ds === 3 ? 0 : nearpos.left - wpos.left,
+                            ds === 1 ? 0 : wpos.right - nearpos.right);
+        if ((ds === "h" || ds === 1 || ds === 3) && xw > 100) {
             return Math.min(wpos.width, xw) - 3*SPACE;
-        else
-            return wpos.width - 3*SPACE;
+        }
+        return wpos.width - 3*SPACE;
     }
 
     function make_bpos(wpos, ds) {
-        var $b = $(bubdiv);
+        const $b = $(bubdiv);
         $b.css("maxWidth", "");
-        var bg = $b.geometry(true);
-        var wconstraint = bpos_wconstraint(wpos, ds);
+        let bg = $b.geometry(true);
+        const wconstraint = bpos_wconstraint(wpos, ds);
         if (wconstraint < bg.width) {
             $b.css("maxWidth", wconstraint);
             bg = $b.geometry(true);
@@ -169,10 +172,10 @@ export function Bubble(content, bubopt) {
         // the bubble was placed on that side. E.g., bpos[0] is the
         // top of the bubble, assuming the bubble is placed over the
         // reference.
-        var bpos = [nearpos.top - sizes.bottom - bg.height - sizes[0],
-                    nearpos.right + sizes.left + bg.width + sizes[0],
-                    nearpos.bottom + sizes.top + bg.height + sizes[0],
-                    nearpos.left - sizes.right - bg.width - sizes[0]];
+        const bpos = [nearpos.top - sizes.bottom - bg.height - sizes[0],
+                      nearpos.right + sizes.left + bg.width + sizes[0],
+                      nearpos.bottom + sizes.top + bg.height + sizes[0],
+                      nearpos.left - sizes.right - bg.width - sizes[0]];
         bpos.width = bg.width;
         bpos.height = bg.height;
         bpos.wconstraint = wconstraint;
@@ -180,32 +183,37 @@ export function Bubble(content, bubopt) {
     }
 
     function remake_bpos(bpos, wpos, ds) {
-        var wconstraint = bpos_wconstraint(wpos, ds);
+        const wconstraint = bpos_wconstraint(wpos, ds);
         if ((wconstraint < bpos.wconstraint && wconstraint < bpos.width)
-            || (wconstraint > bpos.wconstraint && bpos.width >= bpos.wconstraint))
+            || (wconstraint > bpos.wconstraint && bpos.width >= bpos.wconstraint)) {
             bpos = make_bpos(wpos, ds);
+        }
         return bpos;
     }
 
     function parse_dirspec(dirspec, pos) {
-        var res;
+        let res;
         if (dirspec.length > pos
-            && (res = "0123trblnesw".indexOf(dirspec.charAt(pos))) >= 0)
+            && (res = "0123trblnesw".indexOf(dirspec.charAt(pos))) >= 0) {
             return res % 4;
+        }
         return -1;
     }
 
     function csscornerradius(corner, index) {
-        var divbr = $(bubdiv).css("border" + corner + "Radius"), pos;
-        if (!divbr)
+        let divbr = $(bubdiv).css("border" + corner + "Radius");
+        if (!divbr) {
             return 0;
-        if ((pos = divbr.indexOf(" ")) > -1)
+        }
+        const pos = divbr.indexOf(" ");
+        if (pos > -1) {
             divbr = index ? divbr.substring(pos + 1) : divbr.substring(0, pos);
+        }
         return parseFloat(divbr);
     }
 
     function constrainradius(x, bpos, ds) {
-        var x0, x1;
+        let x0, x1;
         if (ds & 1) {
             x0 = csscornerradius(capdir[0] + capdir[ds], 1);
             x1 = csscornerradius(capdir[2] + capdir[ds], 1);
@@ -220,33 +228,37 @@ export function Bubble(content, bubopt) {
         sizes = sizes || calculate_sizes(color);
 
         // parse dirspec
-        if (dirspec == null)
+        if (dirspec == null) {
             dirspec = "r";
-        var noflip = /!/.test(dirspec),
+        }
+        const noflip = /!/.test(dirspec),
             noconstrain = /\*/.test(dirspec),
-            dsx = dirspec.replace(/[^a0-3neswtrblhv]/, ""),
-            ds = parse_dirspec(dsx, 0),
+            dsx = dirspec.replace(/[^a0-3neswtrblhv]/, "");
+        let ds = parse_dirspec(dsx, 0),
             ds2 = parse_dirspec(dsx, 1);
-        if (ds >= 0 && ds2 >= 0 && (ds2 & 1) != (ds & 1))
+        if (ds >= 0 && ds2 >= 0 && (ds2 & 1) != (ds & 1)) {
             ds2 = (ds2 === 1 || ds2 === 2 ? 1 : 0);
-        else
+        } else {
             ds2 = 0.5;
-        if (ds < 0)
+        }
+        if (ds < 0) {
             ds = /^[ahv]$/.test(dsx) ? dsx : "a";
+        }
 
-        var wpos = $(window).geometry();
-        var bpos = make_bpos(wpos, dsx);
+        const wpos = $(window).geometry();
+        let bpos = make_bpos(wpos, dsx);
 
         if (ds === "a") {
             if (bpos.height + sizes[0] > Math.max(nearpos.top - wpos.top, wpos.bottom - nearpos.bottom)) {
                 ds = "h";
                 bpos = remake_bpos(bpos, wpos, ds);
-            } else
+            } else {
                 ds = "v";
+            }
         }
 
-        var wedge = [wpos.top + 3*SPACE, wpos.right - 3*SPACE,
-                     wpos.bottom - 3*SPACE, wpos.left + 3*SPACE];
+        const wedge = [wpos.top + 3*SPACE, wpos.right - 3*SPACE,
+                       wpos.bottom - 3*SPACE, wpos.left + 3*SPACE];
         if ((ds === "v" || ds === 0 || ds === 2) && !noflip && ds2 < 0
             && bpos[2] > wedge[2] && bpos[0] < wedge[0]
             && (bpos[3] >= wedge[3] || bpos[1] <= wedge[1])) {
@@ -256,16 +268,17 @@ export function Bubble(content, bubopt) {
         if ((ds === "v" && bpos[2] > wedge[2] && bpos[0] > wedge[0])
             || (ds === 0 && !noflip && bpos[2] > wpos.bottom
                 && wpos.top - bpos[0] < bpos[2] - wpos.bottom)
-            || (ds === 2 && (noflip || bpos[0] >= wpos.top + SPACE)))
+            || (ds === 2 && (noflip || bpos[0] >= wpos.top + SPACE))) {
             ds = 2;
-        else if (ds === "v" || ds === 0 || ds === 2)
+        } else if (ds === "v" || ds === 0 || ds === 2) {
             ds = 0;
-        else if ((ds === "h" && bpos[3] - wpos.left < wpos.right - bpos[1])
-                 || (ds === 1 && !noflip && bpos[3] < wpos.left)
-                 || (ds === 3 && (noflip || bpos[1] <= wpos.right - SPACE)))
+        } else if ((ds === "h" && bpos[3] - wpos.left < wpos.right - bpos[1])
+                   || (ds === 1 && !noflip && bpos[3] < wpos.left)
+                   || (ds === 3 && (noflip || bpos[1] <= wpos.right - SPACE))) {
             ds = 3;
-        else
+        } else {
             ds = 1;
+        }
         bpos = remake_bpos(bpos, wpos, ds);
 
         if (ds !== dir) {
@@ -273,28 +286,30 @@ export function Bubble(content, bubopt) {
             change_tail_direction();
         }
 
-        var x, y, xa, ya, d;
-        var divbw = parseFloat($(bubdiv).css(cssborder(ds & 1 ? 0 : 3, "Width")));
+        const divbw = parseFloat($(bubdiv).css(cssborder(ds & 1 ? 0 : 3, "Width")));
+        let x, y;
         if (ds & 1) {
-            ya = constrainmid(nearpos, wpos, 0, ds2);
+            const ya = constrainmid(wpos, 0, ds2);
             y = constrain(ya, wpos, bpos, 0, ds2, noconstrain);
-            d = constrainradius(roundpixel(ya - y - sizes[0] / 2 - divbw), bpos, ds);
+            const d = constrainradius(roundpixel(ya - y - sizes[0] / 2 - divbw), bpos, ds);
             bubch[0].style.top = bubch[2].style.top = d + "px";
 
-            if (ds == 1)
+            if (ds == 1) {
                 x = nearpos.left - sizes.right - bpos.width - sizes[1] - 1;
-            else
+            } else {
                 x = nearpos.right + sizes.left + sizes[1];
+            }
         } else {
-            xa = constrainmid(nearpos, wpos, 3, ds2);
+            const xa = constrainmid(wpos, 3, ds2);
             x = constrain(xa, wpos, bpos, 3, ds2, noconstrain);
-            d = constrainradius(roundpixel(xa - x - sizes[0] / 2 - divbw), bpos, ds);
+            const d = constrainradius(roundpixel(xa - x - sizes[0] / 2 - divbw), bpos, ds);
             bubch[0].style.left = bubch[2].style.left = d + "px";
 
-            if (ds == 0)
+            if (ds == 0) {
                 y = nearpos.bottom + sizes.top + sizes[1];
-            else
+            } else {
                 y = nearpos.top - sizes.bottom - bpos.height - sizes[1] - 1;
+            }
         }
 
         bubdiv.style.left = roundpixel(x) + "px";
@@ -310,21 +325,24 @@ export function Bubble(content, bubopt) {
     let bubble = {
         near: function (epos, reference) {
             if (typeof epos === "string" || epos.tagName || epos.jquery) {
-                epos = $(epos);
-                if (dirspec == null && epos[0]) {
-                    dirspec = epos[0].getAttribute("data-tooltip-dir");
+                const el = $(epos)[0];
+                if (dirspec == null && el) {
+                    dirspec = el.getAttribute("data-tooltip-dir");
                 }
-                epos = epos.geometry(true);
+                nearpos = el ? $(el).geometry(true) : null;
+            } else {
+                nearpos = epos;
+                for (let i = 0; i < 4; ++i) {
+                    if (!(lcdir[i] in nearpos) && (lcdir[i ^ 2] in nearpos))
+                        nearpos[lcdir[i]] = nearpos[lcdir[i ^ 2]];
+                }
             }
-            for (let i = 0; i < 4; ++i) {
-                if (!(lcdir[i] in epos) && (lcdir[i ^ 2] in epos))
-                    epos[lcdir[i]] = epos[lcdir[i ^ 2]];
+            if (reference
+                && (reference = $(reference))
+                && reference.length
+                && reference[0] !== window) {
+                nearpos = geometry_translate(nearpos, reference.geometry());
             }
-            if (reference && (reference = $(reference)) && reference.length
-                && reference[0] != window) {
-                epos = geometry_translate(epos, reference.geometry());
-            }
-            nearpos = epos;
             show();
             return bubble;
         },
@@ -349,32 +367,36 @@ export function Bubble(content, bubopt) {
             return bubble;
         },
         html: function (content) {
-            var n = bubch[1];
-            if (content === undefined)
+            let n = bubch[1];
+            if (content === undefined) {
                 return n.innerHTML;
+            }
             if (typeof content === "string"
                 && content === n.innerHTML
-                && bubdiv.style.visibility === "visible")
+                && bubdiv.style.visibility === "visible") {
                 return bubble;
+            }
             nearpos && $(bubdiv).css({maxWidth: "", left: "", top: ""});
-            if (typeof content === "string")
+            if (typeof content === "string") {
                 n.innerHTML = content;
-            else {
-                while (n.childNodes.length)
+            } else {
+                while (n.childNodes.length) {
                     n.removeChild(n.childNodes[0]);
-                if (content && content.jquery)
+                }
+                if (content && content.jquery) {
                     content.appendTo(n);
-                else
+                } else {
                     n.appendChild(content);
+                }
             }
             nearpos && show();
             return bubble;
         },
         text: function (text) {
-            if (text === undefined)
+            if (text === undefined) {
                 return $(bubch[1]).text();
-            else
-                return bubble.html(text ? text_to_html(text) : text);
+            }
+            return bubble.html(text ? text_to_html(text) : text);
         },
         content_node: function () {
             return bubch[1].firstChild;
@@ -384,10 +406,11 @@ export function Bubble(content, bubopt) {
             return bubble;
         },
         removeOn: function (jq, event) {
-            if (arguments.length > 1)
+            if (arguments.length > 1) {
                 $(jq).on(event, remove);
-            else if (bubdiv)
+            } else if (bubdiv) {
                 $(bubdiv).on(jq, remove);
+            }
             return bubble;
         },
         self: function () {
@@ -407,7 +430,7 @@ let builders = {};
 export let global_tooltip = null;
 
 function prepare_info(elt, info) {
-    var xinfo = elt.getAttribute("data-tooltip-info");
+    let xinfo = elt.getAttribute("data-tooltip-info");
     if (xinfo) {
         if (typeof xinfo === "string" && xinfo.charAt(0) === "{") {
             xinfo = JSON.parse(xinfo);
@@ -461,7 +484,7 @@ function show_tooltip(info) {
     info = prepare_info(self, info);
     info.element = this;
 
-    var tt, bub = null, to = null, near = null, delayto = null,
+    let tt, bub = null, to = null, near = null, delayto = null,
         refcount = 1, content = info.content;
 
     function close() {
@@ -503,7 +526,7 @@ function show_tooltip(info) {
             return tt;
         },
         exit: function () {
-            var delay = info.type === "focus" ? 0 : 200;
+            const delay = info.type === "focus" ? 0 : 200;
             to = clearTimeout(to);
             if (--refcount <= 0 && info.type !== "sticky") {
                 to = setTimeout(close, delay);
@@ -515,17 +538,19 @@ function show_tooltip(info) {
         html: function (new_content) {
             if (new_content === undefined) {
                 return content;
-            } else {
-                content = new_content;
-                show_bub();
-                return tt;
             }
+            content = new_content;
+            show_bub();
+            return tt;
         },
         text: function (new_text) {
             return tt.html(escape_entities(new_text));
         },
         near: function () {
             return near;
+        },
+        reposition: function () {
+            bub && near && bub.near(near);
         },
         noDelayClass: function () {
             return info.noDelayClass;
@@ -538,24 +563,24 @@ function show_tooltip(info) {
             && tx._element === info.element
             && tx.html() === content) {
             tt = tx;
-        } else {
-            tx && tx.close();
-            $(self).data("tooltipState", tt);
-            if (info.delay
-                && (!info.noDelayClass
-                    || !tx
-                    || tx.noDelayClass() !== info.noDelayClass)) {
-                delayto = setTimeout(function () {
-                    delayto = null;
-                    content && !bub && show_bub();
-                }, info.delay);
-            } else {
-                show_bub();
-            }
-            global_tooltip = tt;
+            return tt;
         }
+        tx && tx.close();
+        $(self).data("tooltipState", tt);
+        if (info.delay
+            && (!info.noDelayClass
+                || !tx
+                || tx.noDelayClass() !== info.noDelayClass)) {
+            delayto = setTimeout(function () {
+                delayto = null;
+                content && !bub && show_bub();
+            }, info.delay);
+        } else {
+            show_bub();
+        }
+        global_tooltip = tt;
+        return tt;
     }
-    return tt;
 }
 
 function ttenter() {
@@ -570,7 +595,7 @@ function ttleave() {
 
 export function tooltip() {
     removeClass(this, "need-tooltip");
-    var tt = this.getAttribute("data-tooltip-type");
+    const tt = this.getAttribute("data-tooltip-type");
     if (tt === "focus") {
         $(this).on("focus", ttenter).on("blur", ttleave);
     } else {
