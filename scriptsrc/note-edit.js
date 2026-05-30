@@ -272,7 +272,7 @@ function arrowcapture_setfocus(what) {
     const ln = curline && curline.visible_source();
     if (ln) {
         removeClass(ln.element, "pa-dllive");
-        ln.element.tabIndex = -1;
+        ln.element.removeAttribute("tabindex");
     }
     if (what.nodeName === "PA-LINEDIFF") {
         curline = what;
@@ -434,7 +434,7 @@ function capture(tr) {
     for (const el of document.querySelectorAll(".pa-dllive")) {
         if (el !== tr) {
             removeClass(el, "pa-dllive");
-            el.tabIndex = -1;
+            el.removeAttribute("tabindex");
         }
     }
     if (!hasClass(tr, "pa-gw")) {
@@ -454,7 +454,7 @@ function inline_grade_focusin(evt) {
     }
     for (const el of document.querySelectorAll(".pa-dllive")) {
         removeClass(el, "pa-dllive");
-        el.tabIndex = -1;
+        el.removeAttribute("tabindex");
     }
     curline = null;
     curgrade = this;
@@ -480,7 +480,7 @@ $(document).on("focusout", ".pa-gradevalue", inline_grade_focusout);
 function uncapture() {
     for (const tr of document.querySelectorAll(".pa-dllive")) {
         removeClass(tr, "pa-dllive");
-        tr.tabIndex = -1;
+        tr.removeAttribute("tabindex");
     }
     curline = null;
     curgrade = null;
