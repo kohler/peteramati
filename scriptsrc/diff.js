@@ -413,16 +413,18 @@ export class Linediff {
                 t = p[extreme];
                 continue;
             } else if (hasClass(t, "pa-grade")) {
-                if (hasClass(t, "pa-ans")
-                    && hasClass(t.lastChild.firstChild, "pa-filediff")) {
-                    p = t.lastChild.firstChild;
+                const v = t.lastChild.firstChild;
+                if (!v) {
+                    // section or description-only
+                } else if (hasClass(t, "pa-ans")
+                           && hasClass(v, "pa-filediff")) {
+                    p = v;
                     t = p[extreme];
                     continue;
                 } else if (flags & GRADES) {
-                    const inp = t.firstChild.nextSibling.firstChild;
-                    if ((inp.nodeName === "TEXTAREA" && hasClass(inp, "ta1"))
-                        || (inp.nodeName === "INPUT" && inp.type === "text")) {
-                        yield inp;
+                    if ((v.nodeName === "TEXTAREA" && hasClass(v, "ta1"))
+                        || (v.nodeName === "INPUT" && v.type === "text")) {
+                        yield v;
                     }
                 }
             } else if (hasClass(t, "pa-diffcontext")) {

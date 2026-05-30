@@ -9,7 +9,9 @@
         "//build:highlight": "`npm run build:highlight` to build scripts/highlight.min.js",
         "build:highlight": "npx webpack --config webpack.highlight.cjs",
         "//test": "`npm run test` to run Javascript tests",
-        "test": "node --test \"scriptsrc/test/**/*.test.js\""
+        "test": "node --test \"scriptsrc/test/**/*.test.js\"",
+        "//lint": "`npm run lint` to run ESLint over scriptsrc/",
+        "lint": "npx eslint scriptsrc"
     },
     "dependencies": {
         "@xterm/xterm": "^5.5.0",

@@ -93,6 +93,129 @@ function is_form_field(el) {
         || el.isContentEditable;
 }
 
+
+// ---- sidebar gradebox keyboard navigation -------------------------------
+
+function gradebox_entries(gb) {
+    const out = [];
+    for (const e of gb.children) {
+        if (hasClass(e, "pa-grade") && hasClass(e, "pa-p")
+            && !hasClass(e, "pa-p-hidden")
+            && e.querySelector(".pa-gradevalue")) {
+            out.push(e);
+        }
+    }
+    return out;
+}
+
+function focused_gradebox_entry(ae, gb) {
+    const e = ae && ae.closest && ae.closest(".pa-grade.pa-p");
+    return e && e.parentElement === gb ? e : null;
+}
+
+function left_navigates_out(el) {
+    if (el.nodeName === "TEXTAREA"
+        || (el.nodeName === "INPUT"
+            && /^(?:text|search|email|url|tel|password|number)$/.test(el.type))) {
+        try {
+            return el.selectionStart === 0 && el.selectionEnd === 0;
+        } catch {
+            return true;
+        }
+    }
+    return true;
+}
+
+function gradebox_key(evt) {
+    if (event_key.is_modifier(evt) || event_key.modcode(evt)) {
+        return;
+    }
+    const key = event_key(evt);
+    if (key !== "ArrowUp" && key !== "ArrowDown" && key !== "ArrowLeft") {
+        return;
+    }
+    const gb = this, ae = document.activeElement;
+    if (!ae || !gb.contains(ae)) {
+        return;
+    }
+    if (key === "ArrowLeft") {
+        if (!left_navigates_out(ae)) {
+            return;
+        }
+        const live = document.querySelector(".pa-dllive");
+        if (live) {
+            live.focus({preventScroll: true});
+            evt.preventDefault();
+        }
+        return;
+    }
+    if (ae.nodeName === "TEXTAREA") {
+        return; // multi-line entry: defer to textarea caret movement
+    }
+    const cur = focused_gradebox_entry(ae, gb);
+    if (!cur) {
+        return;
+    }
+    const entries = gradebox_entries(gb),
+        idx = entries.indexOf(cur),
+        next = idx >= 0 ? entries[idx + (key === "ArrowDown" ? 1 : -1)] : null;
+    if (next) {
+        const input = next.querySelector(".pa-gradevalue");
+        if (input) {
+            input.focus();
+            evt.preventDefault();
+        }
+    }
+}
+
+function gradebox_focusin(evt) {
+    const entry = focused_gradebox_entry(evt.target, this);
+    if (!entry) {
+        return;
+    }
+    for (const e of this.children) {
+        if (e !== entry && hasClass(e, "pa-graderecent")) {
+            removeClass(e, "pa-graderecent");
+        }
+    }
+    addClass(entry, "pa-graderecent");
+}
+
+function enter_sidebar_gradebox_from(lineEl) {
+    const sb = lineEl.closest(".pa-with-sidebar");
+    if (!sb) {
+        return false;
+    }
+    const gb = sb.querySelector(":scope > .pa-sidebar > .pa-gradebox:not(.pa-filenavbox)");
+    if (!gb) {
+        return false;
+    }
+    const entries = gradebox_entries(gb);
+    if (!entries.length) {
+        return false;
+    }
+    const remembered = gb.querySelector(":scope > .pa-grade.pa-p.pa-graderecent"),
+        target = remembered && entries.indexOf(remembered) >= 0 ? remembered : entries[0],
+        input = target.querySelector(".pa-gradevalue");
+    if (!input) {
+        return false;
+    }
+    input.focus();
+    // For text-like inputs and textareas, select the existing value so the
+    // first keystroke overwrites it. `<select>` has no .select() method;
+    // for non-text input types it's a no-op.
+    if (input.select) {
+        requestAnimationFrame(() => input.select());
+    }
+    return true;
+}
+
+$(document).on("keydown", ".pa-sidebar > .pa-gradebox:not(.pa-filenavbox)", gradebox_key);
+$(document).on("focusin", ".pa-sidebar > .pa-gradebox:not(.pa-filenavbox)", gradebox_focusin);
+
+// -------------------------------------------------------------------------
+
+
 function arrowcapture(evt) {
     if ((evt.type === "keydown"
          && event_key.is_modifier(evt))
@@ -107,10 +230,10 @@ function arrowcapture(evt) {
         return;
     }
 
-    // form fields handle their own arrows/typing; buttons, links, <details>
-    // fall through so arrows keep navigating the diff
+    // form fields handle their own arrows/typing; curgrade is the exception
+    // (we focused it ourselves as the nav cursor)
     const ae = document.activeElement;
-    if (is_form_field(ae)) {
+    if (is_form_field(ae) && ae !== curgrade) {
         return;
     }
 
@@ -119,6 +242,11 @@ function arrowcapture(evt) {
         arrowcapture_arrow(evt, key);
     } else if ((key === "PageUp" || key === "PageDown") && !modkey) {
         arrowcapture_page(evt, key);
+    } else if (key === "ArrowRight" && !modkey) {
+        const liveel = curline && curline.element;
+        if (liveel && enter_sidebar_gradebox_from(liveel)) {
+            evt.preventDefault();
+        }
     } else if (key === "Enter" && (!modkey || modkey === event_key.META)) {
         // let Enter activate a focused button/link/<summary>
         const liveel = curline && curline.element;
@@ -293,6 +421,15 @@ function arrowcapture_enter(evt) {
     make_linenote();
 }
 
+function arm_arrowcapture() {
+    $(".pa-filediff").removeClass("live");
+    capture_scroll_at = performance.now();
+    $(document).off(".pa-linenote");
+    $(window).off(".pa-linenote");
+    $(document).on("keydown.pa-linenote", arrowcapture);
+    $(window).on("scroll.pa-linenote", arrowcapture);
+}
+
 function capture(tr) {
     for (const el of document.querySelectorAll(".pa-dllive")) {
         if (el !== tr) {
@@ -305,13 +442,40 @@ function capture(tr) {
         tr.tabIndex = 0;
         tr.focus();
     }
-    $(".pa-filediff").removeClass("live");
-    capture_scroll_at = performance.now();
-    $(document).off(".pa-linenote");
-    $(window).off(".pa-linenote");
-    $(document).on("keydown.pa-linenote", arrowcapture);
-    $(window).on("scroll.pa-linenote", arrowcapture);
+    arm_arrowcapture();
 }
+
+// Focusing an inline grade input makes it the nav cursor (curgrade).
+// evt.target === this filters ancestor matches: markdown/text gc types
+// put .pa-gradevalue on the container, which can hold inner .pa-dl lines.
+function inline_grade_focusin(evt) {
+    if (evt.target !== this || this.closest(".pa-sidebar")) {
+        return;
+    }
+    for (const el of document.querySelectorAll(".pa-dllive")) {
+        removeClass(el, "pa-dllive");
+        el.tabIndex = -1;
+    }
+    curline = null;
+    curgrade = this;
+    arm_arrowcapture();
+}
+
+// Drop curgrade when focus walks away to something that isn't another
+// grade input. Less sticky than curline.
+function inline_grade_focusout(evt) {
+    if (evt.target !== this || curgrade !== this) {
+        return;
+    }
+    const rt = evt.relatedTarget;
+    if (rt && rt.closest && rt.closest(".pa-gradevalue")) {
+        return;
+    }
+    curgrade = null;
+}
+
+$(document).on("focusin", ".pa-gradevalue", inline_grade_focusin);
+$(document).on("focusout", ".pa-gradevalue", inline_grade_focusout);
 
 function uncapture() {
     for (const tr of document.querySelectorAll(".pa-dllive")) {
@@ -458,7 +622,7 @@ function nearby(dx, dy) {
 }
 
 function pa_linenote(event) {
-    var dl = event.target.closest(".pa-dl");
+    const dl = event.target.closest(".pa-dl");
     if (event.button !== 0
         || !dl
         || hasClass(dl, "pa-gx")
@@ -466,7 +630,7 @@ function pa_linenote(event) {
         || event.target.closest(".pa-note-suggestions")) {
         return;
     }
-    var line = locate(event.target),
+    const line = locate(event.target),
         t = new Date().getTime();
     if (event.type === "mousedown" && line) {
         if (curline
