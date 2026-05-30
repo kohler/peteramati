@@ -84,6 +84,15 @@ function render_form($tr, note, transition) {
     }
 }
 
+function is_form_field(el) {
+    if (!el) {
+        return false;
+    }
+    const tn = el.nodeName;
+    return tn === "INPUT" || tn === "TEXTAREA" || tn === "SELECT"
+        || el.isContentEditable;
+}
+
 function arrowcapture(evt) {
     if ((evt.type === "keydown"
          && event_key.is_modifier(evt))
@@ -98,12 +107,26 @@ function arrowcapture(evt) {
         return;
     }
 
+    // form fields handle their own arrows/typing; buttons, links, <details>
+    // fall through so arrows keep navigating the diff
+    const ae = document.activeElement;
+    if (is_form_field(ae)) {
+        return;
+    }
+
     const key = event_key(evt), modkey = event_key.modcode(evt);
     if ((key === "ArrowUp" || key === "ArrowDown") && !modkey) {
         arrowcapture_arrow(evt, key);
     } else if ((key === "PageUp" || key === "PageDown") && !modkey) {
         arrowcapture_page(evt, key);
     } else if (key === "Enter" && (!modkey || modkey === event_key.META)) {
+        // let Enter activate a focused button/link/<summary>
+        const liveel = curline && curline.element;
+        if (ae && ae !== liveel
+            && ae !== document.body
+            && ae !== document.documentElement) {
+            return;
+        }
         arrowcapture_enter(evt);
     }
 }
@@ -168,7 +191,11 @@ function arrowcapture_arrow(evt, key) {
     if (target) {
         arrowcapture_focusat(target, evt);
     } else {
-        // already at the first/last navigable line; keep focus where it is
+        // at boundary: bounce focus back so the next arrow isn't stolen
+        const liveel = curline && curline.element;
+        if (liveel) {
+            liveel.focus({preventScroll: true});
+        }
         evt.preventDefault();
     }
 }
@@ -236,7 +263,12 @@ function arrowcapture_page(evt, key) {
         }
     }
     if (!target) {
-        return; // already at the first/last navigable line
+        // at boundary: bounce focus back so the next arrow isn't stolen
+        const liveel = curline && curline.element;
+        if (liveel) {
+            liveel.focus({preventScroll: true});
+        }
+        return;
     }
     const pos = Math.max(0, Math.min(curscroll + targetdelta, maxscroll));
     if (win) {
@@ -261,7 +293,13 @@ function arrowcapture_enter(evt) {
     make_linenote();
 }
 
-function capture(tr, keydown) {
+function capture(tr) {
+    for (const el of document.querySelectorAll(".pa-dllive")) {
+        if (el !== tr) {
+            removeClass(el, "pa-dllive");
+            el.tabIndex = -1;
+        }
+    }
     if (!hasClass(tr, "pa-gw")) {
         addClass(tr, "pa-dllive");
         tr.tabIndex = 0;
@@ -271,7 +309,7 @@ function capture(tr, keydown) {
     capture_scroll_at = performance.now();
     $(document).off(".pa-linenote");
     $(window).off(".pa-linenote");
-    $(document).on((keydown ? "keydown.pa-linenote " : "") + "mousedown.pa-linenote", arrowcapture);
+    $(document).on("keydown.pa-linenote", arrowcapture);
     $(window).on("scroll.pa-linenote", arrowcapture);
 }
 
@@ -280,6 +318,8 @@ function uncapture() {
         removeClass(tr, "pa-dllive");
         tr.tabIndex = -1;
     }
+    curline = null;
+    curgrade = null;
     $(".pa-filediff").addClass("live");
     $(document).off(".pa-linenote");
     $(window).off(".pa-linenote");
@@ -378,7 +418,7 @@ export function active_scroll_anchor() {
 function unedit(note) {
     const done = note.render(true),
         ctr = curline && curline.visible_source();
-    ctr && capture(ctr.element, true);
+    ctr && capture(ctr.element);
     return done;
 }
 
@@ -393,7 +433,7 @@ function pa_save_my_note(elt) {
         $(f).find(".aab").append('<div class="aabut pa-save-message">Saving…</div>');
         Note.at(elt).save_text(text, iscomment).then(() => {
             const ctr = curline ? curline.visible_source() : null;
-            ctr && capture(ctr.element, true);
+            ctr && capture(ctr.element);
         });
     }
 }
@@ -474,7 +514,7 @@ function make_linenote(event) {
         $ta[0].setSelectionRange && $ta[0].setSelectionRange(0, $ta.val().length);
         return false;
     }
-    capture(curline.element, false);
+    capture(curline.element);
     render_form($(tr), note, true);
     return false;
 }
