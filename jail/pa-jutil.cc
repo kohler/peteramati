@@ -3,9 +3,12 @@
 // See LICENSE for open-source distribution terms
 
 #include "pa-jutil.hh"
+#include <algorithm>
+#include <cassert>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <unistd.h>
 
 int exit_status = 0;
 
@@ -212,4 +215,103 @@ bool pathmatch(std::string_view pattern, std::string_view str) {
         return false;
     }
     return true;
+}
+
+std::string path_absolute(std::string_view path, std::string_view cwd) {
+    // check for absolute path
+    if (!path.empty() && path[0] == '/') {
+        return std::string(path);
+    }
+    // obtain cwd
+    char buf[BUFSIZ];
+    if (cwd.empty()) {
+        if (getcwd(buf, BUFSIZ - 1) == nullptr) {
+            perror_die("getcwd");
+        }
+        char* endbuf = buf + strlen(buf);
+        while (endbuf - buf > 1 && endbuf[-1] == '/') {
+            --endbuf;
+        }
+        *endbuf = '/';
+        cwd = std::string_view(buf, endbuf + 1);
+    }
+    assert(!cwd.empty() && cwd.front() == '/' && cwd.back() == '/');
+    // canonicalize `cwd + path`
+    while (true) {
+        if (path.starts_with("/")) {
+            // `path` contained multiple slashes, e.g. `.//`
+            path.remove_prefix(1);
+        } else if (path.starts_with("./") || path == ".") {
+            path.remove_prefix(std::min(size_t(2), path.size()));
+        } else if (path.starts_with("../") || path == "..") {
+            // remove final subdirectory
+            while (cwd.size() > 1 && cwd.back() == '/') {
+                cwd.remove_suffix(1);
+            }
+            while (cwd.size() > 1 && cwd.back() != '/') {
+                cwd.remove_suffix(1);
+            }
+            path.remove_prefix(std::min(size_t(3), path.size()));
+        } else {
+            break;
+        }
+    }
+    // return
+    std::string result(cwd);
+    result += path;
+    return result;
+}
+
+std::string path_pa_validate(std::string_view name) {
+    char buf[1024];
+    if (name.empty()
+        || name[0] == '~'
+        || name.length() >= sizeof(buf)) {
+        return std::string();
+    }
+
+    char* out = buf;
+    const char* end = name.data() + name.size();
+    for (const char* s = name.data(); s != end; ++s) {
+        unsigned char ch = *s;
+        if (ch == '.') {
+            if ((s + 1 == end || s[1] == '/')
+                && (out == buf || out[-1] == '/')) {
+                // remove `/./` segments
+                if (out != buf) {
+                    --out;
+                } else {
+                    while (s + 1 != end && s[1] == '/') {
+                        ++s;
+                    }
+                }
+                continue;
+            } else if (s + 1 != end
+                       && s[1] == '.'
+                       && (s + 2 == end || s[2] == '/')
+                       && (out == buf || out[-1] == '/')) {
+                // disallow `/../` segments
+                return std::string();
+            }
+            // otherwise normal character
+        } else if (ch == '/') {
+            // condense `/+` into `/`
+            while (s + 1 != end && s[1] == '/') {
+                ++s;
+            }
+        } else if ((ch >= '-' && ch <= '9')  // `-./0123456789`
+                   || (ch >= 'A' && ch <= 'Z')
+                   || (ch >= 'a' && ch <= 'z')
+                   || ch == '_'
+                   || ch == '~') {
+            // OK
+        } else {
+            return std::string();
+        }
+        *out++ = ch;
+    }
+    while (out > buf + 1 && out[-1] == '/') {
+        --out;
+    }
+    return std::string(buf, out - buf);
 }

@@ -119,7 +119,7 @@ void test_pathmatch() {
     assert(pathmatch("/*a*a*", "/banana"));
     assert(!pathmatch("/*a*a*", "/bann"));
 
-    // regression: `* LIT *` where LIT is absent must fail and must terminate
+    // `* LIT *` where LIT is absent must fail and must terminate
     // (the `*` backtrack once spun forever once `sp` reached end-of-component)
     assert(!pathmatch("/a/*x*", "/a/ab"));
     assert(!pathmatch("/*z*", "/abc"));
@@ -300,8 +300,122 @@ void test_pajailconf() {
     assert(jc.check_jail("/jails/~runa/").treedir == "/jails/~runa/");
 }
 
+void test_path_absolute() {
+    // an explicit `cwd` makes these independent of the real working directory;
+    // every `cwd` passed in ends in `/`, matching what the getcwd path produces
+
+    // absolute paths are returned verbatim (NOT canonicalized)
+    assert(path_absolute("/x/y", "/a/b/") == "/x/y");
+    assert(path_absolute("/x/../y", "/a/b/") == "/x/../y");
+    assert(path_absolute("/", "/a/b/") == "/");
+
+    // relative paths are appended to `cwd`
+    assert(path_absolute("c", "/a/b/") == "/a/b/c");
+    assert(path_absolute("c/d", "/a/b/") == "/a/b/c/d");
+
+    // leading `./` segments are dropped
+    assert(path_absolute("./c", "/a/b/") == "/a/b/c");
+    assert(path_absolute("././c", "/a/b/") == "/a/b/c");
+    assert(path_absolute(".", "/a/b/") == "/a/b/");
+
+    // leading `../` segments ascend, clamping at the root
+    assert(path_absolute("../c", "/a/b/") == "/a/c");
+    assert(path_absolute("../../c", "/a/b/") == "/c");
+    assert(path_absolute("../../../c", "/a/b/") == "/c");
+    assert(path_absolute("../c", "/a/") == "/c");
+    assert(path_absolute("../c", "/") == "/c");
+    assert(path_absolute("../", "/a/b/") == "/a/");
+    assert(path_absolute("..", "/a/b/") == "/a/");
+
+    // mixed leading `./` and `../`, including bare trailing `.`/`..`
+    assert(path_absolute(".././c", "/a/b/") == "/a/c");
+    assert(path_absolute("./../c", "/a/b/") == "/a/c");
+    assert(path_absolute("../..", "/a/b/c/") == "/a/");
+    assert(path_absolute("./.", "/a/b/") == "/a/b/");
+
+    // a leading run of slashes in the relative part is swallowed
+    assert(path_absolute(".//c", "/a/b/") == "/a/b/c");
+
+    // ONLY leading `.`/`..` are handled; embedded ones are left untouched
+    // (callers must run the result through path_pa_validate)
+    assert(path_absolute("x/../c", "/a/b/") == "/a/b/x/../c");
+    assert(path_absolute("x/./c", "/a/b/") == "/a/b/x/./c");
+
+    // empty relative path yields `cwd`
+    assert(path_absolute("", "/a/b/") == "/a/b/");
+
+    // with no explicit cwd, the result is absolute and ends with the input
+    std::string a = path_absolute("foo/bar");
+    assert(a[0] == '/');
+    assert(a.size() >= 7 && a.compare(a.size() - 7, 7, "foo/bar") == 0);
+}
+
+void test_path_pa_validate() {
+    // ordinary valid paths pass through unchanged
+    assert(path_pa_validate("a/b") == "a/b");
+    assert(path_pa_validate("a/b/c") == "a/b/c");
+    assert(path_pa_validate("/abs/path") == "/abs/path");
+    assert(path_pa_validate("file.txt") == "file.txt");
+    assert(path_pa_validate("a-b_c.d~e") == "a-b_c.d~e");
+    assert(path_pa_validate("/") == "/");
+
+    // `/+` is condensed and trailing slashes are trimmed
+    assert(path_pa_validate("a//b") == "a/b");
+    assert(path_pa_validate("a///b") == "a/b");
+    assert(path_pa_validate("a/b/") == "a/b");
+    assert(path_pa_validate("a/b///") == "a/b");
+
+    // `.` path segments are removed
+    assert(path_pa_validate("a/./b") == "a/b");
+    assert(path_pa_validate("a/././b") == "a/b");
+    assert(path_pa_validate("./a") == "a");
+    // a leading `./` followed by extra slashes must not leak a leading `/`
+    // (regression: the old single-`++s` step left a stray `/`, yielding `/a`)
+    assert(path_pa_validate(".//a") == "a");
+    assert(path_pa_validate(".///a") == "a");
+
+    // `..` path segments are disallowed everywhere (the hardening goal)
+    assert(path_pa_validate("..").empty());
+    assert(path_pa_validate("../b").empty());
+    assert(path_pa_validate("a/..").empty());
+    assert(path_pa_validate("a/../b").empty());
+    assert(path_pa_validate("/..").empty());
+    assert(path_pa_validate("/a/../b").empty());
+    assert(path_pa_validate("a/b/../../c").empty());
+
+    // `.` and `..` are only special as whole segments
+    assert(path_pa_validate("..a") == "..a");
+    assert(path_pa_validate("a..b") == "a..b");
+    assert(path_pa_validate(".a") == ".a");
+    assert(path_pa_validate("a.b") == "a.b");
+
+    // a leading `~` is disallowed; a non-leading `~` is fine
+    assert(path_pa_validate("~").empty());
+    assert(path_pa_validate("~x").empty());
+    assert(path_pa_validate("~/x").empty());
+    assert(path_pa_validate("a/~x") == "a/~x");
+
+    // characters outside `[-./0-9A-Za-z_~]` are rejected
+    assert(path_pa_validate("a b").empty());
+    assert(path_pa_validate("a*b").empty());
+    assert(path_pa_validate("a;b").empty());
+    assert(path_pa_validate("a\tb").empty());
+
+    // paths that reduce to nothing come back empty (same as rejection)
+    assert(path_pa_validate("").empty());
+    assert(path_pa_validate(".").empty());
+    assert(path_pa_validate("./").empty());
+    assert(path_pa_validate("/.").empty());
+
+    // length bound: `>= 1024` is rejected, `1023` is accepted
+    assert(path_pa_validate(std::string(1023, 'a')) == std::string(1023, 'a'));
+    assert(path_pa_validate(std::string(1024, 'a')).empty());
+}
+
 int main() {
     test_pathmatch();
     test_pajailconf();
+    test_path_absolute();
+    test_path_pa_validate();
     fprintf(stderr, "test-pa-jailconf: all tests passed\n");
 }

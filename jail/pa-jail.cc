@@ -171,6 +171,22 @@ static int x_fchown(int fd, uid_t owner, gid_t group, const std::string& path) {
     return 0;
 }
 
+static int x_fchown_path(int fd, uid_t owner, gid_t group, const std::string& path) {
+    if (verbose) {
+        fprintf(verbosefile, "chown -h %s:%s %s\n", uid_to_name(owner), gid_to_name(group), path.c_str());
+    }
+#if O_PATH != 0
+    if (!dryrun && fchownat(fd, "", owner, group, AT_EMPTY_PATH) != 0) {
+        return perror_fail("chown %s: %s\n", path.c_str());
+    }
+#else
+    if (!dryrun && fchown(fd, owner, group) != 0) {
+        return perror_fail("chown %s: %s\n", path.c_str());
+    }
+#endif
+    return 0;
+}
+
 static int v_mkdir(const char* pathname, mode_t mode) {
     if (verbose) {
         fprintf(verbosefile, "mkdir -m 0%o %s\n", mode, pathname);
@@ -808,39 +824,47 @@ static int do_copy(const std::string& dst, const std::string& src,
             errno = ENOTDIR;
             return perror_fail("%s: %s\n", dst.c_str());
         }
-        if (v_mkdir(dst.c_str(), perm) != 0)
+        if (v_mkdir(dst.c_str(), perm) != 0) {
             return 1;
+        }
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
         // XXX special handling for /dev/ptmx; there is probably a
         // cleaner way
-        if (x_rm_f(dst))
+        if (x_rm_f(dst)) {
             return 1;
-        if (src.length() == 9 && src == "/dev/ptmx")
+        } else if (src.length() == 9 && src == "/dev/ptmx") {
             return x_symlink("pts/ptmx", dst.c_str());
+        }
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
-        if (x_mknod(dst.c_str(), mode, ss.st_rdev))
+        if (x_mknod(dst.c_str(), mode, ss.st_rdev)) {
             return 1;
+        }
     } else if (S_ISLNK(ss.st_mode)) {
-        if (x_rm_f(dst))
+        if (x_rm_f(dst)) {
             return 1;
+        }
         char lnkbuf[4096];
         ssize_t r = readlink(src.c_str(), lnkbuf, sizeof(lnkbuf));
-        if (r == -1)
+        if (r == -1) {
             return perror_fail("readlink %s: %s\n", src.c_str());
-        else if (r == sizeof(lnkbuf))
+        } else if (r == sizeof(lnkbuf)) {
             return perror_fail("%s: Symbolic link too long\n", src.c_str());
+        }
         lnkbuf[r] = 0;
-        if (x_symlink(lnkbuf, dst.c_str()))
+        if (x_symlink(lnkbuf, dst.c_str())) {
             return 1;
-        if (x_copy_utimes(dst.c_str(), ss))
+        } else if (x_copy_utimes(dst.c_str(), ss)) {
             return 1;
+        }
         handle_symlink_dst(dst, src, std::string(lnkbuf), jaildev);
-    } else
+    } else {
         // cannot deal
         return perror_fail("%s: Odd file type\n", src.c_str());
+    }
 
-    if (ss.st_uid != ROOT || ss.st_gid != ROOT)
+    if (ss.st_uid != ROOT || ss.st_gid != ROOT) {
         return x_lchown(dst.c_str(), ss.st_uid, ss.st_gid);
+    }
     return 0;
 }
 
@@ -1166,49 +1190,6 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
 
 // main program
 
-static std::string check_filename(std::string name) {
-    const char *allowed_chars = "/0123456789-._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~";
-    char buf[1024];
-
-    if (strspn(name.c_str(), allowed_chars) != name.length()
-        || name.empty()
-        || name[0] == '~'
-        || name.length() >= sizeof(buf))
-        return std::string();
-
-    char* out = buf;
-    for (const char* s = name.c_str(); *s; ++s) {
-        *out++ = *s;
-        if (*s == '.' && (s[1] == '/' || s[1] == '\0')
-            && s != name.c_str() && s[-1] == '/') {
-            --out;
-            ++s;
-        } else if (*s == '.' && s[1] == '.' && (s[2] == '/' || s[2] == '\0')
-                   && (s == name.c_str() || s[-1] == '/'))
-            return std::string();
-        while (*s == '/' && s[1] == '/')
-            ++s;
-    }
-    while (out > buf + 1 && out[-1] == '/')
-        --out;
-    *out = '\0';
-    return std::string(buf, out - buf);
-}
-
-static std::string absolute(const std::string& dir) {
-    if (!dir.empty() && dir[0] == '/')
-        return dir;
-    char buf[BUFSIZ];
-    if (getcwd(buf, BUFSIZ - 1) == nullptr) {
-        perror_die("getcwd");
-    }
-    char* endbuf = buf + strlen(buf);
-    while (endbuf - buf > 1 && endbuf[-1] == '/')
-        --endbuf;
-    memcpy(endbuf, "/", 2);
-    return std::string(buf) + dir;
-}
-
 struct jaildirinfo {
     std::string dir;
     std::string parent;
@@ -1234,7 +1215,7 @@ private:
 
 jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
                          jailaction action, pajailconf& jailconf)
-    : dir(check_filename(absolute(str))),
+    : dir(path_pa_validate(path_absolute(str))),
       parentfd(-1), allowed(false), dev(-1),
       skeletondir(skeletonstr) {
     if (dir.empty() || dir == "/" || dir[0] != '/') {
@@ -1250,7 +1231,7 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
     }
 
     if (!skeletondir.empty()) {
-        skeletondir = path_endslash(absolute(skeletondir));
+        skeletondir = path_endslash(path_absolute(skeletondir));
         if (jailperm perm = jailconf.check_skeleton(skeletondir); !perm) {
             die("%s: Skeleton disabled by /etc/pa-jail.conf\n%s",
                 skeletondir.c_str(), perm.disable_message().c_str());
@@ -1343,9 +1324,11 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
 
 void jaildirinfo::check() {
     assert(!permdir.empty() && permdir[permdir.length() - 1] == '/');
-    assert(dir.substr(0, permdir.length()) == permdir);
+    assert(dir.starts_with(permdir));
 }
 
+// Chown `{dir}/home/` to be owned by root, and `{dir}/home/{user}`
+// to be owned by `user:user`.
 void jaildirinfo::chown_home() {
     populate_mount_table();
     std::string dirbuf = dir + "home/";
@@ -1356,20 +1339,68 @@ void jaildirinfo::chown_home() {
         perror_die(dirbuf);
     }
     chown_recursive(dirfd, dirbuf, ROOT, ROOT, true, dirst.st_dev);
+    close(dirfd);
 }
 
-void jaildirinfo::chown_recursive(const std::string& dir,
+// Chown all directories under `path` to be owned by `owner:group`.
+// `path` must be located under the jail’s `dir`. Walks from `dir`
+// down to `path`, refusing to cross symbolic links. The final file
+// may be a regular file or symbolic link (the link or file is chown'd)
+//  or a directory (it is walked into).
+void jaildirinfo::chown_recursive(const std::string& path,
                                   uid_t owner, gid_t group) {
-    std::string dirbuf = path_endslash(dir);
-    int dirfd = open(dir.c_str(), O_CLOEXEC | O_NOFOLLOW);
-    struct stat dirst;
-    if (dirfd == -1 || fstat(dirfd, &dirst) != 0) {
-        perror_die(dirbuf);
+    populate_mount_table();
+    assert(path.starts_with(dir) && path.size() > dir.size());
+    int dirfd = openat(parentfd, component.c_str(),
+                       O_PATH | O_CLOEXEC | O_NOFOLLOW);
+    if (dirfd == -1) {
+        perror_die(dir);
     }
-    if (x_fchown(dirfd, owner, group, dirbuf)) {
+    // walk down to parent directory of `path`
+    size_t pos = dir.size();
+    size_t lastpos = path.size() - (path.back() == '/');
+    size_t dirpos = path.rfind('/', lastpos - 1);
+    assert(pos > 0 && dirpos >= pos - 1 && dirpos < lastpos);
+    struct stat st;
+    while (pos < dirpos) {
+        size_t nextpos = path.find('/', pos);
+        assert(nextpos <= dirpos);
+        int nextfd = openat(dirfd, path.substr(pos, nextpos - pos).c_str(),
+                            O_PATH | O_CLOEXEC | O_NOFOLLOW);
+        if (nextfd == -1 || fstat(nextfd, &st) != 0) {
+            perror_die(path.substr(0, nextpos));
+        } else if (S_ISLNK(st.st_mode)) {
+            die("%s: Refusing to follow symbolic link\n", path.substr(0, nextpos).c_str());
+        }
+        close(dirfd);
+        dirfd = nextfd;
+        pos = nextpos + 1;
+    }
+    // open `path` itself
+    std::string last_component(path.substr(dirpos + 1, lastpos - dirpos - 1));
+    assert(!last_component.empty() && last_component.find('/') == std::string::npos);
+    int lastfd = openat(dirfd, last_component.c_str(),
+                        O_PATH | O_CLOEXEC | O_NOFOLLOW);
+    if (lastfd == -1 || fstat(lastfd, &st) != 0) {
+        perror_die(path);
+    }
+    if (x_fchown_path(lastfd, owner, group, path)) {
         exit(::exit_status);
     }
-    chown_recursive(dirfd, dirbuf, owner, group, false, dirst.st_dev);
+    if (S_ISDIR(st.st_mode)) {
+        // reopen without O_PATH, chown recursively
+        close(lastfd);
+        lastfd = openat(dirfd, last_component.c_str(),
+                        O_CLOEXEC | O_NOFOLLOW);
+        if (lastfd == -1 || fstat(lastfd, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            perror_die(path);
+        }
+        std::string pathbuf = path_endslash(path);
+        chown_recursive(lastfd, pathbuf, owner, group, false, st.st_dev);
+    } else {
+        close(lastfd);
+    }
+    close(dirfd);
 }
 
 void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
@@ -1378,14 +1409,15 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
     dirbuf = path_endslash(dirbuf);
     size_t dirbuflen = dirbuf.length();
 
-    typedef std::pair<uid_t, gid_t> ug_t;
+    using ug_t = std::pair<uid_t, gid_t>;
     std::unordered_map<std::string, ug_t>* home_map = nullptr;
     if (ishome) {
         setpwent();
         home_map = new std::unordered_map<std::string, ug_t>;
         while (struct passwd* pw = getpwent()) {
             std::string name;
-            if (pw->pw_dir && strncmp(pw->pw_dir, "/home/", 6) == 0
+            if (pw->pw_dir
+                && strncmp(pw->pw_dir, "/home/", 6) == 0
                 && strchr(pw->pw_dir + 6, '/') == nullptr) {
                 name = pw->pw_dir + 6;
             } else {
@@ -1396,8 +1428,9 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
     }
 
     DIR* dir = fdopendir(dirfd);
-    if (!dir)
+    if (!dir) {
         perror_die(dirbuf);
+    }
 
     struct dirent* de;
     while ((de = readdir(dir))) {
@@ -1419,30 +1452,35 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
         if (home_map) {
             auto it = home_map->find(de->d_name);
             if (it != home_map->end()) {
-                u = it->second.first, g = it->second.second;
+                u = it->second.first;
+                g = it->second.second;
             }
         }
 
-        // recurse
         if (de->d_type == DT_DIR) {
+            // recurse
             dirbuf += de->d_name;
             auto it = mount_table.find(dirbuf);
             if (it == mount_table.end()) { // not a mount point
                 int subdirfd = openat(dirfd, de->d_name, O_CLOEXEC | O_NOFOLLOW);
                 struct stat subdirst;
-                if (subdirfd == -1 || fstat(subdirfd, &subdirst) != 0) {
-                    perror_die(dirbuf);
-                }
-                if (subdirst.st_dev == dev) {
+                if (subdirfd >= 0
+                    && fstat(subdirfd, &subdirst) == 0
+                    && subdirst.st_dev == dev
+                    && S_ISDIR(subdirst.st_mode)) {
                     if (x_fchown(subdirfd, u, g, dirbuf)) {
                         exit(::exit_status);
                     }
                     chown_recursive(subdirfd, dirbuf, u, g, false, dev);
+                } else if (subdirfd >= 0) {
+                    close(subdirfd);
                 }
             }
             dirbuf.resize(dirbuflen);
-        } else if (x_lchownat(dirfd, de->d_name, u, g, dirbuf)) {
-            exit(::exit_status);
+        } else {
+            if (x_lchownat(dirfd, de->d_name, u, g, dirbuf)) {
+                exit(::exit_status);
+            }
         }
     }
 
@@ -3158,7 +3196,7 @@ int main(int argc, char** argv) {
 
     // move the sandbox if asked
     if (action == do_mv) {
-        std::string newpath = check_filename(absolute(argv[optind + 1]));
+        std::string newpath = path_pa_validate(path_absolute(argv[optind + 1]));
         if (newpath.empty() || newpath[0] != '/') {
             die("%s: Bad characters in move destination\n", argv[optind + 1]);
         }
@@ -3245,17 +3283,24 @@ int main(int argc, char** argv) {
     if (chown_home) {
         jaildir.chown_home();
     }
-    for (auto f : chown_user_args) {
-        if (!f.empty() && f[0] != '/') {
-            f = jaildir.dir + f;
-        }
+    for (const auto& f : chown_user_args) {
         if (f.empty()) {
             die("--chown-user directory must not be empty");
-        } else if (!f.starts_with(jaildir.dir)) {
+        }
+        auto xf = path_pa_validate(path_absolute(f, jaildir.dir));
+        if (xf.empty()) {
+            die("%s: Invalid --chown-user directory",
+                f.c_str());
+        } else if (!xf.starts_with(jaildir.dir)) {
+            // `jaildir.dir` ends in `/` while `xf` (from path_pa_validate) does
+            // not, so this requires `xf` to be a strict subdirectory: the jail
+            // root itself is intentionally excluded, since chowning it to the
+            // ephemeral user would be an escape vector. Don't "fix" this by
+            // normalizing the trailing slash.
             die("%s: --chown-user directory must be within %s",
                 f.c_str(), jaildir.dir.c_str());
         }
-        jaildir.chown_recursive(f, jailuser.owner_, jailuser.group_);
+        jaildir.chown_recursive(xf, jailuser.owner_, jailuser.group_);
     }
 
     // construct the jail

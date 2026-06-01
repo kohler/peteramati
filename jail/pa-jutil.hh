@@ -56,6 +56,19 @@ inline std::string path_noendslash(std::string path) {
 // Examples: `a/b/c`→`a/b/`; `/`→`/`.
 std::string path_parentdir(const std::string& path);
 
+// Return an absolute version of `path`. If `path` starts with a slash,
+// returns `path`; otherwise returns the current working directory with `path`
+// appended. Initial `./` and `../` segments of `path` are removed
+// mechanically, but `./` and `../` segments embedded within `path` remain.
+std::string path_absolute(std::string_view path, std::string_view cwd = std::string_view());
+
+// Return `path` validated according to Peteramati rules. Characters not in
+// `[-./0-9A-Za-z_~]` are disallowed; `path` cannot be more than 1024
+// characters long; `/+` is transformed to `/`; `./` path segments are
+// removed; `../` path segments are disallowed; initial `~` is disallowed.
+// Returns an empty string on invalid `path`.
+std::string path_pa_validate(std::string_view path);
+
 // Return a shell-safe rendering of `argument`. An argument made up entirely of
 // "safe" characters is returned verbatim (no quoting); anything else is wrapped
 // in single quotes. Examples: `a`→`a`; `a b`→`'a b'`; `a'b`→`'a'\''b'`.

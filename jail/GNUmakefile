@@ -18,8 +18,8 @@ pa-jail.o pa-jailconf.o test-pa-jailconf.o: pa-jailconf.hh
 pa-jail.o pa-jailconf.o pa-jutil.o test-pa-jailconf.o: pa-jutil.hh
 
 pa-jail-owner: pa-jail
-	@ok=`find $< -user root -a -group 0 -a -perm -u+s,g+rxs,g-w,o+rx,o-w -print`; \
-	if test -n "$$ok"; then :; \
+	-@ok=`find $< -user root -a -group 0 -a -perm -u+s,g+rxs,g-w,o+rx,o-w -print`; \
+	if test -n "$$ok" -o "`uname`" '!=' Linux; then :; \
 	elif test `id -u` = 0; then \
 	  echo "chown root:0 $< && chmod u+s,g+s,go-w $<"; \
 	  chown root:0 $< && chmod u+s,g+s,go-w $<; \
@@ -35,7 +35,7 @@ pa-writefifo: pa-writefifo.c
 	$(CC) -std=gnu11 -W -Wall -g -O2 -o $@ $^
 
 clean:
-	rm -f pa-jail pa-timeout pa-writefifo test-pa-jailconf *.o
+	rm -rf pa-jail pa-timeout pa-writefifo test-pa-jailconf *.o *.dSYM
 
 install: pa-jail pa-timeout
 	install -d $(BINDIR)
@@ -45,7 +45,13 @@ install: pa-jail pa-timeout
 always:
 	@:
 
-.PHONY: all clean install always pa-jail-owner check
+.PHONY: all clean install always pa-jail-owner check check-docker
 
 check: test-pa-jailconf
 	./test-pa-jailconf
+
+# Build and run the test suite in an ephemeral Linux container. Useful when the
+# host's endpoint-security software quarantines freshly-built binaries, and as a
+# check on pa-jail's real (Linux) target platform. See build-docker.sh.
+check-docker:
+	./build-docker.sh
