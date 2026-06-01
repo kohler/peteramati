@@ -3245,10 +3245,15 @@ int main(int argc, char** argv) {
     if (chown_home) {
         jaildir.chown_home();
     }
-    for (const auto& f : chown_user_args) {
-        if (jailperm perm = jailconf.check_jail_subdir(f); !perm) {
-            die("%s: --chown-user directory disabled by /etc/pa-jail.conf\n%s",
-                f.c_str(), perm.disable_message().c_str());
+    for (auto f : chown_user_args) {
+        if (!f.empty() && f[0] != '/') {
+            f = jaildir.dir + f;
+        }
+        if (f.empty()) {
+            die("--chown-user directory must not be empty");
+        } else if (!f.starts_with(jaildir.dir)) {
+            die("%s: --chown-user directory must be within %s",
+                f.c_str(), jaildir.dir.c_str());
         }
         jaildir.chown_recursive(f, jailuser.owner_, jailuser.group_);
     }
