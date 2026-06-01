@@ -83,9 +83,9 @@ class QueueItem {
 
     // running a command (`start` and helpers)
     /** @var string */
-    private $_jaildir;
+    private $_jaildir;      // jail root (e.g., `/data/jails/repoXXX`); no terminating slash
     /** @var string */
-    private $_jailhomedir;
+    private $_jailhomedir;  // user homedir in jail; subdir of `$this->_jaildir`; no terminating slash
     /** @var resource */
     private $_lockstream;
     /** @var string */
@@ -1112,19 +1112,18 @@ class QueueItem {
             if ($jfiles
                 && !preg_match('/[\s\];]/', $jfiles)
                 && ($jhash = hash_file("sha256", $jfiles)) !== false) {
-                $contents .= " $jhash $jfiles";
+                $contents .= " {$jhash} {$jfiles}";
             }
             $contents .= "]\n{$userhome} <- {$this->_jailhomedir} [bind]";
             $cmdarg[] = "-u{$this->_jailhomedir}";
             $cmdarg[] = "-F{$contents}";
-            $homedir = $binddir;
+            $cmdarg[] = "-B{$binddir}";
         } else if ($jfiles) {
             $cmdarg[] = "-h";
             $cmdarg[] = "-f{$jfiles}";
             if ($skeletondir) {
                 $cmdarg[] = "-S{$skeletondir}";
             }
-            $homedir = $this->_jaildir;
         } else {
             throw new RunnerException("Missing jail population configuration");
         }
@@ -1153,7 +1152,7 @@ class QueueItem {
             $cmdarg[] = "--fg";
         }
 
-        $cmdarg[] = $homedir;
+        $cmdarg[] = $this->_jaildir;
         $cmdarg[] = $username;
         $cmdarg[] = "TERM=xterm-256color";
         $cmdarg[] = $this->expand($runner->command);

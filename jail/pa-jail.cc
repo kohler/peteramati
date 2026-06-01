@@ -32,6 +32,7 @@
 #include <list>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 #include <iostream>
 #include <sys/ioctl.h>
 #include <sys/file.h>
@@ -2753,7 +2754,8 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
         fprintf(stderr, "  -u, --chown-user DIR      Change ownership of DIR/** to USER\n");
         fprintf(stderr, "  -S, --skeleton SKELDIR    Populate jail from SKELDIR\n");
         if (action == do_run) {
-            fprintf(stderr, "  -p, --pid-file PIDFILE    Write jail process PID to PIDFILE\n\
+            fprintf(stderr, "  -B, --bind BINDDIR        Build the jail in scaffold BINDDIR\n\
+  -p, --pid-file PIDFILE    Write jail process PID to PIDFILE\n\
   -P, --pid-contents STR    Write STR to PIDFILE\n\
   -i, --input INPUTSOCKET   Use TTY, read input from INPUTSOCKET\n\
       --event-source SOCK   Listen on UNIX SOCK for event source connections\n\
@@ -2792,6 +2794,7 @@ static struct option longoptions_run[] = {
     { "verbose", no_argument, nullptr, 'V' },
     { "dry-run", no_argument, nullptr, 'n' },
     { "help", no_argument, nullptr, 'H' },
+    { "bind", required_argument, nullptr, 'B' },
     { "skeleton", required_argument, nullptr, 'S' },
     { "pid-file", required_argument, nullptr, 'p' },
     { "pid-contents", required_argument, nullptr, 'P' },
@@ -2829,7 +2832,7 @@ static struct option* longoptions_action[] = {
     longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnS:f:F:p:P:T:I:qi:hu:t:", "VnS:f:F:p:P:T:I:qi:hu:t:", "Vnf", "Vn"
+    "+Vn", "VnB:S:f:F:p:P:T:I:qi:hu:t:", "VnB:S:f:F:p:P:T:I:qi:hu:t:", "Vnf", "Vn"
 };
 
 static bool opt_strtod(double& v) {
@@ -2861,7 +2864,7 @@ int main(int argc, char** argv) {
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
     double timeout = -1, idle_timeout = -1;
-    std::string inputarg, linkarg, manifest;
+    std::string inputarg, linkarg, manifest, bindarg;
     std::vector<std::string> chown_user_args;
     pidcontents = "$$";
 
@@ -2871,6 +2874,8 @@ int main(int argc, char** argv) {
                                  longoptions_action[(int) action], nullptr)) != -1) {
             if (ch == 'V') {
                 verbose = true;
+            } else if (ch == 'B') {
+                bindarg = optarg;
             } else if (ch == 'S') {
                 linkarg = optarg;
             } else if (ch == 'n') {
@@ -3110,6 +3115,17 @@ int main(int argc, char** argv) {
     pajailconf jailconf;
     jaildirinfo jaildir(argv[optind], linkarg, action, jailconf);
 
+    // `pa-jail run --bind BINDDIR` builds the jail in a shared scaffold BINDDIR
+    // and binds the real jail's contents into it (via the manifest), rather than
+    // building directly in JAILDIR. JAILDIR stays the identity that selects
+    // config and gets its home chowned; BINDDIR is the build/pivot root. The
+    // scaffold must itself be an allowed jail directory (for now via `enablejail`).
+    std::optional<jaildirinfo> bindjail;
+    if (!bindarg.empty()) {
+        bindjail.emplace(bindarg.c_str(), std::string(), action, jailconf);
+    }
+    jaildirinfo& buildjail = bindjail ? *bindjail : jaildir;
+
     // move the sandbox if asked
     if (action == do_mv) {
         std::string newpath = check_filename(absolute(argv[optind + 1]));
@@ -3209,11 +3225,11 @@ int main(int argc, char** argv) {
 
     // construct the jail
     mount_status = optind + 2 < argc;
-    dstroot = path_noendslash(jaildir.dir);
+    dstroot = path_noendslash(buildjail.dir);
     assert(dstroot != "/");
     if (!manifest.empty()) {
         mode_t old_umask = umask(0);
-        if (construct_jail(jaildir.dev, manifest, false) != 0) {
+        if (construct_jail(buildjail.dev, manifest, false) != 0) {
             exit(1);
         }
         umask(old_umask);
@@ -3222,13 +3238,17 @@ int main(int argc, char** argv) {
     // close `parentfd`
     close(jaildir.parentfd);
     jaildir.parentfd = -1;
+    if (bindjail) {
+        close(bindjail->parentfd);
+        bindjail->parentfd = -1;
+    }
 
     // maybe execute a command in the jail
     if (optind + 2 < argc) {
         jailuser.set_inputfd(inputfd);
         jailuser.set_timeout(timeout, idle_timeout);
         jailuser.set_foreground(foreground);
-        jailuser.exec(argc - (optind + 2), argv + optind + 2, jaildir);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, buildjail);
     }
 
     // close timing and lock file if appropriate
