@@ -3090,7 +3090,7 @@ static void close_unwanted_fds() {
 [[noreturn]] static void usage(jailaction action = do_start) {
     if (action == do_start) {
         fprintf(stderr, "Usage: pa-jail add [-nh] [-f FILE | -F DATA] [-S SKELETON] JAILDIR [USER]\n\
-       pa-jail run [--fg] [-nqhL] [-T TIMEOUT] [-I TIMEOUT] [-p PIDFILE] \\\n\
+       pa-jail run [--fg] [-nqh] [-T TIMEOUT] [-I TIMEOUT] [-p PIDFILE] \\\n\
                    [-i INPUT] [-f FILE | -F DATA] [-S SKELETON] \\\n\
                    JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
@@ -3122,6 +3122,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
         fprintf(stderr, "  -f, --manifest-file FILE  Populate jail with manifest from FILE\n");
         fprintf(stderr, "  -F, --manifest MANIFEST   Populate jail with MANIFEST\n");
         fprintf(stderr, "  -h, --chown-home          Change ownership of USER homedir\n");
+        fprintf(stderr, "  -u, --chown-user DIR      Change ownership of DIR/** to USER\n");
         fprintf(stderr, "  -S, --skeleton SKELDIR    Populate jail from SKELDIR\n");
         if (action == do_run) {
             fprintf(stderr, "  -p, --pid-file PIDFILE    Write jail process PID to PIDFILE\n\
@@ -3129,14 +3130,18 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
   -i, --input INPUTSOCKET   Use TTY, read input from INPUTSOCKET\n\
       --event-source SOCK   Listen on UNIX SOCK for event source connections\n\
       --ready[=STR]         Write STR to stdout when ready\n\
+      --onlcr               Translate \\n -> \\r\\n in output [default]\n\
       --no-onlcr            Don't translate \\n -> \\r\\n in output\n\
+      --size WxH            Set terminal size [80x25]\n\
+  -t, --timing-file FILE    Write output timing data to FILE\n\
   -T, --timeout TIMEOUT     Kill the jail after TIMEOUT seconds\n\
   -I, --idle-timeout TIMEOUT  Kill the jail after TIMEOUT idle seconds\n\
-      --size WxH            Set terminal size [80x25]\n\
+  -q, --quiet               Don't print timeout or termination notices\n\
       --fg                  Run in the foreground\n");
         }
         fprintf(stderr, "  -n, --dry-run             Print actions, don't run them\n\
-  -V, --verbose             Print actions and run them\n");
+  -V, --verbose             Print actions and run them\n\
+      --help                Print this message\n");
     }
     exit(1);
 }
@@ -3178,6 +3183,7 @@ static struct option longoptions_run[] = {
     { "size", required_argument, nullptr, ARG_SIZE },
     { "event-source", required_argument, nullptr, ARG_EVENT_SOURCE },
     { "ready", optional_argument, nullptr, ARG_READY },
+    { "quiet", no_argument, nullptr, 'q' },
     { nullptr, 0, nullptr, 0 }
 };
 
