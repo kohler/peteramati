@@ -28,21 +28,26 @@
 #include <utime.h>
 #include <getopt.h>
 #include <fnmatch.h>
-#include <string>
+#include <algorithm>
+#include <format>
+#include <iostream>
 #include <list>
+#include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
-#include <optional>
-#include <iostream>
 #include <sys/ioctl.h>
 #include <sys/file.h>
+#include <sys/resource.h>
 #if __linux__
 #include <mntent.h>
 #include <sched.h>
+#include <linux/sched.h>        // struct clone_args, CLONE_INTO_CGROUP
 #include <sys/signalfd.h>
 #include <sys/sysmacros.h>
 #include <sys/syscall.h>
 #include <sys/prctl.h>
+#include <linux/capability.h>   // capset, CAP_LAST_CAP (raw, no libcap)
 #elif __APPLE__
 #include <sys/param.h>
 #include <sys/ucred.h>
@@ -80,6 +85,7 @@ static bool verbose = false;
 static bool dryrun = false;
 static bool quiet = false;
 static bool doforce = false;
+static bool opt_userns = false;     // `--userns`: run student in a user namespace
 static bool no_onlcr = false;
 static long tsize[2] = {80, 25};
 static FILE* verbosefile = stdout;
@@ -101,7 +107,7 @@ static int sigpipe[2];
 #endif
 
 enum jailaction {
-    do_start, do_add, do_run, do_rm, do_mv
+    do_start, do_add, do_run, do_rm, do_mv, do_init
 };
 
 
@@ -201,27 +207,38 @@ static int v_mkdirat(int dirfd, const char* component, mode_t mode, const std::s
     return dryrun ? 0 : mkdirat(dirfd, component, mode);
 }
 
+[[maybe_unused]] static int v_rmdir(const char* pathname) {
+    if (verbose) {
+        fprintf(verbosefile, "rmdir %s\n", pathname);
+    }
+    return dryrun ? 0 : rmdir(pathname);
+}
+
 // Ensure `pathname` exists as a directory, creating it and any missing parents.
-// Uses `lstat`, so a symlink anywhere along the created portion is rejected
-// rather than followed.
+// Each component is validated top-down with its own `lstat` (as a final path
+// element), so a symlink at *any* component is rejected (ENOTDIR) rather than
+// followed -- even when the leaf already exists. Still path-based, so unlike the
+// O_PATH|O_NOFOLLOW walk in `jaildirinfo` it leaves a TOCTOU window; paths here
+// are also root-owned config.
 static int v_ensuredir(std::string pathname, mode_t mode) {
     pathname = path_noendslash(pathname);
     auto it = dirtable.find(pathname);
     if (it != dirtable.end()) {
         return it->second;
     }
+    int r;
     struct stat st;
-    int r = lstat(pathname.c_str(), &st);
-    if (r == 0 && !S_ISDIR(st.st_mode)) {
-        errno = ENOTDIR;
+    std::string parent_pathname = path_parentdir(pathname);
+    if (parent_pathname.size() > 1
+        && v_ensuredir(parent_pathname, mode) < 0) {
         r = -1;
-    }
-    if (r == -1 && errno == ENOENT) {
-        std::string parent_pathname = path_parentdir(pathname);
-        if ((parent_pathname.length() == pathname.length()
-             || v_ensuredir(parent_pathname, mode) >= 0)
-            && v_mkdir(pathname.c_str(), mode) == 0) {
-            r = 1;
+    } else {
+        r = lstat(pathname.c_str(), &st);
+        if (r == 0 && !S_ISDIR(st.st_mode)) {
+            r = -1;
+            errno = ENOTDIR;
+        } else if (r == -1 && errno == ENOENT) {
+            r = v_mkdir(pathname.c_str(), mode) ? : 1;
         }
     }
     dirtable.insert(std::make_pair(pathname, r == 1 ? 0 : r));
@@ -285,6 +302,32 @@ static int x_mknod(const char* path, mode_t mode, dev_t dev) {
         return perror_fail("mknod %s: %s\n", path);
     }
     return 0;
+}
+
+// The only device nodes pa-jail will create, matched by major:minor (the kernel
+// driver, not the manifest path). `mknod` wields the setuid binary's root
+// authority, so an arbitrary manifest-named node (`/dev/mem`, a raw disk) would
+// hand jailed code a kernel-level capability; only these char nodes, never block.
+// See HARDENING.md §2.
+static bool dev_node_allowed(mode_t mode, dev_t rdev) {
+    if (!S_ISCHR(mode)) {
+        return false;
+    }
+    static const struct { dev_t major, minor; } allowed[] = {
+        { 1, 3 },   // null
+        { 1, 5 },   // zero
+        { 1, 7 },   // full
+        { 1, 8 },   // random
+        { 1, 9 },   // urandom
+        { 5, 0 },   // tty
+        { 5, 2 }    // ptmx
+    };
+    for (const auto& a : allowed) {
+        if (major(rdev) == a.major && minor(rdev) == a.minor) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static bool x_symlink_eexist_ok(const char* oldpath, const char* newpath) {
@@ -604,6 +647,23 @@ static int populate_mount_table() {
 #endif
 }
 
+// Hardening flags forced onto the jail's own mounts regardless of host config:
+// `nosuid` everywhere; `nodev` except on devpts, whose pty slaves are devices;
+// `noexec` only where nothing should run -- not /tmp, which executes student
+// build output.
+#if __linux__
+static unsigned long jail_mount_hardening(const std::string& src, const std::string& type) {
+    if (src == "/proc" && type == "proc") {
+        return MS_NOSUID | MS_NODEV | MS_NOEXEC;
+    } else if (src == "/dev/pts" && type == "devpts") {
+        return MS_NOSUID | MS_NOEXEC;
+    } else if (type == "tmpfs" && (src == "/tmp" || src == "/run")) {
+        return MS_NOSUID | MS_NODEV;
+    }
+    return 0;
+}
+#endif
+
 static int handle_mount(std::string src, std::string dst, bool in_child) {
     auto it = mount_table.find(src);
     if (it == mount_table.end()
@@ -635,6 +695,9 @@ static int handle_mount(std::string src, std::string dst, bool in_child) {
 
     mountslot msx(it->second);
 #if __linux__
+    if (in_child) {
+        msx.opts |= jail_mount_hardening(src, msx.type);
+    }
     if (msx.type == "devpts" && in_child) {
         msx.add_mountopt("newinstance");
         msx.add_mountopt("ptmxmode=0666");
@@ -800,6 +863,15 @@ static inline int stat_mtimes_same(const struct stat& st1, const struct stat& st
 
 static int do_copy(const std::string& dst, const std::string& src,
                    const struct stat& ss, bool reuse_link, dev_t jaildev) {
+    // a manifest may name any path, but a device node is a root-authority
+    // capability, not data: refuse anything outside the allowlist before it can be
+    // created (or accepted as a pre-existing match below)
+    if ((S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode))
+        && !dev_node_allowed(ss.st_mode, ss.st_rdev)) {
+        std::string what = src + " (" + dev_name(ss.st_mode, ss.st_rdev) + ")";
+        return perror_fail("%s: Device node not permitted in jail\n", what.c_str());
+    }
+
     struct stat ds;
     int r = lstat(dst.c_str(), &ds);
     if (r == 0
@@ -839,13 +911,11 @@ static int do_copy(const std::string& dst, const std::string& src,
             return 1;
         }
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
-        // XXX special handling for /dev/ptmx; there is probably a
-        // cleaner way
         if (x_rm_f(dst)) {
             return 1;
-        } else if (src.length() == 9 && src == "/dev/ptmx") {
-            return x_symlink("pts/ptmx", dst.c_str());
         }
+        // /dev/ptmx is mknod'd here like any other node; exec_go() later replaces
+        // it with the `pts/ptmx` symlink the newinstance devpts needs.
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
         if (x_mknod(dst.c_str(), mode, ss.st_rdev)) {
             return 1;
@@ -879,6 +949,9 @@ static int do_copy(const std::string& dst, const std::string& src,
     return 0;
 }
 
+// Populate one manifest entry into the jail. `construct_jail` ignores the return
+// value and reports failure via the global `::exit_status`, so any error path here
+// (and in `do_copy`) must set `::exit_status = 1`, not merely return nonzero.
 static int handle_copy(std::string src, std::string subdst,
                        int flags, dev_t jaildev) {
     static std::string last_parentdir;
@@ -950,44 +1023,6 @@ inline bool opt_eq(const char* opt, const char* endopt,
     return endopt - opt == len && memcmp(opt, def, len) == 0;
 }
 
-static std::string file_get_contents_error(std::string msg, int errorness) {
-    if (errorness > 0) {
-        fprintf(stderr, "%s\n", msg.c_str());
-    }
-    if (errorness > 1) {
-        exit(1);
-    }
-    return "";
-}
-
-static std::string file_get_contents(std::string fname, int errorness) {
-    FILE* f;
-    if (fname == "-") {
-        f = stdin;
-        if (isatty(STDIN_FILENO)) {
-            return file_get_contents_error("stdin: Is a tty", errorness);
-        }
-    } else {
-        f = fopen(fname.c_str(), "r");
-        if (!f) {
-            return file_get_contents_error(fname + ": " + strerror(errno), errorness);
-        }
-    }
-    std::string contents;
-    while (!feof(f) && !ferror(f)) {
-        char buf[BUFSIZ];
-        size_t n = fread(buf, 1, BUFSIZ, f);
-        if (n > 0) {
-            contents.append(buf, n);
-        }
-    }
-    if (ferror(f)) {
-        return file_get_contents_error(fname + ": " + strerror(errno), errorness);
-    }
-    fclose(f);
-    return contents;
-}
-
 static void fix_jail_bind_src(dev_t jaildev,
                               std::string src, std::string want_tag,
                               std::string want_files) {
@@ -995,7 +1030,7 @@ static void fix_jail_bind_src(dev_t jaildev,
     if (verbose) {
         fprintf(verbosefile, "test %s = `cat %s`\n", shell_quote(want_tag).c_str(), shell_quote(srcx).c_str());
     }
-    std::string got_tag = file_get_contents(srcx, 0);
+    std::string got_tag = file_get_contents(srcx, -1);
     while (!got_tag.empty() && isspace((unsigned char) got_tag.back())) {
         got_tag.pop_back();
     }
@@ -1204,8 +1239,24 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
 
 // main program
 
+// Built-in default limits in pa-jail.conf format. These are parsed before
+// /etc/pa-jail.conf and can be overridden by it. All limits are soft (`?`),
+// so they do not cause errors if they can’t be applied. The memory budget is
+// a `%`-of-RAM aggregate on the pool to avoid oversubscribing across
+// concurrent jails (HARDENING.md §4.6).
+static constexpr std::string_view default_limits_conf =
+    "limit pids.max=1024?,tmpfs.size=512m?,rlimit.core=0?\n"
+    "[cgroup]\n"
+    "limit memory.high=70%?,memory.max=85%?,memory.swap.max=0?\n";
+
+static const pajailconf& default_conf() {
+    static const pajailconf c{default_limits_conf};
+    return c;
+}
+
 struct jaildirinfo {
     jailperm perm;
+    pajailconf* conf_ = nullptr;        // the config `perm` was resolved from
     std::string parent;
     int parentfd = -1;
     std::string component;
@@ -1226,6 +1277,7 @@ private:
 
 jaildirinfo::jaildirinfo(const char* dirstr, const std::string& skeletonstr,
                          jailaction action, pajailconf& jailconf) {
+    conf_ = &jailconf;
     perm.dir = path_pa_validate(path_absolute(dirstr));
     if (perm.dir.empty() || perm.dir == "/" || perm.dir[0] != '/') {
         fprintf(stderr, "%s: Bad jail directory\n", dirstr);
@@ -1244,6 +1296,7 @@ jaildirinfo::jaildirinfo(const char* dirstr, const std::string& skeletonstr,
             perm.skeletondir.push_back('/');
         }
     }
+    default_conf().parse(perm);         // seed built-in defaults, under the config
     jailconf.parse(perm);
     if (!perm) {
         die("%s: Jail disabled in /etc/pa-jail.conf\n%s",
@@ -1381,11 +1434,11 @@ void jaildirinfo::chown_home() {
     close(dirfd);
 }
 
-// Chown `path` and directories under it to be owned by `owner:group`.
-// `path` must be located under the jail’s `dir`. Walks from `dir`
-// down to `path`, refusing to cross symbolic links. The final file
-// may be a regular file or symbolic link (the link or file is chown'd)
-//  or a directory (it and its children are chown'd recursively).
+// Chown `path` and directories under it to be owned by `owner:group`. `path`
+// must be located under the jail’s `dir`. Refuses to cross symbolic links in
+// the path. The final file may be a regular file or symbolic link (the link
+// or file is chown'd) or a directory (it and its children are chown'd
+// recursively).
 void jaildirinfo::chown_recursive(const std::string& path,
                                   uid_t owner, gid_t group) {
     populate_mount_table();
@@ -1821,6 +1874,566 @@ void esfd::write_event(jbuffer& jbuf) {
 }
 
 
+// cgroup v2 resource limits.
+//
+// Everything here runs in the host-ns root parent (before/around `clone`), so
+// it uses ordinary `/sys/fs/cgroup` paths and full root credentials. All
+// jails live under one pool cgroup (default `/sys/fs/cgroup/pa-jail`,
+// configurable in pa-jail.conf via `cgroupbase`) so they can be limited
+// together). Each run gets its own cgroup in that pool `<pool>/<pid>`
+// carrying that jail’s limits; the child created by `pa-jail run` is born
+// into the leaf. Each setup reclaims the empty leaves of *previous* finished
+// runs -- folding cleanup into work the root parent must do anyway. Each
+// cgroup-v2 limit binds one controller and one interface file as defined in
+// `jaillimitinfo`.
+
+// Append the cgroup controllers set by `lim` to `need` (deduplicated).
+static void cgroup_add_controllers(const jaillimits& lim,
+                                   std::vector<std::string_view>& need,
+                                   bool include_soft) {
+    for (int id = JLIMIT_CGROUP_FIRST; id != JLIMIT_CGROUP_LAST; ++id) {
+        const jaillimitinfo& info = jaillimitinfo::get(id);
+        if (lim[id].set
+            && (include_soft || !lim[id].soft)
+            && std::find(need.begin(), need.end(), info.cgroup_controller()) == need.end()) {
+            need.push_back(info.cgroup_controller());
+        }
+    }
+}
+
+
+// clone3 with CLONE_INTO_CGROUP (Linux 5.7+) starts the child already inside the
+// target cgroup, so its limits apply from birth -- no placement race.
+// `struct clone_args`/`CLONE_INTO_CGROUP` come from <linux/sched.h>, `SYS_clone3`
+// from <sys/syscall.h>. If the build's kernel headers predate that, cgroup
+// support is compiled out (PA_HAVE_CGROUP 0): the binary still builds and runs,
+// but a configured cgroup limit fails closed at run time (cgroup_setup below)
+// rather than silently running unconfined.
+#ifndef PA_HAVE_CGROUP
+# if defined(CLONE_INTO_CGROUP) && defined(SYS_clone3) && __linux__
+#  define PA_HAVE_CGROUP 1
+# else
+#  define PA_HAVE_CGROUP 0
+# endif
+#endif
+
+#if __linux__
+static const std::string_view cgroup_base = "/sys/fs/cgroup";    // cgroup v2 unified mount
+
+#if PA_HAVE_CGROUP
+// Is `ctrl` listed in a cgroup.controllers / subtree_control string (a run of
+// space/newline-separated controller names)?
+static bool cgroup_has_controller(std::string_view list, std::string_view ctrl) {
+    const char* s = list.data();
+    const char* end = s + list.size();
+    while (true) {
+        while (s != end && isspace((unsigned char) *s)) {
+            ++s;
+        }
+        if (s == end) {
+            return false;
+        }
+        const char* first = s;
+        while (s != end && !isspace((unsigned char) *s)) {
+            ++s;
+        }
+        if (std::string_view(first, s - first) == ctrl) {
+            return true;
+        }
+    }
+}
+
+// Make a cgroup directory, returning 0 on success and an error code on failure.
+// An existing directory is success.
+static int cgroup_try_mkdir(const std::string& path) {
+    if (verbose) {
+        fprintf(verbosefile, "mkdir %s\n", path.c_str());
+    }
+    int r = dryrun ? 0 : mkdir(path.c_str(), 0755);
+    return r == 0 || errno == EEXIST ? 0 : errno;
+}
+
+static void cgroup_mkdir(const std::string& path) {
+    if (cgroup_try_mkdir(path) != 0) {
+        perror_die("mkdir " + path);
+    }
+}
+#endif
+
+// Open and write `value` to a cgroup file identified by `path`; return true
+// on success, false on failure
+static bool cgroup_try_write(const std::string& path, const std::string& value) {
+    if (verbose) {
+        fprintf(verbosefile, "echo %s > %s\n", shell_quote(value).c_str(), path.c_str());
+    }
+    if (dryrun) {
+        return true;
+    }
+    int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+    if (fd < 0) {
+        return false;
+    }
+    ssize_t n = write(fd, value.data(), value.size());
+    int e = errno;
+    close(fd);
+    errno = e;
+    return n == (ssize_t) value.size();
+}
+
+#if PA_HAVE_CGROUP
+// Test if `dir` is the cgroup-v2 root. The root lacks the per-cgroup core files
+// (here `cgroup.type`) that every non-root cgroup has -- including a container's
+// cgroup-namespace root, which is a real non-root cgroup. The root is exempt
+// from the no-internal-processes rule, so it never needs evacuating.
+static bool cgroup_is_root(const std::string& dir) {
+    return access((dir + "/cgroup.type").c_str(), F_OK) != 0;
+}
+
+// Move the processes `procs` (a `cgroup.procs` dump) out of cgroup `dir` into a
+// child, so `dir` can delegate controllers to its children (cgroup v2 forbids a
+// non-root cgroup from doing so while it holds processes -- and the violation
+// surfaces as an error one level down, not at `dir`). Best-effort per process;
+// the empty holding cgroup is removed if nothing moved (e.g. a process exited
+// between reading `procs` and the move).
+static void cgroup_evacuate(const std::string& dir, const std::string& procs) {
+    std::string sub = dir + "/pa-jail.host";
+    cgroup_mkdir(sub);
+    std::string dst = sub + "/cgroup.procs";
+    size_t pos = 0;
+    while (pos < procs.size()) {
+        size_t eol = procs.find('\n', pos);
+        std::string pid = procs.substr(pos, (eol == std::string::npos ? procs.size() : eol) - pos);
+        pos = eol == std::string::npos ? procs.size() : eol + 1;
+        if (!pid.empty()) {
+            cgroup_try_write(dst, pid);     // kernel thread / exited proc: ignore
+        }
+    }
+    v_rmdir(sub.c_str());                   // succeeds only if nothing moved in
+}
+
+// Enable each controller in `need` on cgroup `dir`'s subtree_control (so dir's
+// children can carry it), skipping ones already enabled or unavailable here. If
+// every needed controller is already enabled there is nothing to do and `dir` is
+// left untouched -- so a second `init` is a no-op and never re-evacuates.
+// Otherwise, since a non-root cgroup must be process-free to delegate, evacuate
+// `dir`'s processes first when it is a non-root cgroup that still holds them.
+// Best-effort: a controller that still can't be delegated is reported and
+// skipped -- a per-jail limit needing it fails closed at run time, while the
+// others are set up.
+static void cgroup_init_delegate(const std::string& dir,
+                                 const std::vector<std::string_view>& need) {
+    std::string avail = file_get_contents(dir + "/cgroup.controllers", -1);
+    std::string enabled = file_get_contents(dir + "/cgroup.subtree_control", -1);
+    std::vector<std::string_view> todo;
+    for (auto c : need) {
+        if (cgroup_has_controller(avail, c) && !cgroup_has_controller(enabled, c)) {
+            todo.push_back(c);
+        }
+    }
+    if (todo.empty()) {
+        return;                         // already configured: no work, no evacuation
+    }
+    std::string procs = file_get_contents(dir + "/cgroup.procs", -1);
+    if (!procs.empty() && !cgroup_is_root(dir)) {
+        cgroup_evacuate(dir, procs);
+    }
+    for (auto c : todo) {
+        if (!cgroup_try_write(dir + "/cgroup.subtree_control", std::format("+{}", c))) {
+            fprintf(stderr, "pa-jail init: cannot enable `%.*s` controller at %s: %s\n",
+                    (int) c.size(), c.data(), dir.c_str(), strerror(errno));
+        }
+    }
+}
+
+
+// Enable each controller in `need` in `dir`'s subtree_control, so dir's children
+// can carry it. Already-delegated controllers are skipped, so on a systemd host
+// (which already delegates cpu/pids at the root) this is a no-op for the base.
+// Best-effort: a controller that can't be delegated is left undone, and the
+// per-limit write that needs it then decides hard-die vs soft-skip.
+static void cgroup_delegate(std::string_view dir,
+                            const std::vector<std::string_view>& need) {
+    std::string subtree_control = std::format("{}/cgroup.subtree_control", dir);
+    std::string enabled = dryrun ? std::string() : file_get_contents(subtree_control, -1);
+    for (auto c : need) {
+        if (!cgroup_has_controller(enabled, c)) {
+            cgroup_try_write(subtree_control, std::format("+{}", c));
+        }
+    }
+}
+
+// Reclaim the leaves of previous finished runs: rmdir each `<pool>/<N>` whose
+// owning pa-jail process `N` is gone. A still-running jail is skipped two ways --
+// its owner is alive, and its leaf is populated so rmdir would fail anyway -- so
+// neither a running nor a concurrently-starting run is disturbed. Best-effort:
+// failures are ignored (at worst an empty dir lingers to the next run).
+static void cgroup_reclaim_stale(const std::string& pool) {
+    DIR* d = opendir(pool.c_str());
+    if (!d) {
+        return;
+    }
+    while (struct dirent* de = readdir(d)) {
+        char* end;
+        long pid = strtol(de->d_name, &end, 10);
+        if (end == de->d_name
+            || *end != '\0'
+            || pid <= 0
+            || kill((pid_t) pid, 0) == 0
+            || errno != ESRCH) {
+            continue;           // not a `<pid>` leaf, or its owner may be alive
+        }
+        std::string leaf = pool + "/" + de->d_name;
+        v_rmdir(leaf.c_str());  // fails harmlessly if not yet empty
+    }
+    closedir(d);
+}
+#endif
+
+// The value to write to a limit's interface file: `max` for unlimited, else the
+// number -- except `cpu.max`, which is "$QUOTA $PERIOD" in microseconds (PERIOD
+// pinned at 100ms, QUOTA = millicores * 100).
+static std::string cgroup_limit_value(int id, const jaillimit& l) {
+    if (id == JLIMIT_CPU_MAX) {
+        return l.unlimited ? "max 100000" : std::format("{} 100000", l.value * 100);
+    }
+    return l.unlimited ? "max" : std::to_string(l.value);
+}
+
+// Write each set cgroup limit in `lim` to its interface file under `dir`,
+// returning how many were successfully applied. A hard limit's write failure
+// dies; a soft limit's is skipped, counting nothing -- with a stderr warning
+// unless the value is unlimited (an unenforced "no constraint" is harmless).
+static int cgroup_write_limits(const std::string& dir,
+                               const jaillimits& lim,
+                               int direrror) {
+    int applied = 0;
+    for (int id = JLIMIT_CGROUP_FIRST; id != JLIMIT_CGROUP_LAST; ++id) {
+        if (!lim[id].set) {
+            continue;
+        }
+        const auto& linfo = jaillimitinfo::get(id);
+        std::string path = std::format("{}/{}", dir, linfo.cgroup_file());
+        std::string value = cgroup_limit_value(id, lim[id]);
+        if (direrror == 0 && cgroup_try_write(path, value)) {
+            ++applied;
+        } else if (!lim[id].soft) {
+#if !PA_HAVE_CGROUP
+            die("Cgroup limit failed (this pa-jail does not support cgroups)\n");
+#else
+            if (direrror) {
+                errno = direrror;
+            }
+            perror_die(path);
+#endif
+        } else if (!lim[id].unlimited) {
+            fputs(std::format("Warning: Soft limit `{}` not set\n", linfo.name).c_str(), stderr);
+        }
+    }
+    return applied;
+}
+
+// Resolve a `cgroupbase` config value to an absolute cgroup-v2 path. A leading
+// `$SELF` expands to pa-jail's own cgroup, read from /proc/self/cgroup (the v2
+// `0::/<path>` line); any other value is literal. The result must sit under the
+// v2 mount and contain no `..` (cheap defense -- the conf is root-owned, but).
+static std::string cgroup_resolve_pool(std::string_view base) {
+    std::string path;
+    if (base == "$SELF" || base.starts_with("$SELF/")) {
+        std::string self = file_get_contents("/proc/self/cgroup", 2);
+        size_t nl = self.find('\n');
+        std::string_view line(self.data(), nl == std::string::npos ? self.size() : nl);
+        if (!line.starts_with("0::/")) {
+            die("cgroup: cannot resolve $SELF: no cgroup v2 line in /proc/self/cgroup\n");
+        }
+        // our cgroup path after `0::`, with the root `/` reduced to "" so the
+        // join below never doubles a slash
+        std::string selfpath = path_noendslash(std::string(line.substr(3)));
+        if (selfpath == "/") {
+            selfpath.clear();
+        }
+        path = std::format("{}{}{}", cgroup_base, selfpath, base.substr(5));     // text after `$SELF`
+    } else {
+        path = base;
+    }
+    path = path_noendslash(path);
+    if ((path != cgroup_base && !path.starts_with(path_endslash(cgroup_base)))
+        || path.find("/../") != std::string::npos
+        || path.ends_with("/..")) {
+        die("cgroup: invalid pool path `%s` (must be under %.*s, no `..`)\n",
+            path.c_str(), (int) cgroup_base.size(), cgroup_base.data());
+    }
+    return path;
+}
+
+#if PA_HAVE_CGROUP
+// True if any *set* cgroup limit in `lim` is hard (not soft). A soft-only set may
+// be dropped when it can't be enforced; a single hard one makes the same failure
+// fatal.
+static bool cgroup_any_hard(const jaillimits& lim) {
+    return lim.any([](int, const jaillimit& l) { return l.set && !l.soft; },
+                   JLIMIT_CGROUP_FIRST, JLIMIT_CGROUP_LAST);
+}
+
+// True if any cgroup limit in `lim` is set, hard or soft.
+static bool cgroup_any_set(const jaillimits& lim) {
+    return lim.any([](int, const jaillimit& l) { return l.set; },
+                   JLIMIT_CGROUP_FIRST, JLIMIT_CGROUP_LAST);
+}
+#endif
+
+#endif
+
+// Total memory that `NN%` byte limits resolve against: the machine/VM physical
+// RAM, clamped by the `memory.max` of any cgroup pa-jail runs under (so it's the
+// container's budget when containerized, the VM/host RAM otherwise). Cached.
+static unsigned long long host_mem_bytes() {
+    static unsigned long long cached = 0;
+    if (cached != 0) {
+        return cached;
+    }
+    long pages = sysconf(_SC_PHYS_PAGES), pgsz = sysconf(_SC_PAGE_SIZE);
+    unsigned long long mem = pages > 0 && pgsz > 0
+        ? (unsigned long long) pages * (unsigned long long) pgsz : 0;
+#if __linux__
+    // walk our cgroup up to the v2 root, clamping by each level's memory.max
+    std::string self = file_get_contents("/proc/self/cgroup", -1);
+    size_t nl = self.find('\n');
+    std::string_view line(self.data(), nl == std::string::npos ? self.size() : nl);
+    if (line.starts_with("0::/")) {
+        std::string dir = path_noendslash(std::format("{}{}", cgroup_base, line.substr(3)));
+        while (true) {
+            std::string v = file_get_contents(dir + "/memory.max", -1);
+            char* end;
+            unsigned long long m = strtoull(v.c_str(), &end, 10);
+            if (end != v.c_str() && m > 0 && (mem == 0 || m < mem)) {
+                mem = m;
+            }
+            if (dir == cgroup_base) {
+                break;
+            }
+            dir = path_noendslash(path_parentdir(dir));
+        }
+    }
+#endif
+    cached = mem ? mem : (1ULL << 30);   // 1 GiB fallback if introspection fails
+    return cached;
+}
+
+// Resolve any `percent` (NN% of total RAM) byte limits in `lim` to absolute bytes.
+// Must run before `jaillimits::apply_overrides` (so its `min` compares only bytes)
+// and before the limits are applied.
+static void resolve_percent_limits(jaillimits& lim) {
+    for (int id = 0; id != JLIMIT_COUNT; ++id) {
+        if (lim[id].set && lim[id].percent) {
+            lim[id].value = host_mem_bytes() * lim[id].value / 100;
+            lim[id].percent = false;
+        }
+    }
+}
+
+// `pa-jail init JAILDIR`: prepare the cgroup pool `perm` resolves to, by enabling
+// exactly the controllers `perm`'s limits (leaf + pool) need on the pool and its
+// parent, so per-run jails can create leaves that carry those limits. If the jail
+// has no cgroup limits, it does nothing. One-time and operator-run; unlike the
+// per-run path it may relocate foreign processes to satisfy cgroup v2's
+// no-internal-processes rule (needed inside a container). Idempotent.
+static int cgroup_init(const pajailconf& conf, const jailperm& perm) {
+    jaillimits pool_lim;
+    default_conf().parse_pool(pool_lim, perm.cgroupbase);   // built-in defaults
+    conf.parse_pool(pool_lim, perm.cgroupbase);             // real config overlays
+    resolve_percent_limits(pool_lim);
+    std::vector<std::string_view> need;
+    cgroup_add_controllers(perm.limits, need, PA_HAVE_CGROUP);
+    cgroup_add_controllers(pool_lim, need, PA_HAVE_CGROUP);
+    if (need.empty()) {
+        return 0;               // no cgroup limits for this jail -> nothing to do
+    }
+#if PA_HAVE_CGROUP
+    if (access("/sys/fs/cgroup/cgroup.controllers", R_OK) != 0) {
+        // no cgroup v2 here: fatal only if a hard cgroup limit needs it; an
+        // all-soft set is dropped, best-effort, like a no-cgroup build
+        if (cgroup_any_hard(perm.limits) || cgroup_any_hard(pool_lim)) {
+            die("/sys/fs/cgroup: Not a cgroup v2 unified hierarchy\n");
+        }
+        return 0;
+    }
+    std::string pool = cgroup_resolve_pool(perm.cgroupbase);
+    cgroup_init_delegate(path_noendslash(path_parentdir(pool)), need);
+    cgroup_mkdir(pool);
+    cgroup_init_delegate(pool, need);
+    return 0;
+#else
+    die("Cgroup limit failed (this pa-jail does not support cgroups)\n");
+#endif
+}
+
+#if __linux__
+// Create and configure this run's leaf cgroup, returning its path (empty if no
+// cgroup limit is set anywhere, i.e. the feature is opt-in). The pool is the
+// jail's `cgroupbase` (resolved); the leaf is `<pool>/<pid>`. cgroup v2 makes the
+// effective limit `min(leaf, pool, ...ancestors)`, so per-jail leaf limits and a
+// shared pool cap compose for free.
+static std::string cgroup_setup(const pajailconf& conf, const jailperm& perm) {
+    const jaillimits& leaf_lim = perm.limits;   // already %-resolved in jail_main
+    jaillimits pool_lim;
+    default_conf().parse_pool(pool_lim, perm.cgroupbase);   // built-in defaults
+    conf.parse_pool(pool_lim, perm.cgroupbase);             // real config overlays
+    resolve_percent_limits(pool_lim);
+
+    // controllers needed by either the per-jail leaf or the shared pool
+    std::vector<std::string_view> need;
+    cgroup_add_controllers(leaf_lim, need, PA_HAVE_CGROUP);
+    cgroup_add_controllers(pool_lim, need, PA_HAVE_CGROUP);
+    if (need.empty()) {
+        return std::string();
+    }
+
+    std::string pool = cgroup_resolve_pool(perm.cgroupbase);
+    std::string leaf = std::format("{}/{}", pool, getpid());
+    int pool_error = EINVAL, leaf_error = EINVAL;
+
+    // `cgroupbase $SELF` can resolve the pool to the cgroup-v2 root -- on bare
+    // metal, or the container's own namespace root under Docker. That cgroup has
+    // no controller interface files and is the operator's (or Docker's) to cap,
+    // not pa-jail's; writing aggregate limits there would clobber the container's
+    // own caps. So we leave it alone: only the per-jail leaf limits apply (in
+    // leaves created under it). See the pool-limit handling below.
+    [[maybe_unused]] bool pool_is_root = pool == cgroup_base;
+
+#if PA_HAVE_CGROUP
+    // The pool's parent delegates the controllers down to the pool, and the pool
+    // down to its per-run leaves. The pool is created once and left in place
+    // (idle pools are free) and carries the aggregate cap shared by its jails.
+    // Delegation is best-effort and the per-limit writes are hard/soft-aware, so
+    // only an outright failure to *create* a cgroup needs the explicit fallback.
+    if (!pool_is_root) {
+        cgroup_delegate(path_noendslash(path_parentdir(pool)), need);
+    }
+    pool_error = leaf_error = cgroup_try_mkdir(pool);
+    if (pool_error == 0) {
+        cgroup_delegate(pool, need);
+
+        // clean up leaves from previous finished runs, then make this run's
+        // leaf (the explicit rmdir clears a stale leaf left by a crashed run
+        // that reused our pid; reclaim skips that one because we, its owner,
+        // are alive)
+        cgroup_reclaim_stale(pool);
+        v_rmdir(leaf.c_str());
+        leaf_error = cgroup_try_mkdir(leaf);
+    }
+#endif
+
+    int applied = cgroup_write_limits(leaf, leaf_lim, leaf_error);
+    if (pool_is_root) {
+        // can't (and won't) cap the cgroup root; an explicit hard pool limit
+        // that thus goes unenforced is fatal, the soft defaults drop with a note
+        if (cgroup_any_hard(pool_lim)) {
+            die("Cannot enforce [cgroup] limits on cgroup root `%s`\n",
+                pool.c_str());
+        } else if (cgroup_any_set(pool_lim) && !quiet) {
+            fprintf(stderr, "Warning: Ignoring [cgroup] limits on cgroup root `%s`\n",
+                    pool.c_str());
+        }
+    } else {
+        applied += cgroup_write_limits(pool, pool_lim, pool_error);
+    }
+
+    // If not one limit could be applied (necessarily all soft -- a hard write
+    // would have died), the cgroup is unusable here: don't birth the child into a
+    // dead leaf (clone3 would fail too). Drop it and run unconfined.
+    if (applied == 0) {
+        v_rmdir(leaf.c_str());
+        return std::string();
+    }
+    return leaf;
+}
+#endif
+
+
+// Apply (or, when `!apply`, only --verbose-log) the per-process rlimits set in
+// `lim` -- the `rlimit.*` tail of `jaillimitinfo`, each binding a `RLIMIT_*`.
+// Unlike the cgroup limits, these go on with setrlimit(2) in the child about to
+// exec student code, just before the final privilege drop -- belt-and-suspenders
+// alongside the per-jail cgroup caps (see HARDENING.md §4.6). The log form runs in
+// the parent flow (so `--dry-run --verbose` shows it); the apply form runs in the
+// child. Fail-safe: a setrlimit error dies rather than silently not applying.
+static void apply_rlimits(const jaillimits& lim, bool apply) {
+    for (int id = JLIMIT_RLIMIT_FIRST; id != JLIMIT_RLIMIT_LAST; ++id) {
+        if (!lim[id].set) {
+            continue;
+        }
+        const auto& linfo = jaillimitinfo::get(id);
+        if (!apply) {
+            if (verbose) {
+                if (lim[id].unlimited) {
+                    fputs(std::format("setrlimit {} = unlimited\n", linfo.name).c_str(), verbosefile);
+                } else {
+                    fputs(std::format("setrlimit {} = {}\n", linfo.name, lim[id].value).c_str(), verbosefile);
+                }
+            }
+            continue;
+        }
+        struct rlimit rl;
+        rl.rlim_cur = rl.rlim_max =
+            lim[id].unlimited ? RLIM_INFINITY : (rlim_t) lim[id].value;
+        if (setrlimit(linfo.rlimit_resource(), &rl) != 0) {
+            if (!lim[id].soft) {
+                perror_die(std::format("setrlimit {}", linfo.name));
+            } else if (!lim[id].unlimited) {
+                fputs(std::format("Warning: Soft limit `{}` not set\n", linfo.name).c_str(), stderr);
+            }
+        }
+    }
+}
+
+#if __linux__
+// Drop every capability from the effective/permitted/inheritable sets, the
+// ambient set, and the bounding set. Used after entering a fresh user namespace
+// (whose creator gets a full set) so the student holds no capabilities even
+// `CAP_SYS_ADMIN` inside its own namespace. Raw syscall to avoid a libcap dep.
+static void cap_drop_all() {
+    prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0);
+    for (int cap = 0; cap <= CAP_LAST_CAP; ++cap) {
+        prctl(PR_CAPBSET_DROP, cap, 0, 0, 0);   // unknown caps simply fail; fine
+    }
+    struct __user_cap_header_struct hdr = {};
+    hdr.version = _LINUX_CAPABILITY_VERSION_3;
+    struct __user_cap_data_struct data[2] = {};
+    if (syscall(SYS_capset, &hdr, data) != 0) {
+        perror_die("capset");
+    }
+}
+
+static void write_idmap(const char* path, const std::string& line) {
+    int fd = open(path, O_WRONLY | O_CLOEXEC);
+    if (fd < 0 || write(fd, line.data(), line.size()) != (ssize_t) line.size()) {
+        perror_die(path);
+    }
+    close(fd);
+}
+
+// Put the about-to-exec student into a fresh user namespace where it keeps its
+// own (non-root) uid/gid via an *identity* map. The namespace's uid 0 ("root in
+// the jail") is therefore unmapped -- it resolves to the host overflow uid
+// (nobody), never real root -- so an in-jail escalation to uid 0 gains nothing on
+// the host. The creator gets a full capability set in the new namespace, so we
+// then drop all capabilities. The uid change made us non-dumpable (which makes
+// /proc/self/uid_map root-owned); PR_SET_DUMPABLE restores write access. Runs as
+// the student `owner`/`group`, just before execve. Fail-closed: any failure dies.
+static void setup_userns(uid_t owner, gid_t group) {
+    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+    if (unshare(CLONE_NEWUSER) != 0) {
+        perror_die("unshare(CLONE_NEWUSER)");
+    }
+    write_idmap("/proc/self/setgroups", "deny");
+    write_idmap("/proc/self/gid_map", std::format("{} {} 1\n", group, group));
+    write_idmap("/proc/self/uid_map", std::format("{} {} 1\n", owner, owner));
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+    cap_drop_all();
+}
+#endif
+
+
 class jailownerinfo {
   public:
     uid_t owner_ = ROOT;
@@ -1835,13 +2448,14 @@ class jailownerinfo {
     void set_inputfd(int inputfd);
     void set_timeout(double timeout, double idle_timeout);
     void set_foreground(bool foreground);
-    void exec(int argc, char** argv, jaildirinfo& jaildir);
+    void exec(int argc, char** argv, jaildirinfo& jaildir, jaildirinfo& permjail);
     int exec_go();
 
   private:
     std::vector<const char*> newenv_;
     char** argv_ = nullptr;
-    jaildirinfo* jaildir_;
+    jaildirinfo* jaildir_ = nullptr;
+    jaildirinfo* permjail_ = nullptr;
     int inputfd_ = -1;
     double timeout_ = -1.0;
     double idle_timeout_ = -1.0;
@@ -2005,7 +2619,7 @@ void jailownerinfo::set_foreground(bool foreground) {
     this->foreground_ = foreground;
 }
 
-void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
+void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir, jaildirinfo& permjail) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     snprintf(homebuf, sizeof(homebuf), "HOME=%s", owner_home_.c_str());
@@ -2086,6 +2700,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
 
     // store other arguments
     this->jaildir_ = &jaildir;
+    this->permjail_ = &permjail;
     gettimeofday(&this->start_time_, nullptr);
     if (this->timeout_ > 0) {
         this->expiry_ = timer_add_delay(this->start_time_, this->timeout_);
@@ -2099,23 +2714,51 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
 
     // enter the jail
 #if __linux__
-    char* new_stack = (char*) malloc(256 * 1024);
-    if (!new_stack) {
-        die("Out of memory\n");
-    }
+    // set up the per-run cgroup (no-op unless cgroup limits are configured)
+    std::string cgleaf = cgroup_setup(*permjail_->conf_, permjail_->perm);
     if (verbose) {
         fprintf(verbosefile, "-clone-\n");
     }
     int child;
-    if (!dryrun) {
-        child = clone(exec_clone_function, new_stack + 256 * 1024,
-                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | SIGCHLD, this);
-    } else {
+    if (dryrun) {
         exec_clone_function(this);
         exit(0);
-    }
-    if (child == -1) {
-        perror_die("clone");
+    } else if (cgleaf.empty()) {
+        char* new_stack = (char*) malloc(256 * 1024);
+        if (!new_stack) {
+            die("Out of memory\n");
+        }
+        child = clone(exec_clone_function, new_stack + 256 * 1024,
+                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | SIGCHLD, this);
+        if (child == -1) {
+            perror_die("clone");
+        }
+    } else {
+#if PA_HAVE_CGROUP
+        // clone3 + CLONE_INTO_CGROUP: the child is born inside the leaf, so its
+        // limits apply from the start and student code (forked much later) can
+        // never run unconfined -- no placement race, no barrier. The leaf is
+        // reclaimed by a later run's setup; no privileged process lingers.
+        int cgfd = open(cgleaf.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+        if (cgfd < 0) {
+            perror_die(cgleaf);
+        }
+        struct clone_args ca = {};
+        ca.flags = CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | CLONE_INTO_CGROUP;
+        ca.exit_signal = SIGCHLD;
+        ca.cgroup = (uint64_t) cgfd;
+        long pid = syscall(SYS_clone3, &ca, sizeof(ca));
+        if (pid < 0) {
+            perror_die("clone3 (cgroup limits need Linux 5.7+)");
+        } else if (pid == 0) {
+            close(cgfd);
+            _exit(exec_go());
+        }
+        close(cgfd);
+        child = (int) pid;
+#else
+        die("internal error: cgroup leaf without cgroup support\n");  // unreachable
+#endif
     }
 #else
     int child = fork();
@@ -2185,6 +2828,22 @@ int jailownerinfo::exec_go() {
     }
     handle_mount("/proc", jdir + "proc", true);
     handle_mount("/dev/pts", jdir + "dev/pts", true);
+    // /dev/pts is mounted `newinstance`, so its pty multiplexor is
+    // /dev/pts/ptmx. posix_openpt() requires a /dev/ptmx → /dev/pts/ptmx
+    // symlink to this new multiplexor; we install it unconditionally.
+    std::string ptmx = jdir + "dev/ptmx";
+    x_rm_f(ptmx);
+    x_symlink("pts/ptmx", ptmx.c_str());
+    // a configured `tmpfs.size` limit becomes a `size=` cap on the jail's /tmp
+    // tmpfs (only meaningful when /tmp is a tmpfs -- a disk-backed /tmp is not a
+    // RAM-fill vector; the jail mounts a fresh empty tmpfs, so it's bounded)
+    if (const jaillimit& tsz = permjail_->perm.limits[JLIMIT_TMPFS_SIZE];
+        tsz.set && !tsz.unlimited) {
+        if (auto it = mount_table.find("/tmp");
+            it != mount_table.end() && it->second.type == "tmpfs") {
+            it->second.add_mountopt(("size=" + std::to_string(tsz.value)).c_str());
+        }
+    }
     handle_mount("/tmp", jdir + "tmp", true);
     handle_mount("/run", jdir + "run", true);
 #endif
@@ -2310,6 +2969,14 @@ int jailownerinfo::exec_go() {
         }
     }
 
+    // per-process rlimits (applied in the child below; logged here so they show
+    // under --verbose, including --dry-run)
+    apply_rlimits(permjail_->perm.limits, false);
+    if (opt_userns && verbose) {
+        fprintf(verbosefile, "unshare --user (identity-map uid %d gid %d; drop caps)\n",
+                (int) owner_, (int) group_);
+    }
+
     // run command
     if (verbose) {
         for (int i = 0; newenv_[i]; ++i) {
@@ -2349,6 +3016,9 @@ int jailownerinfo::exec_go() {
             }
 #endif
 
+            // per-process resource limits, before the permanent privilege drop
+            apply_rlimits(permjail_->perm.limits, true);
+
             // reduce privileges permanently
             if (setresgid(group_, group_, group_) != 0) {
                 perror_die("setresgid");
@@ -2369,6 +3039,15 @@ int jailownerinfo::exec_go() {
             for (int sig = 1; sig < NSIG; ++sig) {
                 signal(sig, SIG_DFL);
             }
+
+#if __linux__
+            // `--userns`: enter a user namespace so jail-root is unprivileged on
+            // the host (and drop all capabilities). Last, so the controlling tty
+            // and signal setup above run in the parent namespace.
+            if (opt_userns) {
+                setup_userns(owner_, group_);
+            }
+#endif
 
             int r = execve(argv_[0], (char* const*) argv_,
                            (char* const*) newenv_.data());
@@ -2830,7 +3509,17 @@ static void close_unwanted_fds() {
                    [-i INPUT] [-f FILE | -F DATA] [-S SKELETON] \\\n\
                    JAILDIR USER COMMAND\n\
        pa-jail mv SOURCE DEST\n\
-       pa-jail rm [-nf] [--bg] JAILDIR\n");
+       pa-jail rm [-nf] [--bg] JAILDIR\n\
+       pa-jail init [-nV] JAILDIR\n");
+    } else if (action == do_init) {
+        fprintf(stderr, "Usage: pa-jail init [-nV] JAILDIR\n\
+Prepare the cgroup pool that `pa-jail run JAILDIR` would use (the `cgroupbase`\n\
+JAILDIR resolves to in /etc/pa-jail.conf): enable the cpu/pids/memory\n\
+controllers so per-run jails can carry limits. Run once per boot, before any\n\
+jails (e.g. from a systemd unit). Needs root and a cgroup v2 unified hierarchy.\n\
+\n\
+  -n, --dry-run     Print actions that would be taken, don't run them\n\
+  -V, --verbose     Print actions as well as running them\n");
     } else if (action == do_mv) {
         fprintf(stderr, "Usage: pa-jail mv [-n] SOURCE DEST\n\
 Safely move a jail from SOURCE to DEST. SOURCE and DEST must be allowed\n\
@@ -2874,6 +3563,8 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
   -T, --timeout TIMEOUT     Kill the jail after TIMEOUT seconds\n\
   -I, --idle-timeout TIMEOUT  Kill the jail after TIMEOUT idle seconds\n\
   -q, --quiet               Don't print timeout or termination notices\n\
+  -l, --limit NAME=VALUE,...  Tighten resource limits (may not loosen the config)\n\
+      --userns              Run in a user namespace (jail-root maps to nobody)\n\
       --fg                  Run in the foreground\n");
         }
         fprintf(stderr, "  -n, --dry-run             Print actions, don't run them\n\
@@ -2896,6 +3587,7 @@ static struct option longoptions_before[] = {
 #define ARG_EVENT_SOURCE 1003
 #define ARG_BG           1004
 #define ARG_READY        1005
+#define ARG_USERNS       1006
 
 static struct option longoptions_run[] = {
     { "verbose", no_argument, nullptr, 'V' },
@@ -2922,6 +3614,8 @@ static struct option longoptions_run[] = {
     { "event-source", required_argument, nullptr, ARG_EVENT_SOURCE },
     { "ready", optional_argument, nullptr, ARG_READY },
     { "quiet", no_argument, nullptr, 'q' },
+    { "limit", required_argument, nullptr, 'l' },
+    { "userns", no_argument, nullptr, ARG_USERNS },
     { nullptr, 0, nullptr, 0 }
 };
 
@@ -2936,10 +3630,10 @@ static struct option longoptions_rm[] = {
 
 static struct option* longoptions_action[] = {
     longoptions_before, longoptions_run, longoptions_run, longoptions_rm,
-    longoptions_before
+    longoptions_before, longoptions_before
 };
 static const char* shortoptions_action[] = {
-    "+Vn", "VnB:S:f:F:p:P:T:I:qi:hu:t:", "VnB:S:f:F:p:P:T:I:qi:hu:t:", "Vnf", "Vn"
+    "+Vn", "VnB:S:f:F:p:P:T:I:qi:hu:t:l:", "VnB:S:f:F:p:P:T:I:qi:hu:t:l:", "Vnf", "Vn", "Vn"
 };
 
 static bool opt_strtod(double& v) {
@@ -2966,13 +3660,15 @@ static bool range_strtol(long& v, const char* a, const char* b) {
     return a == b;
 }
 
-int main(int argc, char** argv) {
+// May throw an exception
+static int jail_main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
     double timeout = -1, idle_timeout = -1;
     std::string inputarg, linkarg, manifest, bindarg;
     std::vector<std::string> chown_user_args;
+    jaillimits limit_override;          // `--limit` command-line overrides
     pidcontents = "$$";
 
     int ch;
@@ -3048,6 +3744,10 @@ int main(int argc, char** argv) {
                 }
             } else if (ch == 't' && action == do_run) {
                 timingfilename = optarg;
+            } else if (ch == 'l') {
+                pajailconf::parse_limits(limit_override, optarg); // may throw
+            } else if (ch == ARG_USERNS) {
+                opt_userns = true;
             } else { /* if (ch == 'H') */
                 usage(action);
             }
@@ -3062,8 +3762,9 @@ int main(int argc, char** argv) {
             foreground = true;
         } else if (strcmp(argv[optind], "mv") == 0) {
             action = do_mv;
-        } else if (strcmp(argv[optind], "init") == 0
-                   || strcmp(argv[optind], "add") == 0) {
+        } else if (strcmp(argv[optind], "init") == 0) {
+            action = do_init;
+        } else if (strcmp(argv[optind], "add") == 0) {
             action = do_add;
         } else if (strcmp(argv[optind], "run") == 0) {
             action = do_run;
@@ -3082,11 +3783,13 @@ int main(int argc, char** argv) {
     bool has_runarg = !linkarg.empty() || !manifest.empty() || !inputarg.empty() || !eventsourcefilename.empty();
     if ((action == do_rm && optind + 1 != argc)
         || (action == do_mv && optind + 2 != argc)
+        || (action == do_init && optind + 1 != argc)
         || (action == do_add && optind != argc - 1 && optind + 2 != argc)
         || (action == do_run && optind + 3 > argc)
         || (action == do_run && foreground && (!inputarg.empty() || !eventsourcefilename.empty()))
         || (action == do_rm && has_runarg)
         || (action == do_mv && has_runarg)
+        || (action == do_init && has_runarg)
         || !argv[optind][0]
         || (action == do_mv && !argv[optind+1][0])) {
         usage();
@@ -3220,7 +3923,38 @@ int main(int argc, char** argv) {
     //   necessary
     // - try to eliminate TOCTTOU
     pajailconf jailconf;
+
+    // `pa-jail init JAILDIR`: prepare the cgroup pool that `run JAILDIR` would
+    // use -- the `cgroupbase` JAILDIR resolves to in the config. No jail tree is
+    // built or required, so this resolves the config only (no path walk).
+    if (action == do_init) {
+        std::string dir = path_pa_validate(path_absolute(argv[optind]));
+        if (dir.empty() || dir == "/" || dir[0] != '/') {
+            fprintf(stderr, "%s: Bad jail directory\n", argv[optind]);
+            exit(1);
+        }
+        jailperm perm(dir);
+        default_conf().parse(perm);         // seed built-in defaults, under the config
+        jailconf.parse(perm);
+        if (!perm.enabled) {
+            die("%s: Jail disabled in /etc/pa-jail.conf\n%s",
+                perm.dir.c_str(), perm.disable_message().c_str());
+        }
+        resolve_percent_limits(perm.limits);
+        return cgroup_init(jailconf, perm);
+    }
+
     jaildirinfo jaildir(argv[optind], linkarg, action, jailconf);
+
+    // resolve `NN%`-of-RAM byte limits to bytes, then fold any `--limit` overrides
+    // into this jail's resolved limits (a hard conf limit may only be tightened, a
+    // soft default is replaced outright, a `!`-pinned value is immune -- see §6.4).
+    // Resolve first so the override's `min` compares only absolute byte values.
+    if (action == do_run) {
+        resolve_percent_limits(jaildir.perm.limits);
+        resolve_percent_limits(limit_override);
+        jaildir.perm.limits.apply_overrides(limit_override);
+    }
 
     // `pa-jail run --bind BINDDIR` builds the jail in a shared scaffold BINDDIR
     // and binds the real jail's contents into it (via the manifest), rather than
@@ -3294,10 +4028,11 @@ int main(int argc, char** argv) {
 
     // create the home directory
     if (!jailuser.owner_home_.empty()) {
-        if (v_ensuredir(jaildir.perm.dir + "/home", 0755) < 0) {
-            perror_die(jaildir.perm.dir + "/home");
+        assert(jaildir.perm.dir.ends_with('/') && jailuser.owner_home_.starts_with('/'));
+        if (v_ensuredir(jaildir.perm.dir + "home", 0755) < 0) {
+            perror_die(jaildir.perm.dir + "home");
         }
-        std::string jailhome = jaildir.perm.dir + jailuser.owner_home_;
+        std::string jailhome = jaildir.perm.dir + jailuser.owner_home_.substr(1);
         int r = v_ensuredir(jailhome, 0700);
         uid_t want_owner = action == do_add ? caller_owner : jailuser.owner_;
         gid_t want_group = action == do_add ? caller_group : jailuser.group_;
@@ -3307,6 +4042,7 @@ int main(int argc, char** argv) {
         }
         // also create in skeleton, but ignore errors
         if (!linkdir.empty()) {
+            assert(!linkdir.ends_with('/'));
             (void) v_ensuredir(linkdir + "/home", 0755);
             std::string linkhome = linkdir + jailuser.owner_home_;
             r = v_ensuredir(linkhome, 0700);
@@ -3330,10 +4066,7 @@ int main(int argc, char** argv) {
                 f.c_str());
         } else if (!xf.starts_with(jaildir.perm.dir)) {
             // `jaildir.dir` ends in `/` while `xf` (from path_pa_validate) does
-            // not, so this requires `xf` to be a strict subdirectory: the jail
-            // root itself is intentionally excluded, since chowning it to the
-            // ephemeral user would be an escape vector. Don't "fix" this by
-            // normalizing the trailing slash.
+            // not; this enforces that `xf` is a strict subdirectory
             die("%s: --chown-user directory must be within %s\n",
                 f.c_str(), jaildir.perm.dir.c_str());
         }
@@ -3365,7 +4098,7 @@ int main(int argc, char** argv) {
         jailuser.set_inputfd(inputfd);
         jailuser.set_timeout(timeout, idle_timeout);
         jailuser.set_foreground(foreground);
-        jailuser.exec(argc - (optind + 2), argv + optind + 2, buildjail);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, buildjail, jaildir);
     }
 
     // close timing and lock file if appropriate
@@ -3374,4 +4107,13 @@ int main(int argc, char** argv) {
     }
 
     exit(0);
+}
+
+int main(int argc, char** argv) {
+    try {
+        return jail_main(argc, argv);
+    } catch (const pajailconf_error& e) {
+        fprintf(stderr, "%s\n", e.message().c_str());
+        exit(1);
+    }
 }

@@ -52,6 +52,13 @@ inline std::string path_noendslash(std::string path) {
     return path;
 }
 
+inline std::string_view path_noendslash(std::string_view path) {
+    while (path.size() > 1 && path.back() == '/') {
+        path.remove_suffix(1);
+    }
+    return path;
+}
+
 // Return the parent directory of `path`, ending in a slash.
 // Examples: `a/b/c`→`a/b/`; `/`→`/`.
 std::string path_parentdir(const std::string& path);
@@ -94,3 +101,9 @@ bool pathmatch(std::string_view pattern, std::string_view str);
 // `/` added if absent. The result always ends in `/`. This is the deepest
 // directory that any path matching `pattern` is guaranteed to share.
 std::string pathmatch_literal_prefix(std::string_view pattern);
+
+// Return the contents of file `path` as a string. `error_behavior` determines
+// what happens on error. If negative, the function fails silently; if zero,
+// it prints an error message to standard error; if positive, it prints an
+// error message and calls `exit(1)`.
+std::string file_get_contents(std::string path, int error_behavior = 0);

@@ -351,3 +351,42 @@ std::string path_pa_validate(std::string_view name) {
     }
     return std::string(buf, out - buf);
 }
+
+
+static std::string file_get_contents_error(std::string msg, int error_behavior) {
+    if (error_behavior > 0) {
+        fprintf(stderr, "%s\n", msg.c_str());
+    }
+    if (error_behavior > 1) {
+        exit(1);
+    }
+    return "";
+}
+
+std::string file_get_contents(std::string fname, int error_behavior) {
+    FILE* f;
+    if (fname == "-") {
+        f = stdin;
+        if (isatty(STDIN_FILENO)) {
+            return file_get_contents_error("stdin: Is a tty", error_behavior);
+        }
+    } else {
+        f = fopen(fname.c_str(), "r");
+        if (!f) {
+            return file_get_contents_error(fname + ": " + strerror(errno), error_behavior);
+        }
+    }
+    std::string contents;
+    while (!feof(f) && !ferror(f)) {
+        char buf[BUFSIZ];
+        size_t n = fread(buf, 1, BUFSIZ, f);
+        if (n > 0) {
+            contents.append(buf, n);
+        }
+    }
+    if (ferror(f)) {
+        return file_get_contents_error(fname + ": " + strerror(errno), error_behavior);
+    }
+    fclose(f);
+    return contents;
+}
