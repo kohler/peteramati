@@ -1,4 +1,4 @@
-// pa-jutil.cc -- Peteramati helper functions for pa-jail, test-pa-jail
+// pa-jutil.cc -- Peteramati helper functions for pa-jail
 // Peteramati is Copyright (c) 2013-2026 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 

@@ -59,6 +59,9 @@
 #ifndef O_PATH
 #define O_PATH 0
 #endif
+#ifndef MS_REMOUNT
+#define MS_REMOUNT 0
+#endif
 
 typedef std::pair<dev_t, ino_t> devino;
 namespace std { template <> struct hash<devino> {
@@ -266,27 +269,32 @@ static bool x_symlink_eexist_ok(const char* oldpath, const char* newpath) {
 }
 
 static int x_symlink(const char* oldpath, const char* newpath) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "ln -s %s %s\n", oldpath, newpath);
+    }
     if (!dryrun
         && symlink(oldpath, newpath) != 0
-        && (errno != EEXIST || !x_symlink_eexist_ok(oldpath, newpath)))
+        && (errno != EEXIST || !x_symlink_eexist_ok(oldpath, newpath))) {
         return perror_fail("symlink %s: %s\n", (std::string(oldpath) + " " + newpath).c_str());
+    }
     return 0;
 }
 
 static int x_copy_utimes(const char* path, const struct stat& st) {
-#if __linux__
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "touch -m -d @%ld %s\n", st.st_mtime, path);
+    }
     if (!dryrun) {
         struct timespec ts[2];
         ts[0].tv_nsec = UTIME_OMIT;
+#if __linux__
         ts[1] = st.st_mtim;
+#else
+        ts[1] = st.st_mtimespec;
+#endif
         if (utimensat(-1, path, ts, AT_SYMLINK_NOFOLLOW) != 0)
             return perror_fail("utimensat %s: %s\n", path);
     }
-#endif
     return 0;
 }
 
@@ -305,6 +313,40 @@ static std::pair<pid_t, int> x_waitpid(pid_t child, int flags) {
             return std::make_pair((pid_t) -1, -1);
     }
 }
+
+#if __APPLE__
+// Approximations of Linux-only system calls to allow Mac OS X compilation
+// (NB: pa-jail is not expected to work on Mac OS X.)
+
+int mount(const char*, const char* target, const char* fstype,
+          unsigned long flags, const void*) {
+    return ::mount(fstype, target, flags, nullptr);
+}
+
+int umount(const char* dir) {
+    return ::unmount(dir, 0);
+}
+
+int setresuid(uid_t ruid, uid_t euid, uid_t suid) {
+    if (ruid == euid && ruid == suid) {
+        return setuid(ruid);
+    } else if (ruid == euid && suid == ROOT) {
+        return seteuid(euid);
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
+    if (rgid == egid && rgid == sgid) {
+        return setgid(rgid);
+    } else if (rgid == egid && sgid == ROOT) {
+        return setegid(egid);
+    }
+    errno = EINVAL;
+    return -1;
+}
+#endif
 
 
 // jailmaking
@@ -487,9 +529,8 @@ bool mountslot::mountable(std::string src, std::string dst) const {
         } else {
             return true;
         }
-    } else {
-        return false;
     }
+    return false;
 }
 
 int mountslot::x_mount(std::string dst, unsigned long opts) {
@@ -534,17 +575,6 @@ static int populate_mount_table() {
     return 0;
 #endif
 }
-
-#if __APPLE__
-int mount(const char*, const char* target, const char* fstype,
-          unsigned long flags, const void*) {
-    return ::mount(fstype, target, flags, nullptr);
-}
-
-int umount(const char* dir) {
-    return ::unmount(dir, 0);
-}
-#endif
 
 static int handle_mount(std::string src, std::string dst, bool in_child) {
     auto it = mount_table.find(src);
@@ -632,10 +662,10 @@ static std::string unmounted(std::string dir, bool no_change = false) {
         return dir;
     } else if (dir.back() == '/') {
         return unmounted(dir.substr(0, dir.length() - 1), true);
-    } else {
-        return unmounted(dir + '/', true);
     }
+    return unmounted(dir + '/', true);
 #else
+    (void) no_change;
     return dir;
 #endif
 }
@@ -1704,11 +1734,11 @@ void esfd::write_header() {
 
 void esfd::write_event(jbuffer& jbuf) {
     char xbuf[2048];
-    size_t n = sprintf(xbuf, "data:{\"offset\":%zu,\"data\":\"", output_off_);
+    size_t n = snprintf(xbuf, sizeof(xbuf), "data:{\"offset\":%zu,\"data\":\"", output_off_);
     jbuf_.append(xbuf, n);
     const unsigned char* stop = jbuf_.append_json_chars(jbuf.buf_ + output_off_ - jbuf.bufpos_, jbuf.buf_ + jbuf.tail_);
     size_t newoff = jbuf.bufpos_ + (stop - jbuf.buf_);
-    n = sprintf(xbuf, "\",\"end_offset\":%zu}\nid:%zu\n\n", newoff, newoff);
+    n = snprintf(xbuf, sizeof(xbuf), "\",\"end_offset\":%zu}\nid:%zu\n\n", newoff, newoff);
     jbuf_.append(xbuf, n);
     output_off_ = newoff;
 }
