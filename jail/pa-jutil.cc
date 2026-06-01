@@ -1,0 +1,215 @@
+// pa-jutil.cc -- Peteramati helper functions for pa-jail, test-pa-jail
+// Peteramati is Copyright (c) 2013-2026 Eddie Kohler and others
+// See LICENSE for open-source distribution terms
+
+#include "pa-jutil.hh"
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+
+int exit_status = 0;
+
+int perror_fail(const char* format, const char* arg1) {
+    fprintf(stderr, format, arg1, strerror(errno));
+    ::exit_status = 1;
+    return 1;
+}
+
+void die(const char* fmt, ...) {
+    va_list val;
+    va_start(val, fmt);
+    vfprintf(stderr, fmt, val);
+    va_end(val);
+    exit(1);
+}
+
+void perror_die(const char* message) {
+    die("%s: %s\n", message, strerror(errno));
+}
+
+std::string path_parentdir(const std::string& path) {
+    size_t npos = path.size();
+    while (npos > 1 && path[npos - 1] == '/') {
+        --npos;
+    }
+    while (npos > 1 && path[npos - 1] != '/') {
+        --npos;
+    }
+    return path.substr(0, npos);
+}
+
+std::string shell_quote(const std::string& argument) {
+    std::string quoted;         // quoted string prefix (if quotes required)
+    size_t emit_from = 0;       // first index not yet appended to `quoted`
+    for (size_t pos = 0; pos != argument.size(); ++pos) {
+        // skip safe characters
+        if (isalnum((unsigned char) argument[pos])
+            || argument[pos] == '_'
+            || argument[pos] == '-'
+            || argument[pos] == '.'
+            || argument[pos] == '/'
+            || (argument[pos] == '~' && pos != 0)) {
+            continue;
+        }
+        // otherwise, quotes required
+        if (quoted.empty()) {
+            quoted = "'";
+        }
+        // a single quote cannot appear inside a '...' span: flush the
+        // pending run, then close/escape/reopen the quote as '\''
+        if (argument[pos] == '\'') {
+            quoted += argument.substr(emit_from, pos - emit_from) + "'\\''";
+            emit_from = pos + 1;
+        }
+    }
+    if (quoted.empty()) {
+        // no special characters: use argument as-is
+        return argument;
+    }
+    // flush the trailing run and close the open quote
+    quoted += argument.substr(emit_from) + "'";
+    return quoted;
+}
+
+// Check a potential character class match starting at `pp` against the string
+// starting at `sp`. Return 0 on no match, the (positive) number of pattern
+// characters in the character class on successful match, and -1 if `[pp, pe)`
+// does not contain a valid character class.
+static size_t pathmatch_classcheck(const char* pp, const char* pe,
+                                   const char* sp, const char* se,
+                                   const char* scomponent) {
+    if (sp == se
+        || *sp == '/'
+        || (*sp == '.' && sp == scomponent)) {
+        return 0;
+    }
+    const char* cps = pp + 1;
+    bool negated = cps != pe && (*cps == '!' || *cps == '^');
+    if (negated) {
+        ++cps;
+    }
+    const char* cpe = cps;
+    if (cpe != pe && *cpe == ']') {
+        ++cpe;
+    }
+    while (cpe != pe && *cpe != ']') {
+        cpe += 1 + (*cpe == '\\' && cpe + 1 != pe);
+    }
+    if (cpe == pe) {
+        return -1;
+    }
+    // NB: The range [cps, cpe) does not end with an unescaped backslash.
+    // (We eliminated that case above.)
+    while (cps != cpe) {
+        unsigned char c1 = *cps;
+        if (c1 == '\\') {
+            ++cps;
+            c1 = *cps;
+        }
+        ++cps;
+        unsigned char c2 = c1;
+        if (cps != cpe && *cps == '-' && cps + 1 != cpe) {
+            ++cps;
+            c2 = *cps;
+            if (c2 == '\\') {
+                ++cps;
+                c2 = *cps;
+            }
+        }
+        if ((unsigned char) *sp >= c1
+            && (unsigned char) *sp <= c2) {
+            return negated ? 0 : cpe + 1 - pp;
+        }
+    }
+    return negated ? cpe + 1 - pp : 0;
+}
+
+bool pathmatch(std::string_view pattern, std::string_view str) {
+    const char* pp = pattern.data();
+    const char* pe = pp + pattern.size();
+    const char* sp = str.data();
+    const char* se = sp + str.size();
+
+    // check path
+    const char* pstar = pp;
+    const char* sstar = nullptr;
+    const char* pstarstar = pp;
+    const char* sstarstar = nullptr;
+    const char* scomponent = sp;
+    int classcheck;
+    while (pp != pe || sp != se) {
+        if (pp != pe) {
+            if (*pp == '*') {
+                if (pp + 1 != pe
+                    && pp[1] == '*'
+                    && (pp + 2 == pe || pp[2] == '/')
+                    && (pp == pattern.data() || pp[-1] == '/')) {
+                    pstarstar = pp;
+                    sstarstar = sp;
+                    pp += 2 + (pp != pattern.data() && pp + 2 != pe);
+                    continue;
+                }
+                if (sp != scomponent
+                    || sp == se
+                    || *sp != '.') {
+                    pstar = pp;
+                    sstar = sp;
+                    ++pp;
+                    continue;
+                }
+            } else if (*pp == '?') {
+                if (sp != se
+                    && *sp != '/'
+                    && (sp != scomponent || *sp != '.')) {
+                    ++pp;
+                    ++sp;
+                    continue;
+                }
+            } else if (*pp == '['
+                       && (classcheck = pathmatch_classcheck(pp, pe, sp, se, scomponent)) >= 0) {
+                if (classcheck > 0) {
+                    pp += classcheck;
+                    ++sp;
+                    continue;
+                }
+            } else { // normal character, possibly escaped
+                if (*pp == '\\' && pp + 1 != pe) {
+                    ++pp;
+                }
+                if (sp != se && *pp == *sp) {
+                    if (*sp == '/') {
+                        scomponent = sp + 1;
+                        sstar = nullptr;
+                    }
+                    ++pp;
+                    ++sp;
+                    continue;
+                }
+            }
+        }
+        // match failed: advance * or **
+        if (sstar != nullptr
+            && sstar != se
+            && *sstar != '/') {
+            pp = pstar;
+            sp = sstar + 1;
+            continue;
+        }
+        if (sstarstar != nullptr
+            && sstarstar != se) {
+            pp = pstarstar;
+            sp = sstarstar + 1;
+            while (sp != se
+                   && *sp != '/') {
+                ++sp;
+            }
+            if (sp != se) {
+                scomponent = sp = sp + 1;
+                sstar = nullptr;
+            }
+            continue;
+        }
+        return false;
+    }
+    return true;
+}

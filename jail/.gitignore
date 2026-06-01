@@ -1,4 +1,5 @@
+*.o
 pa-jail
 pa-timeout
 pa-writefifo
-stderrtostdout
+test-pa-jailconf

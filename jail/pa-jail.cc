@@ -1,5 +1,5 @@
 // pa-jail.cc -- Peteramati program sets up a jail for student code
-// Peteramati is Copyright (c) 2013-2024 Eddie Kohler and others
+// Peteramati is Copyright (c) 2013-2026 Eddie Kohler and others
 // See LICENSE for open-source distribution terms
 
 #include <sys/types.h>
@@ -47,8 +47,8 @@
 #include <sys/ucred.h>
 #include <sys/mount.h>
 #endif
-
-#define ROOT 0
+#include "pa-jailconf.hh"
+#include "pa-jutil.hh"
 
 #define FLAG_CP       1        // copy even if source is symlink
 #define FLAG_BIND     2
@@ -72,7 +72,6 @@ static gid_t caller_group;
 static std::unordered_map<std::string, int> dirtable;
 static std::unordered_map<std::string, int> dst_table;
 static std::unordered_map<devino, std::string> devino_table;
-static int exit_value = 0;
 static bool verbose = false;
 static bool dryrun = false;
 static bool quiet = false;
@@ -100,97 +99,6 @@ static int sigpipe[2];
 enum jailaction {
     do_start, do_add, do_run, do_rm, do_mv
 };
-
-
-// error helpers
-
-static int perror_fail(const char* format, const char* arg1) {
-    fprintf(stderr, format, arg1, strerror(errno));
-    exit_value = 1;
-    return 1;
-}
-
-[[noreturn]] static void die(const char* fmt, ...) {
-    va_list val;
-    va_start(val, fmt);
-    vfprintf(stderr, fmt, val);
-    va_end(val);
-    exit(1);
-}
-
-[[noreturn]] static void perror_die(const char* message) {
-    die("%s: %s\n", message, strerror(errno));
-}
-
-[[noreturn]] static inline void perror_die(const std::string& message) {
-    perror_die(message.c_str());
-}
-
-
-// pathname helpers
-
-static std::string path_endslash(const std::string& path) {
-    if (path.empty() || path.back() != '/') {
-        return path + "/";
-    } else {
-        return path;
-    }
-}
-
-static std::string path_noendslash(std::string path) {
-    while (path.length() > 1 && path.back() == '/') {
-        path = path.substr(0, path.length() - 1);
-    }
-    return path;
-}
-
-// returns a non-empty path that ends in slash
-static std::string path_parentdir(const std::string& path) {
-    size_t npos = path.length();
-    while (npos > 1 && path[npos - 1] == '/') {
-        --npos;
-    }
-    while (npos > 1 && path[npos - 1] != '/') {
-        --npos;
-    }
-    return path.substr(0, npos);
-}
-
-// Return a shell-safe rendering of `argument`. An argument made up entirely of
-// "safe" characters is returned verbatim (no quoting); anything else is wrapped
-// in single quotes. Examples: `a`→`a`; `a b`→`'a b'`; `a'b`→`'a'\''b'`.
-static std::string shell_quote(const std::string& argument) {
-    std::string quoted;         // quoted string prefix (if quotes required)
-    size_t emit_from = 0;       // first index not yet appended to `quoted`
-    for (size_t pos = 0; pos != argument.length(); ++pos) {
-        // skip safe characters
-        if (isalnum((unsigned char) argument[pos])
-            || argument[pos] == '_'
-            || argument[pos] == '-'
-            || argument[pos] == '.'
-            || argument[pos] == '/'
-            || (argument[pos] == '~' && pos != 0)) {
-            continue;
-        }
-        // otherwise, quotes required
-        if (quoted.empty()) {
-            quoted = "'";
-        }
-        // a single quote cannot appear inside a '...' span: flush the
-        // pending run, then close/escape/reopen the quote as '\''
-        if (argument[pos] == '\'') {
-            quoted += argument.substr(emit_from, pos - emit_from) + "'\\''";
-            emit_from = pos + 1;
-        }
-    }
-    if (quoted.empty()) {
-        // no special characters: use argument as-is
-        return argument;
-    }
-    // flush the trailing run and close the open quote
-    quoted += argument.substr(emit_from) + "'";
-    return quoted;
-}
 
 
 static const char* uid_to_name(uid_t u) {
@@ -1221,288 +1129,8 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
         }
     }
 
-    return exit_value;
+    return ::exit_status;
 }
-
-
-// pa-jail.conf
-
-struct pajailconf {
-    pajailconf();
-    pajailconf(const std::string& str);
-
-    bool allow_jail(const std::string& dir) const {
-        return allows_type("jail", dir, false);
-    }
-    bool allow_jail_subdir(const std::string& dir) const {
-        return allows_type("jail", dir, true);
-    }
-    bool allow_skeleton(const std::string& dir) const {
-        return allows_type("skeleton", dir, false);
-    }
-    const std::string& treedir() const {
-        return treedir_;
-    }
-    std::string disable_message() const {
-        if (!allowance_pattern_.empty()) {
-            return "  (disabled by " + allowance_pattern_ + ")\n";
-        } else {
-            return std::string();
-        }
-    }
-private:
-    char buf_[8192];
-    size_t len_;
-    mutable std::string treedir_;
-    mutable std::string allowance_pattern_;
-
-    std::pair<const char*, const char*> take_word(size_t& pos) const;
-    bool allows_type(const char* type, std::string dir, bool superdir) const;
-    void set_treedir(std::string pattern, const std::string& dir, bool is_explicit) const;
-};
-
-static bool writable_only_by_root(const struct stat& st) {
-    return st.st_uid == ROOT
-        && (st.st_gid == ROOT || !(st.st_mode & S_IWGRP))
-        && !(st.st_mode & S_IWOTH);
-}
-
-pajailconf::pajailconf() {
-    int fd = open("/etc/pa-jail.conf", O_RDONLY | O_NOFOLLOW);
-    if (fd == -1) {
-        perror_die("/etc/pa-jail.conf");
-    }
-
-    struct stat st;
-    if (fstat(fd, &st) != 0) {
-        perror_die("/etc/pa-jail.conf");
-    } else if (!writable_only_by_root(st)) {
-        die("/etc/pa-jail.conf: Writable by non-root\n");
-    }
-
-    ssize_t nr = read(fd, buf_, sizeof(buf_));
-    if (nr < 0) {
-        perror_die("/etc/pa-jail.conf");
-    } else if (nr == 0) {
-        die("/etc/pa-jail.conf: Empty file\n");
-    } else if (nr == sizeof(buf_)) {
-        die("/etc/pa-jail.conf: Too big, max %zu bytes\n", sizeof(buf_));
-    }
-    len_ = nr;
-
-    close(fd);
-}
-
-pajailconf::pajailconf(const std::string& s) {
-    if (s.length() >= sizeof(buf_)) {
-        die("pajailconf: String too big, max %zu bytes\n", sizeof(buf_));
-    }
-    memcpy(buf_, s.data(), s.length());
-    len_ = s.length();
-}
-
-std::pair<const char*, const char*> pajailconf::take_word(size_t& pos) const {
-    while (pos < len_
-           && buf_[pos] != '\n'
-           && isspace((unsigned char) buf_[pos])) {
-        ++pos;
-    }
-    const char* a = &buf_[pos];
-    while (pos < len_ && !isspace((unsigned char) buf_[pos])) {
-        ++pos;
-    }
-    return std::make_pair(a, &buf_[pos]);
-}
-
-static bool check_action(const std::pair<const char*, const char*>& action,
-                         const char* prefix,
-                         const char* type, size_t typelen) {
-    return size_t(action.second - action.first) == strlen(prefix) + typelen
-        && memcmp(action.first, prefix, strlen(prefix)) == 0
-        && memcmp(action.second - typelen, type, typelen) == 0;
-}
-
-static bool check_dirmatch(const std::string& pattern,
-                           std::string str,
-                           bool superdir = false,
-                           std::string* store_superdir = nullptr) {
-    if (superdir) {
-        size_t patslashpos = 0, strslashpos = 0;
-        while (true) {
-            patslashpos = pattern.find('/', patslashpos);
-            if (patslashpos == std::string::npos) {
-                str = str.substr(0, strslashpos);
-                if (store_superdir) {
-                    *store_superdir = str;
-                }
-                break;
-            }
-            ++patslashpos;
-            strslashpos = str.find('/', strslashpos);
-            if (strslashpos == std::string::npos) {
-                return false;
-            }
-            ++strslashpos;
-        }
-    }
-    return fnmatch(pattern.c_str(), str.c_str(),
-                   FNM_PATHNAME | FNM_PERIOD) == 0;
-}
-
-void pajailconf::set_treedir(std::string pattern,
-                             const std::string& str,
-                             bool is_explicit) const {
-    if (!is_explicit
-        && pattern.length() > 3
-        && memcmp(pattern.data() + pattern.length() - 3, "/*/", 3) == 0) {
-        pattern = pattern.substr(0, pattern.length() - 2);
-    }
-    std::string superdir;
-    if (check_dirmatch(pattern, str, true, &superdir)
-        && (treedir_.empty() || treedir_.length() > superdir.length())) {
-        treedir_ = superdir;
-    }
-}
-
-bool pajailconf::allows_type(const char* type,
-                             std::string dir,
-                             bool superdir) const {
-    size_t pos = 0, typelen = strlen(type);
-    int allowed_globally = -1, allowed_locally = -1;
-    allowance_pattern_ = treedir_ = std::string();
-    dir = path_endslash(dir);
-
-    while (pos < len_) {
-        auto action = take_word(pos);
-        auto arg = take_word(pos);
-        while (pos < len_ && buf_[pos] != '\n') {
-            take_word(pos);
-        }
-        while (pos < len_ && buf_[pos] == '\n') {
-            ++pos;
-        }
-
-        // check action
-        int allowed;
-        if (check_action(action, "disable", type, typelen)
-            || check_action(action, "no", type, typelen)) {
-            allowed = 0;
-        } else if (check_action(action, "enable", type, typelen)
-                   || check_action(action, "allow", type, typelen)) {
-            allowed = 1;
-        } else if (check_action(action, "treedir", "", 0)) {
-            if (arg.first != arg.second && arg.first[0] == '/') {
-                auto pattern = path_endslash(std::string(arg.first, arg.second));
-                set_treedir(pattern, dir, true);
-            }
-            continue;
-        } else {
-            continue;
-        }
-
-        if (arg.first == arg.second) {
-            // global allowance
-            allowed_globally = allowed;
-            if (!allowed) {
-                allowed_locally = allowed;
-            }
-            allowance_pattern_ = std::string();
-        } else if (arg.first[0] == '/') {
-            // check subdirectory match
-            auto pattern = path_endslash(std::string(arg.first, arg.second));
-            if (check_dirmatch(pattern, dir, superdir || allowed <= 0)) {
-                allowed_locally = allowed;
-                allowance_pattern_ = pattern;
-                if (allowed > 0) {
-                    set_treedir(pattern, dir, false);
-                }
-            }
-        }
-    }
-
-    return allowed_globally != 0 && allowed_locally > 0;
-}
-
-#if 0
-struct pajailconf_tester {
-    pajailconf_tester() {
-        pajailconf jc("enablejail /jails/run*\nenablejail /jails/~*\n");
-        assert(jc.allow_jail("/jails/run"));
-        assert(jc.treedir() == "/jails/run/");
-        assert(jc.allow_jail("/jails/run/"));
-        assert(jc.treedir() == "/jails/run/");
-        assert(!jc.allow_jail("/jails"));
-        assert(!jc.allow_jail("/jails/"));
-        assert(!jc.allow_jail("/jails/runa/runb"));
-        assert(!jc.allow_jail("/jails/runa/runb/"));
-        assert(jc.allow_jail_subdir("/jails/runa/runb"));
-        assert(jc.allow_jail_subdir("/jails/runa/runb/"));
-        assert(jc.allow_jail("/jails/runa"));
-        assert(jc.treedir() == "/jails/runa/");
-        assert(jc.allow_jail("/jails/runa/"));
-        assert(jc.treedir() == "/jails/runa/");
-        assert(jc.allow_jail("/jails/~runa"));
-        assert(jc.treedir() == "/jails/~runa/");
-        assert(jc.allow_jail("/jails/~runa/"));
-        assert(jc.treedir() == "/jails/~runa/");
-
-        jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ndisablejail /\n");
-        assert(!jc.allow_jail("/jails/run"));
-        assert(!jc.allow_jail("/jails/run/"));
-        assert(!jc.allow_jail("/jails"));
-        assert(!jc.allow_jail("/jails/"));
-        assert(!jc.allow_jail("/jails/runa/runb"));
-        assert(!jc.allow_jail("/jails/runa/runb/"));
-        assert(!jc.allow_jail("/jails/runa"));
-        assert(!jc.allow_jail("/jails/runa/"));
-        assert(!jc.allow_jail("/jails/~runa"));
-        assert(!jc.allow_jail("/jails/~runa/"));
-
-        jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ndisablejail /jails/runa\n");
-        assert(jc.allow_jail("/jails/run"));
-        assert(jc.allow_jail("/jails/run/"));
-        assert(!jc.allow_jail("/jails"));
-        assert(!jc.allow_jail("/jails/"));
-        assert(!jc.allow_jail("/jails/runa/runb"));
-        assert(!jc.allow_jail("/jails/runa/runb/"));
-        assert(!jc.allow_jail("/jails/runa"));
-        assert(!jc.allow_jail("/jails/runa/"));
-        assert(jc.allow_jail("/jails/~runa"));
-        assert(jc.allow_jail("/jails/~runa/"));
-
-        jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ntreedir /jails\n");
-        assert(jc.allow_jail("/jails/run"));
-        assert(jc.allow_jail("/jails/run/"));
-        assert(jc.treedir() == "/jails/");
-        assert(!jc.allow_jail("/jails"));
-        assert(!jc.allow_jail("/jails/"));
-        assert(!jc.allow_jail("/jails/runa/runb"));
-        assert(!jc.allow_jail("/jails/runa/runb/"));
-        assert(jc.allow_jail("/jails/runa"));
-        assert(jc.allow_jail("/jails/runa/"));
-        assert(jc.treedir() == "/jails/");
-        assert(jc.allow_jail("/jails/~runa"));
-        assert(jc.allow_jail("/jails/~runa/"));
-        assert(jc.treedir() == "/jails/");
-
-        jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ntreedir /hails\n");
-        assert(jc.allow_jail("/jails/run"));
-        assert(jc.allow_jail("/jails/run/"));
-        assert(jc.treedir() == "/jails/run/");
-        assert(!jc.allow_jail("/jails"));
-        assert(!jc.allow_jail("/jails/"));
-        assert(!jc.allow_jail("/jails/runa/runb"));
-        assert(!jc.allow_jail("/jails/runa/runb/"));
-        assert(jc.allow_jail("/jails/runa"));
-        assert(jc.allow_jail("/jails/runa/"));
-        assert(jc.treedir() == "/jails/runa/");
-        assert(jc.allow_jail("/jails/~runa"));
-        assert(jc.allow_jail("/jails/~runa/"));
-        assert(jc.treedir() == "/jails/~runa/");
-    }
-};
-static pajailconf_tester tester;
-#endif
 
 
 // main program
@@ -1579,22 +1207,22 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
       parentfd(-1), allowed(false), dev(-1),
       skeletondir(skeletonstr) {
     if (dir.empty() || dir == "/" || dir[0] != '/') {
-        fprintf(stderr, "%s: Bad characters in filename\n", str);
+        fprintf(stderr, "%s: Bad jail filename\n", str);
         exit(1);
     }
     dir = path_endslash(dir);
-    if (jailconf.allow_jail(dir)) {
-        permdir = jailconf.treedir();
+    if (jailperm perm = jailconf.check_jail(dir)) {
+        permdir = perm.treedir;
     } else {
         die("%s: Jail disabled by /etc/pa-jail.conf\n%s",
-            dir.c_str(), jailconf.disable_message().c_str());
+            dir.c_str(), perm.disable_message().c_str());
     }
 
     if (!skeletondir.empty()) {
         skeletondir = path_endslash(absolute(skeletondir));
-        if (!jailconf.allow_skeleton(skeletondir)) {
+        if (jailperm perm = jailconf.check_skeleton(skeletondir); !perm) {
             die("%s: Skeleton disabled by /etc/pa-jail.conf\n%s",
-                skeletondir.c_str(), jailconf.disable_message().c_str());
+                skeletondir.c_str(), perm.disable_message().c_str());
         }
     }
 
@@ -1708,7 +1336,7 @@ void jaildirinfo::chown_recursive(const std::string& dir,
         perror_die(dirbuf);
     }
     if (x_fchown(dirfd, owner, group, dirbuf)) {
-        exit(exit_value);
+        exit(::exit_status);
     }
     chown_recursive(dirfd, dirbuf, owner, group, false, dirst.st_dev);
 }
@@ -1749,7 +1377,7 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
         // don't follow symbolic links
         if (de->d_type == DT_LNK) {
             if (x_lchownat(dirfd, de->d_name, owner, group, dirbuf)) {
-                exit(exit_value);
+                exit(::exit_status);
             }
             continue;
         }
@@ -1776,14 +1404,14 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
                 }
                 if (subdirst.st_dev == dev) {
                     if (x_fchown(subdirfd, u, g, dirbuf)) {
-                        exit(exit_value);
+                        exit(::exit_status);
                     }
                     chown_recursive(subdirfd, dirbuf, u, g, false, dev);
                 }
             }
             dirbuf.resize(dirbuflen);
         } else if (x_lchownat(dirfd, de->d_name, u, g, dirbuf)) {
-            exit(exit_value);
+            exit(::exit_status);
         }
     }
 
@@ -3496,9 +3124,9 @@ int main(int argc, char** argv) {
         }
 
         // check jail allowance
-        if (!jailconf.allow_jail(newpath)) {
+        if (jailperm perm = jailconf.check_jail(newpath); !perm) {
             die("%s: Destination jail disabled by /etc/pa-jail.conf\n%s",
-                newpath.c_str(), jailconf.disable_message().c_str());
+                newpath.c_str(), perm.disable_message().c_str());
         }
 
         if (verbose) {
@@ -3572,9 +3200,9 @@ int main(int argc, char** argv) {
         jaildir.chown_home();
     }
     for (const auto& f : chown_user_args) {
-        if (!jailconf.allow_jail_subdir(f)) {
+        if (jailperm perm = jailconf.check_jail_subdir(f); !perm) {
             die("%s: --chown-user directory disabled by /etc/pa-jail.conf\n%s",
-                f.c_str(), jailconf.disable_message().c_str());
+                f.c_str(), perm.disable_message().c_str());
         }
         jaildir.chown_recursive(f, jailuser.owner_, jailuser.group_);
     }
