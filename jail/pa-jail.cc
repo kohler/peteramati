@@ -1342,11 +1342,11 @@ void jaildirinfo::chown_home() {
     close(dirfd);
 }
 
-// Chown all directories under `path` to be owned by `owner:group`.
+// Chown `path` and directories under it to be owned by `owner:group`.
 // `path` must be located under the jail’s `dir`. Walks from `dir`
 // down to `path`, refusing to cross symbolic links. The final file
 // may be a regular file or symbolic link (the link or file is chown'd)
-//  or a directory (it is walked into).
+//  or a directory (it and its children are chown'd recursively).
 void jaildirinfo::chown_recursive(const std::string& path,
                                   uid_t owner, gid_t group) {
     populate_mount_table();

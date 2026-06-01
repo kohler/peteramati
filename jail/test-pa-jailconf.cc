@@ -241,8 +241,6 @@ void test_pajailconf() {
     assert(!jc.check_jail("/jails/"));
     assert(!jc.check_jail("/jails/runa/runb"));
     assert(!jc.check_jail("/jails/runa/runb/"));
-    assert(jc.check_jail_subdir("/jails/runa/runb"));
-    assert(jc.check_jail_subdir("/jails/runa/runb/"));
     assert(jc.check_jail("/jails/runa").treedir == "/jails/runa/");
     assert(jc.check_jail("/jails/runa/").treedir == "/jails/runa/");
     assert(jc.check_jail("/jails/~runa").treedir == "/jails/~runa/");

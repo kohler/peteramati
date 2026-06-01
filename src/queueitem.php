@@ -1115,11 +1115,9 @@ class QueueItem {
                 $contents .= " {$jhash} {$jfiles}";
             }
             $contents .= "]\n{$userhome} <- {$this->_jailhomedir} [bind]";
-            $cmdarg[] = "-u{$this->_jailhomedir}";
             $cmdarg[] = "-F{$contents}";
             $cmdarg[] = "-B{$binddir}";
         } else if ($jfiles) {
-            $cmdarg[] = "-h";
             $cmdarg[] = "-f{$jfiles}";
             if ($skeletondir) {
                 $cmdarg[] = "-S{$skeletondir}";
@@ -1132,6 +1130,8 @@ class QueueItem {
         if ($jmanifest) {
             $cmdarg[] = "-F" . join("\n", $jmanifest);
         }
+
+        $cmdarg[] = "-h";
 
         if (!$foreground) {
             if (($to = $runner->timeout ?? $pset->run_timeout) > 0) {

@@ -119,8 +119,7 @@ static void set_treedir(std::string& treedir, std::string pattern,
 }
 
 jailperm pajailconf::check_type(std::string_view type,
-                                std::string dir,
-                                bool superdir) const {
+                                std::string dir) const {
     const char* pos = buf_;
     const char* last = buf_ + len_;
     int allowed_globally = -1, allowed_locally = -1;
@@ -174,7 +173,7 @@ jailperm pajailconf::check_type(std::string_view type,
         } else if (arg[0] == '/') {
             // check subdirectory match
             auto pattern = path_endslash(std::string(arg));
-            if (check_dirmatch(pattern, dir, superdir || allowed <= 0)) {
+            if (check_dirmatch(pattern, dir, allowed <= 0)) {
                 allowed_locally = allowed;
                 perm.disabled_by = pattern;
                 if (allowed > 0) {

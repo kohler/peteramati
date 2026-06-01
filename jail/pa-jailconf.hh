@@ -34,18 +34,15 @@ struct pajailconf {
     pajailconf(const std::string& str);
 
     jailperm check_jail(const std::string& dir) const {
-        return check_type("jail", dir, false);
-    }
-    jailperm check_jail_subdir(const std::string& dir) const {
-        return check_type("jail", dir, true);
+        return check_type("jail", dir);
     }
     jailperm check_skeleton(const std::string& dir) const {
-        return check_type("skeleton", dir, false);
+        return check_type("skeleton", dir);
     }
 
 private:
     char buf_[8192];
     size_t len_;
 
-    jailperm check_type(std::string_view type, std::string dir, bool superdir) const;
+    jailperm check_type(std::string_view type, std::string dir) const;
 };
