@@ -276,68 +276,114 @@ void test_pathmatch_literal_prefix() {
 }
 
 void test_pajailconf() {
+    // permdir is the literal prefix of the matching enable pattern: here the
+    // wildcard is glued to a literal in the last component, so the prefix is the
+    // parent
     pajailconf jc("enablejail /jails/run*\nenablejail /jails/~*\n");
-    assert(jc.check_jail("/jails/run").treedir == "/jails/run/");
-    assert(jc.check_jail("/jails/run/").treedir == "/jails/run/");
-    assert(!jc.check_jail("/jails"));
-    assert(!jc.check_jail("/jails/"));
-    assert(!jc.check_jail("/jails/runa/runb"));
-    assert(!jc.check_jail("/jails/runa/runb/"));
-    assert(jc.check_jail("/jails/runa").treedir == "/jails/runa/");
-    assert(jc.check_jail("/jails/runa/").treedir == "/jails/runa/");
-    assert(jc.check_jail("/jails/~runa").treedir == "/jails/~runa/");
-    assert(jc.check_jail("/jails/~runa/").treedir == "/jails/~runa/");
+    assert(jc.get("/jails/run").permdir == "/jails/");
+    assert(jc.get("/jails/run/").permdir == "/jails/");
+    assert(!jc.get("/jails"));
+    assert(!jc.get("/jails/"));
+    assert(!jc.get("/jails/runa/runb"));
+    assert(!jc.get("/jails/runa/runb/"));
+    assert(jc.get("/jails/runa").permdir == "/jails/");
+    assert(jc.get("/jails/runa/").permdir == "/jails/");
+    assert(jc.get("/jails/~runa").permdir == "/jails/");
+    assert(jc.get("/jails/~runa/").permdir == "/jails/");
 
-    // a disable pattern cascades into subdirectories: `disablejail /` is a veto
-    jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ndisablejail /\n");
-    assert(!jc.check_jail("/jails/run"));
-    assert(!jc.check_jail("/jails/run/"));
-    assert(!jc.check_jail("/jails"));
-    assert(!jc.check_jail("/jails/"));
-    assert(!jc.check_jail("/jails/runa/runb"));
-    assert(!jc.check_jail("/jails/runa/runb/"));
-    assert(!jc.check_jail("/jails/runa"));
-    assert(!jc.check_jail("/jails/runa/"));
-    assert(!jc.check_jail("/jails/~runa"));
-    assert(!jc.check_jail("/jails/~runa/"));
+    // a wildcard that is its own component leaves the parent as permdir; a
+    // fully-literal pattern is its own permdir (matches deployment configs)
+    jc = pajailconf("enablejail /data/jails/*\nenablejail /data/jailbind\n");
+    assert(jc.get("/data/jails/repo10").permdir == "/data/jails/");
+    assert(jc.get("/data/jails/repo10/").permdir == "/data/jails/");
+    assert(jc.get("/data/jailbind").permdir == "/data/jailbind/");
+    assert(jc.get("/data/jailbind/").permdir == "/data/jailbind/");
+
+    // global `disablejail` is a veto
+    jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ndisablejail\n");
+    assert(!jc.get("/jails/run"));
+    assert(!jc.get("/jails/run/"));
+    assert(!jc.get("/jails"));
+    assert(!jc.get("/jails/"));
+    assert(!jc.get("/jails/runa/runb"));
+    assert(!jc.get("/jails/runa/runb/"));
+    assert(!jc.get("/jails/runa"));
+    assert(!jc.get("/jails/runa/"));
+    assert(!jc.get("/jails/~runa"));
+    assert(!jc.get("/jails/~runa/"));
+
+    // `disablejail /**` is a veto also, since it cascades into subdirs
+    jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ndisablejail /**\n");
+    assert(!jc.get("/jails/run"));
+    assert(!jc.get("/jails/run/"));
+    assert(!jc.get("/jails"));
+    assert(!jc.get("/jails/"));
+    assert(!jc.get("/jails/runa/runb"));
+    assert(!jc.get("/jails/runa/runb/"));
+    assert(!jc.get("/jails/runa"));
+    assert(!jc.get("/jails/runa/"));
+    assert(!jc.get("/jails/~runa"));
+    assert(!jc.get("/jails/~runa/"));
 
     jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ndisablejail /jails/runa\n");
-    assert(jc.check_jail("/jails/run"));
-    assert(jc.check_jail("/jails/run/"));
-    assert(!jc.check_jail("/jails"));
-    assert(!jc.check_jail("/jails/"));
-    assert(!jc.check_jail("/jails/runa/runb"));
-    assert(!jc.check_jail("/jails/runa/runb/"));
-    assert(!jc.check_jail("/jails/runa"));
-    assert(!jc.check_jail("/jails/runa/"));
-    assert(jc.check_jail("/jails/~runa"));
-    assert(jc.check_jail("/jails/~runa/"));
+    assert(jc.get("/jails/run"));
+    assert(jc.get("/jails/run/"));
+    assert(!jc.get("/jails"));
+    assert(!jc.get("/jails/"));
+    assert(!jc.get("/jails/runa/runb"));
+    assert(!jc.get("/jails/runa/runb/"));
+    assert(!jc.get("/jails/runa"));
+    assert(!jc.get("/jails/runa/"));
+    assert(jc.get("/jails/~runa"));
+    assert(jc.get("/jails/~runa/"));
 
-    // an explicit `treedir` directive widens the permission directory
-    jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ntreedir /jails\n");
-    assert(jc.check_jail("/jails/run").treedir == "/jails/");
-    assert(jc.check_jail("/jails/run/").treedir == "/jails/");
-    assert(!jc.check_jail("/jails"));
-    assert(!jc.check_jail("/jails/"));
-    assert(!jc.check_jail("/jails/runa/runb"));
-    assert(!jc.check_jail("/jails/runa/runb/"));
-    assert(jc.check_jail("/jails/runa").treedir == "/jails/");
-    assert(jc.check_jail("/jails/runa/").treedir == "/jails/");
-    assert(jc.check_jail("/jails/~runa").treedir == "/jails/");
-    assert(jc.check_jail("/jails/~runa/").treedir == "/jails/");
+    // disable does NOT cascade: a broadly-enabled subdir survives a disable of
+    // its parent; only the exact directory is disabled
+    jc = pajailconf("enablejail /jails/**\ndisablejail /jails/runa\n");
+    assert(jc.get("/jails/runa/runb"));
+    assert(jc.get("/jails/runa/runb/"));
+    assert(!jc.get("/jails/runa"));
+    assert(!jc.get("/jails/runa/"));
+    assert(jc.get("/jails/runb"));
 
-    // a non-matching `treedir` leaves the permission directory at the jail dir
-    jc = pajailconf("enablejail /jails/run*\nenablejail /jails/~*\ntreedir /hails\n");
-    assert(jc.check_jail("/jails/run").treedir == "/jails/run/");
-    assert(jc.check_jail("/jails/run/").treedir == "/jails/run/");
-    assert(!jc.check_jail("/jails"));
-    assert(!jc.check_jail("/jails/"));
-    assert(!jc.check_jail("/jails/runa/runb"));
-    assert(!jc.check_jail("/jails/runa/runb/"));
-    assert(jc.check_jail("/jails/runa").treedir == "/jails/runa/");
-    assert(jc.check_jail("/jails/runa/").treedir == "/jails/runa/");
-    assert(jc.check_jail("/jails/~runa").treedir == "/jails/~runa/");
-    assert(jc.check_jail("/jails/~runa/").treedir == "/jails/~runa/");
+    // an explicit `/**` is needed to disable a whole subtree
+    jc = pajailconf("enablejail /jails/**\ndisablejail /jails/runa/**\n");
+    assert(!jc.get("/jails/runa"));
+    assert(!jc.get("/jails/runa/"));
+    assert(!jc.get("/jails/runa/runb"));
+    assert(!jc.get("/jails/runa/runb/"));
+    assert(jc.get("/jails/runb"));
+
+    // global and local allowances are independent axes, ANDed together; a global
+    // disable can be undone by a later global enable without re-matching locally
+    jc = pajailconf("enablejail /jails/run*\ndisablejail\n");
+    assert(!jc.get("/jails/run"));
+    jc = pajailconf("enablejail /jails/run*\ndisablejail\nenablejail\n");
+    assert(jc.get("/jails/run"));
+
+    // skeleton allowance parallels jail allowance, keyed on the skeleton dir
+    jc = pajailconf("enablejail /jails/**\nenableskeleton /skel/*\n");
+    assert(jc.get("/jails/a", "/skel/x").skeletondir == "/skel/x/");
+    assert(jc.get("/jails/a", "/skel/x/").skeletondir == "/skel/x/");
+    assert(jc.get("/jails/a", "/skel/x").allowed);
+    assert(jc.get("/jails/a", "/other").skeletondir == "");
+    assert(jc.get("/jails/a").skeletondir == "");
+    assert(jc.get("/jails/a").allowed);
+
+    // a bare `enableskeleton` enables nothing by itself
+    jc = pajailconf("enablejail /jails/**\nenableskeleton\n");
+    assert(jc.get("/jails/a", "/skel/x").skeletondir == "");
+
+    // `disableskeleton` overrides a prior enable (last match wins)
+    jc = pajailconf("enablejail /jails/**\nenableskeleton /skel/*\ndisableskeleton /skel/bad\n");
+    assert(jc.get("/jails/a", "/skel/ok").skeletondir == "/skel/ok/");
+    assert(jc.get("/jails/a", "/skel/bad").skeletondir == "");
+
+    // a skeleton enable must not affect the jail's permdir (without the guard,
+    // the `/jails/*` skeleton pattern would set permdir to "/jails/")
+    jc = pajailconf("enablejail /jails/a\nenableskeleton /jails/*\n");
+    assert(jc.get("/jails/a", "/jails/skel").skeletondir == "/jails/skel/");
+    assert(jc.get("/jails/a", "/jails/skel").permdir == "/jails/a/");
 }
 
 void test_path_absolute() {

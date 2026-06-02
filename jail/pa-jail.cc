@@ -201,14 +201,17 @@ static int v_mkdirat(int dirfd, const char* component, mode_t mode, const std::s
     return dryrun ? 0 : mkdirat(dirfd, component, mode);
 }
 
-static int v_ensuredir(std::string pathname, mode_t mode, bool nolink) {
+// Ensure `pathname` exists as a directory, creating it and any missing parents.
+// Uses `lstat`, so a symlink anywhere along the created portion is rejected
+// rather than followed.
+static int v_ensuredir(std::string pathname, mode_t mode) {
     pathname = path_noendslash(pathname);
     auto it = dirtable.find(pathname);
     if (it != dirtable.end()) {
         return it->second;
     }
     struct stat st;
-    int r = (nolink ? lstat : stat)(pathname.c_str(), &st);
+    int r = lstat(pathname.c_str(), &st);
     if (r == 0 && !S_ISDIR(st.st_mode)) {
         errno = ENOTDIR;
         r = -1;
@@ -216,7 +219,7 @@ static int v_ensuredir(std::string pathname, mode_t mode, bool nolink) {
     if (r == -1 && errno == ENOENT) {
         std::string parent_pathname = path_parentdir(pathname);
         if ((parent_pathname.length() == pathname.length()
-             || v_ensuredir(parent_pathname, mode, false) >= 0)
+             || v_ensuredir(parent_pathname, mode) >= 0)
             && v_mkdir(pathname.c_str(), mode) == 0) {
             r = 1;
         }
@@ -618,7 +621,7 @@ static int handle_mount(std::string src, std::string dst, bool in_child) {
     dst_table[dst] = 2;
 
     if (in_child) {
-        v_ensuredir(dst, 0555, true);
+        v_ensuredir(dst, 0555);
     }
 
     mountslot msx(it->second);
@@ -1168,7 +1171,7 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
                              flags & FLAG_BIND_RO ? "bind,rec,unbindable,ro" : "bind,rec,unbindable");
                 ms.wanted = true;
                 mount_table[src] = ms;
-                v_ensuredir(dstroot + dst, 0555, true);
+                v_ensuredir(dstroot + dst, 0555);
                 handle_mount(src, dstroot + dst, false);
             }
         } else if (flags & FLAG_MOUNT) {
@@ -1176,7 +1179,7 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
                 mountslot ms(src.c_str(), mount_dst.c_str(), mount_args.c_str());
                 ms.wanted = true;
                 mount_table[src] = ms;
-                v_ensuredir(dstroot + dst, 0555, true);
+                v_ensuredir(dstroot + dst, 0555);
                 handle_mount(src, dstroot + dst, false);
             }
         } else {
@@ -1223,20 +1226,19 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
         exit(1);
     }
     dir = path_endslash(dir);
-    if (jailperm perm = jailconf.check_jail(dir)) {
-        permdir = perm.treedir;
-    } else {
-        die("%s: Jail disabled by /etc/pa-jail.conf\n%s",
-            dir.c_str(), perm.disable_message().c_str());
-    }
-
     if (!skeletondir.empty()) {
         skeletondir = path_endslash(path_absolute(skeletondir));
-        if (jailperm perm = jailconf.check_skeleton(skeletondir); !perm) {
-            die("%s: Skeleton disabled by /etc/pa-jail.conf\n%s",
-                skeletondir.c_str(), perm.disable_message().c_str());
-        }
     }
+    jailperm perm = jailconf.get(dir, skeletondir);
+    if (!perm) {
+        die("%s: Jail disabled by /etc/pa-jail.conf\n%s",
+            dir.c_str(), perm.disable_message().c_str());
+    } else if (!skeletondir.empty() && perm.skeletondir.empty()) {
+        die("%s: Skeleton disabled by /etc/pa-jail.conf\n%s",
+            skeletondir.c_str(), perm.disable_message().c_str());
+    }
+    permdir = perm.permdir;
+    skeletondir = perm.skeletondir;
 
     size_t last_pos = 0;
     int fd = -1;
@@ -1268,13 +1270,24 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
             close(parentfd);
         }
         parentfd = fd;
-        fd = openat(parentfd, component.c_str(), O_PATH | O_CLOEXEC | O_NOFOLLOW);
+        fd = openat(parentfd, component.c_str(),
+                    O_PATH | O_CLOEXEC | O_NOFOLLOW);
         if (fd == -1 && !allowed_here && errno == ENOENT) {
+            // A component above the permission directory is missing. For the
+            // creating actions this is fatal: we must not let later code
+            // (`v_ensuredir`) `mkdir -p` it unchecked, outside the boundary.
+            // For `rm`/`mv` there is nothing to create, so stop the walk.
+            if (action == do_add || action == do_run) {
+                die("%s: Required parent directory does not exist\n",
+                    thisdir.c_str());
+            }
             break;
         }
-        if ((fd == -1 && dryrunning)
-            || (fd == -1 && allowed_here && errno == ENOENT
-                && (action == do_add || action == do_run))) {
+        if (fd == -1
+            && (dryrunning
+                || (allowed_here
+                    && errno == ENOENT
+                    && (action == do_add || action == do_run)))) {
             if (v_mkdirat(parentfd, component.c_str(), 0755, thisdir) != 0) {
                 fprintf(stderr, "mkdir %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
@@ -2125,7 +2138,7 @@ int jailownerinfo::exec_go() {
 
     std::string parent_mnt = jdir + "mnt/.parent";
     std::string unmounted_parent_mnt = unmounted_jdir + "mnt/.parent";
-    if (v_ensuredir(unmounted_parent_mnt, 0777, true) < 0) {
+    if (v_ensuredir(unmounted_parent_mnt, 0777) < 0) {
         perror_die("mkdir -p " + unmounted_parent_mnt);
     }
 
@@ -3208,7 +3221,7 @@ int main(int argc, char** argv) {
         }
 
         // check jail allowance
-        if (jailperm perm = jailconf.check_jail(newpath); !perm) {
+        if (jailperm perm = jailconf.get(newpath); !perm) {
             die("%s: Destination jail disabled by /etc/pa-jail.conf\n%s",
                 newpath.c_str(), perm.disable_message().c_str());
         }
@@ -3249,7 +3262,7 @@ int main(int argc, char** argv) {
 
     // check skeleton directory
     if (!jaildir.skeletondir.empty()) {
-        if (v_ensuredir(jaildir.skeletondir, 0755, true) < 0) {
+        if (v_ensuredir(jaildir.skeletondir, 0755) < 0) {
             perror_die(jaildir.skeletondir);
         }
         linkdir = path_noendslash(jaildir.skeletondir);
@@ -3257,11 +3270,11 @@ int main(int argc, char** argv) {
 
     // create the home directory
     if (!jailuser.owner_home_.empty()) {
-        if (v_ensuredir(jaildir.dir + "/home", 0755, true) < 0) {
+        if (v_ensuredir(jaildir.dir + "/home", 0755) < 0) {
             perror_die(jaildir.dir + "/home");
         }
         std::string jailhome = jaildir.dir + jailuser.owner_home_;
-        int r = v_ensuredir(jailhome, 0700, true);
+        int r = v_ensuredir(jailhome, 0700);
         uid_t want_owner = action == do_add ? caller_owner : jailuser.owner_;
         gid_t want_group = action == do_add ? caller_group : jailuser.group_;
         if (r < 0
@@ -3270,9 +3283,9 @@ int main(int argc, char** argv) {
         }
         // also create in skeleton, but ignore errors
         if (!linkdir.empty()) {
-            (void) v_ensuredir(linkdir + "/home", 0755, true);
+            (void) v_ensuredir(linkdir + "/home", 0755);
             std::string linkhome = linkdir + jailuser.owner_home_;
-            r = v_ensuredir(linkhome, 0700, true);
+            r = v_ensuredir(linkhome, 0700);
             if (r > 0) {
                 x_lchown(linkhome.c_str(), jailuser.owner_, jailuser.group_);
             }
