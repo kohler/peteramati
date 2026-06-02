@@ -3,6 +3,8 @@
 #include "pa-jutil.hh"
 #include <cassert>
 #include <cstdio>
+#include <cstdint>
+#include <string>
 
 void test_pathmatch() {
     // slashes are significant; no insensitivity
@@ -498,11 +500,194 @@ void test_path_pa_validate() {
     assert(path_pa_validate(std::string(1024, 'a')).empty());
 }
 
+void test_shell_quote() {
+    // entirely-safe strings are returned verbatim (no quoting)
+    assert(shell_quote("abc") == "abc");
+    assert(shell_quote("ABZ019") == "ABZ019");
+    assert(shell_quote("a_b-c.d/e") == "a_b-c.d/e");
+    assert(shell_quote("/usr/bin/foo-bar_baz.sh") == "/usr/bin/foo-bar_baz.sh");
+    // `~` is safe only when it is NOT the first character
+    assert(shell_quote("a~") == "a~");
+    assert(shell_quote("a~b") == "a~b");
+    assert(shell_quote("~") == "'~'");          // leading tilde forces quoting
+    assert(shell_quote("~root") == "'~root'");
+
+    // empty argument must become an explicit empty word, not vanish
+    assert(shell_quote("") == "''");
+
+    // any other character forces single-quoting of the whole word; the safe
+    // characters around it are included inside the quotes
+    assert(shell_quote("a b") == "'a b'");
+    assert(shell_quote(" ") == "' '");
+    assert(shell_quote("$PATH") == "'$PATH'");
+    assert(shell_quote("a;b") == "'a;b'");
+    assert(shell_quote("a&b|c") == "'a&b|c'");
+    assert(shell_quote("a*b?c[d]") == "'a*b?c[d]'");
+    assert(shell_quote("a\"b") == "'a\"b'");
+    assert(shell_quote("a\\b") == "'a\\b'");
+    assert(shell_quote("a\nb") == "'a\nb'");
+    assert(shell_quote("a\tb") == "'a\tb'");
+    assert(shell_quote("#a=b:c") == "'#a=b:c'");
+
+    // single quotes are emitted as the close/escape/reopen idiom `'\''`
+    assert(shell_quote("'") == "''\\'''");       // ''  \'  ''  -> one literal '
+    assert(shell_quote("a'b") == "'a'\\''b'");
+    assert(shell_quote("'a") == "''\\''a'");
+    assert(shell_quote("a'") == "'a'\\'''");
+    assert(shell_quote("''") == "''\\'''\\'''"); // two adjacent quotes
+}
+
+// Independent oracle: decode a string produced by shell_quote the way a POSIX
+// shell would, treating it as a single word. Models only what shell_quote can
+// emit -- runs of literal characters and `'...'` spans (with single quotes
+// rendered as the unquoted-and-backslash-escaped `\'`). Returns false if the
+// input does not parse to exactly one word: an unquoted blank (which would
+// split the word) or an unterminated quote both fail.
+static bool shq_decode(const std::string& q, std::string& out) {
+    out.clear();
+    bool any = false;
+    size_t i = 0, n = q.size();
+    while (i < n) {
+        char c = q[i];
+        if (c == ' ' || c == '\t' || c == '\n') {
+            return false;       // shell_quote must never leave a blank unquoted
+        }
+        any = true;
+        if (c == '\'') {
+            ++i;
+            while (i < n && q[i] != '\'') {
+                out += q[i];
+                ++i;
+            }
+            if (i == n) {
+                return false;   // unterminated single quote
+            }
+            ++i;                // consume the closing quote
+        } else if (c == '\\') {
+            if (i + 1 == n) {
+                return false;   // dangling backslash
+            }
+            out += q[i + 1];
+            i += 2;
+        } else {
+            out += c;
+            ++i;
+        }
+    }
+    return any;                 // empty input == zero words == failure
+}
+
+// Best-effort second oracle: ask a real /bin/sh to parse `q` as a word list and
+// report the count and the first word's bytes. Returns false (and the test
+// skips it) if a shell cannot be run in this environment. `set --` makes the
+// quoted text the positional parameters; we print the count, a literal `X`
+// separator (never produced by the digit count), then `$1` verbatim.
+static bool shell_can_run = true;
+static bool shell_eval_word(const std::string& q, int& count, std::string& word) {
+    std::string cmd = "set -- " + q + "; printf %s \"$#\"; printf X; printf %s \"$1\"";
+    FILE* f = popen(cmd.c_str(), "r");
+    if (!f) {
+        return false;
+    }
+    std::string out;
+    char buf[4096];
+    size_t nr;
+    while ((nr = fread(buf, 1, sizeof(buf), f)) > 0) {
+        out.append(buf, nr);
+    }
+    int rc = pclose(f);
+    if (rc != 0) {
+        return false;
+    }
+    size_t x = out.find('X');
+    if (x == std::string::npos) {
+        return false;
+    }
+    count = atoi(out.substr(0, x).c_str());
+    word = out.substr(x + 1);
+    return true;
+}
+
+void fuzz_shell_quote() {
+    // an "interesting" alphabet: safe characters, shell metacharacters, quotes,
+    // whitespace, and a couple of high bytes (quoted under the C locale)
+    static const char alpha[] = {
+        'a', 'Z', '5', '_', '-', '.', '/', '~',
+        ' ', '\t', '\n', '\'', '"', '`', '$', '\\',
+        ';', '&', '|', '<', '>', '(', ')', '{', '}',
+        '*', '?', '[', ']', '#', '!', '=', ':', '+', '%', '^',
+        (char) 0x80, (char) 0xC3
+    };
+    const size_t nalpha = sizeof(alpha) / sizeof(alpha[0]);
+
+    // probe once whether a shell is usable for cross-checking
+    {
+        int c; std::string w;
+        shell_can_run = shell_eval_word("ok", c, w) && c == 1 && w == "ok";
+    }
+
+    // deterministic PRNG (xorshift32, fixed seed) so any failure reproduces
+    uint32_t st = 0x9e3779b9u;
+    auto rnd = [&]() {
+        st ^= st << 13; st ^= st >> 17; st ^= st << 5;
+        return st;
+    };
+
+    // The pure decoder oracle is cheap; the real-shell cross-check forks a shell
+    // per case, so it is capped low by default. `PA_SHELL_FUZZ=N` scales it up
+    // (e.g. for a thorough local run); 0 disables it.
+    const int iters = 200000;
+    int shell_budget = 20;
+    if (const char* e = getenv("PA_SHELL_FUZZ")) {
+        shell_budget = atoi(e);
+    }
+    int shell_checked = 0;
+    for (int it = 0; it != iters; ++it) {
+        size_t len = rnd() % 13;        // 0..12 bytes, including the empty word
+        std::string s;
+        for (size_t j = 0; j != len; ++j) {
+            s += alpha[rnd() % nalpha];
+        }
+
+        std::string q = shell_quote(s);
+
+        // oracle 1: our own decoder round-trips to exactly the original word
+        std::string decoded;
+        bool ok = shq_decode(q, decoded);
+        if (!ok || decoded != s) {
+            fprintf(stderr, "fuzz_shell_quote: decode mismatch for %zu bytes\n",
+                    s.size());
+            assert(ok && decoded == s);
+        }
+
+        // oracle 2: a real shell parses it as one word equal to the original.
+        // Cap the shell round-trips to keep `make check` fast.
+        if (shell_can_run && shell_checked < shell_budget) {
+            ++shell_checked;
+            int count = -1;
+            std::string word;
+            if (shell_eval_word(q, count, word)) {
+                if (count != 1 || word != s) {
+                    fprintf(stderr, "fuzz_shell_quote: shell saw %d word(s)"
+                            " for %zu-byte input\n", count, s.size());
+                    assert(count == 1 && word == s);
+                }
+            }
+        }
+    }
+    if (!shell_can_run) {
+        fprintf(stderr, "test-pa-jailconf: (note) no usable /bin/sh;"
+                " skipped shell cross-check of shell_quote\n");
+    }
+}
+
 int main() {
     test_pathmatch();
     test_pathmatch_literal_prefix();
     test_pajailconf();
     test_path_absolute();
     test_path_pa_validate();
+    test_shell_quote();
+    fuzz_shell_quote();
     fprintf(stderr, "test-pa-jailconf: all tests passed\n");
 }

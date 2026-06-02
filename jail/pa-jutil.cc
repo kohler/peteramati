@@ -42,8 +42,13 @@ std::string path_parentdir(const std::string& path) {
 }
 
 std::string shell_quote(const std::string& argument) {
+    if (argument.empty()) {
+        // An empty word must be quoted: bare emptiness would vanish from the
+        // command line rather than survive as an empty argument.
+        return "''";
+    }
     std::string quoted;         // quoted string prefix (if quotes required)
-    size_t emit_from = 0;       // first index not yet appended to `quoted`
+    size_t from = 0;            // first index not yet appended to `quoted`
     for (size_t pos = 0; pos != argument.size(); ++pos) {
         // skip safe characters
         if (isalnum((unsigned char) argument[pos])
@@ -61,8 +66,8 @@ std::string shell_quote(const std::string& argument) {
         // a single quote cannot appear inside a '...' span: flush the
         // pending run, then close/escape/reopen the quote as '\''
         if (argument[pos] == '\'') {
-            quoted += argument.substr(emit_from, pos - emit_from) + "'\\''";
-            emit_from = pos + 1;
+            quoted += argument.substr(from, pos - from) + "'\\''";
+            from = pos + 1;
         }
     }
     if (quoted.empty()) {
@@ -70,7 +75,7 @@ std::string shell_quote(const std::string& argument) {
         return argument;
     }
     // flush the trailing run and close the open quote
-    quoted += argument.substr(emit_from) + "'";
+    quoted += argument.substr(from) + "'";
     return quoted;
 }
 
@@ -219,22 +224,22 @@ bool pathmatch(std::string_view pattern, std::string_view str) {
 
 std::string pathmatch_literal_prefix(std::string_view pattern) {
     std::string prefix;
-    size_t last = 0, pos = 0, slash = 0, pslash = 0;
+    size_t from = 0, pos = 0, slash = 0, pslash = 0;
     while (pos != pattern.size()) {
         char ch = pattern[pos];
         if (ch == '*' || ch == '?' || ch == '[') {
-            if (slash < last) {
+            if (slash < from) {
                 prefix.resize(pslash);
             }
             pos = slash;
             break;
         }
         if (ch == '\\' && pos + 1 != pattern.size()) {
-            if (last < slash) {
-                pslash = prefix.size() + slash - last;
+            if (from < slash) {
+                pslash = prefix.size() + slash - from;
             }
-            prefix.append(pattern.data() + last, pos - last);
-            last = pos = pos + 1;
+            prefix.append(pattern.data() + from, pos - from);
+            from = pos = pos + 1;
             ch = pattern[pos];
         }
         if (ch == '/') {
@@ -242,8 +247,8 @@ std::string pathmatch_literal_prefix(std::string_view pattern) {
         }
         ++pos;
     }
-    if (last < pos) {
-        prefix.append(pattern.data() + last, pos - last);
+    if (from < pos) {
+        prefix.append(pattern.data() + from, pos - from);
     }
     return path_endslash(prefix);
 }
