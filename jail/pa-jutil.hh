@@ -87,3 +87,10 @@ std::string shell_quote(const std::string& argument);
 // trailing, and doubled slashes are significant, so `/foo` does not match
 // `/foo/`. Returns true on match.
 bool pathmatch(std::string_view pattern, std::string_view str);
+
+// Return the literal directory prefix of `pattern`: everything up to and
+// including the last `/` that precedes the first wildcard character (`*`, `?`,
+// or `[`). If `pattern` has no wildcard it is returned whole, with a trailing
+// `/` added if absent. The result always ends in `/`. This is the deepest
+// directory that any path matching `pattern` is guaranteed to share.
+std::string pathmatch_literal_prefix(std::string_view pattern);

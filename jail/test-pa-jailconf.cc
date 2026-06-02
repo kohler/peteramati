@@ -233,6 +233,48 @@ void test_pathmatch() {
     assert(!pathmatch("/**/ab", "/xab"));
 }
 
+void test_pathmatch_literal_prefix() {
+    // fully literal: the whole pattern, with a trailing slash ensured
+    assert(pathmatch_literal_prefix("/jail") == "/jail/");
+    assert(pathmatch_literal_prefix("/jail/") == "/jail/");
+    assert(pathmatch_literal_prefix("/data/jailbind") == "/data/jailbind/");
+    assert(pathmatch_literal_prefix("/data/jailbind/") == "/data/jailbind/");
+    // wildcard as its own component: prefix is the parent
+    assert(pathmatch_literal_prefix("/data/jails/*") == "/data/jails/");
+    assert(pathmatch_literal_prefix("/data/jails/*/") == "/data/jails/");
+    assert(pathmatch_literal_prefix("/data/jails/**") == "/data/jails/");
+    // wildcard glued to a literal: cut back to the last slash
+    assert(pathmatch_literal_prefix("/jails/run*") == "/jails/");
+    assert(pathmatch_literal_prefix("/jails/~*/") == "/jails/");
+    // other wildcard characters also end the prefix
+    assert(pathmatch_literal_prefix("/a/b?") == "/a/");
+    assert(pathmatch_literal_prefix("/a/[bc]") == "/a/");
+    assert(pathmatch_literal_prefix("/*") == "/");
+    assert(pathmatch_literal_prefix("/a/b/c*d/e") == "/a/b/");
+    // more cases
+    assert(pathmatch_literal_prefix("ab") == "ab/");
+    assert(pathmatch_literal_prefix("") == "/");
+    assert(pathmatch_literal_prefix("ab/\\**") == "ab/");
+    assert(pathmatch_literal_prefix("ab\\/\\**") == "ab/");
+    assert(pathmatch_literal_prefix("ab\\/\\*/*") == "ab/*/");
+    // backslash escapes: an escaped wildcard is literal and the backslash is
+    // dropped from the result
+    assert(pathmatch_literal_prefix("/a/\\*b") == "/a/*b/");
+    assert(pathmatch_literal_prefix("/a/\\*b/c") == "/a/*b/c/");
+    assert(pathmatch_literal_prefix("/a/\\*b*/c") == "/a/");
+    assert(pathmatch_literal_prefix("/a/x\\?y") == "/a/x?y/");
+    assert(pathmatch_literal_prefix("/a/\\[b]/c*") == "/a/[b]/");
+    assert(pathmatch_literal_prefix("/a\\\\b") == "/a\\b/");
+    // a backslash-escaped slash decodes to `/` and still separates components,
+    // even when an earlier run was already flushed by another backslash
+    assert(pathmatch_literal_prefix("/a/b\\/c") == "/a/b/c/");
+    assert(pathmatch_literal_prefix("/a/b\\/c*") == "/a/b/");
+    assert(pathmatch_literal_prefix("/a\\*b\\/c*") == "/a*b/");
+    // doubled slashes are preserved (slashes match exactly)
+    assert(pathmatch_literal_prefix("/a//b*") == "/a//");
+    assert(pathmatch_literal_prefix("/a//") == "/a//");
+}
+
 void test_pajailconf() {
     pajailconf jc("enablejail /jails/run*\nenablejail /jails/~*\n");
     assert(jc.check_jail("/jails/run").treedir == "/jails/run/");
@@ -412,6 +454,7 @@ void test_path_pa_validate() {
 
 int main() {
     test_pathmatch();
+    test_pathmatch_literal_prefix();
     test_pajailconf();
     test_path_absolute();
     test_path_pa_validate();

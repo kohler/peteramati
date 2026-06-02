@@ -217,6 +217,37 @@ bool pathmatch(std::string_view pattern, std::string_view str) {
     return true;
 }
 
+std::string pathmatch_literal_prefix(std::string_view pattern) {
+    std::string prefix;
+    size_t last = 0, pos = 0, slash = 0, pslash = 0;
+    while (pos != pattern.size()) {
+        char ch = pattern[pos];
+        if (ch == '*' || ch == '?' || ch == '[') {
+            if (slash < last) {
+                prefix.resize(pslash);
+            }
+            pos = slash;
+            break;
+        }
+        if (ch == '\\' && pos + 1 != pattern.size()) {
+            if (last < slash) {
+                pslash = prefix.size() + slash - last;
+            }
+            prefix.append(pattern.data() + last, pos - last);
+            last = pos = pos + 1;
+            ch = pattern[pos];
+        }
+        if (ch == '/') {
+            slash = pos + 1;
+        }
+        ++pos;
+    }
+    if (last < pos) {
+        prefix.append(pattern.data() + last, pos - last);
+    }
+    return path_endslash(prefix);
+}
+
 std::string path_absolute(std::string_view path, std::string_view cwd) {
     // check for absolute path
     if (!path.empty() && path[0] == '/') {
