@@ -1231,11 +1231,11 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
     }
     jailperm perm = jailconf.get(dir, skeletondir);
     if (!perm) {
-        die("%s: Jail disabled by /etc/pa-jail.conf\n%s",
+        die("%s: Jail disabled in /etc/pa-jail.conf\n%s",
             dir.c_str(), perm.disable_message().c_str());
     } else if (!skeletondir.empty() && perm.skeletondir.empty()) {
-        die("%s: Skeleton disabled by /etc/pa-jail.conf\n%s",
-            skeletondir.c_str(), perm.disable_message().c_str());
+        die("%s: Skeleton disabled in /etc/pa-jail.conf\n",
+            skeletondir.c_str());
     }
     permdir = perm.permdir;
     skeletondir = perm.skeletondir;
@@ -1317,10 +1317,21 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
         if (fstat(fd, &s) != 0) {
             perror_die(thisdir);
         }
+        bool final_target = last_pos == dir.length();
+        // The final target is the jail root that we will `pivot_root` into and
+        // run untrusted code under. Even at/below `permdir` (where we otherwise
+        // trust the permission tree), a *pre-existing* jail root that is not
+        // root-owned or is group/other-writable is a breakout path: an attacker
+        // who can write it could stage a setuid binary or swap the tree. So
+        // ownership-check the final target for the creating/running actions too.
+        // A root-created root (the `mkdir` branch above) is 0755 root:root and
+        // passes; this only rejects a loosely-permissioned pre-existing root.
+        bool check_owner = (!allowed_here && !final_target)
+            || (final_target && (action == do_add || action == do_run));
         if (!S_ISDIR(s.st_mode)) {
             errno = ENOTDIR;
             perror_die(thisdir);
-        } else if (!allowed_here && last_pos != dir.length()) {
+        } else if (check_owner) {
             if (s.st_uid != ROOT) {
                 die("%s: Not owned by root\n", thisdir.c_str());
             } else if ((s.st_gid != ROOT && (s.st_mode & S_IWGRP))
@@ -3298,11 +3309,11 @@ int main(int argc, char** argv) {
     }
     for (const auto& f : chown_user_args) {
         if (f.empty()) {
-            die("--chown-user directory must not be empty");
+            die("--chown-user directory must not be empty\n");
         }
         auto xf = path_pa_validate(path_absolute(f, jaildir.dir));
         if (xf.empty()) {
-            die("%s: Invalid --chown-user directory",
+            die("%s: Invalid --chown-user directory\n",
                 f.c_str());
         } else if (!xf.starts_with(jaildir.dir)) {
             // `jaildir.dir` ends in `/` while `xf` (from path_pa_validate) does
@@ -3310,7 +3321,7 @@ int main(int argc, char** argv) {
             // root itself is intentionally excluded, since chowning it to the
             // ephemeral user would be an escape vector. Don't "fix" this by
             // normalizing the trailing slash.
-            die("%s: --chown-user directory must be within %s",
+            die("%s: --chown-user directory must be within %s\n",
                 f.c_str(), jaildir.dir.c_str());
         }
         jaildir.chown_recursive(xf, jailuser.owner_, jailuser.group_);

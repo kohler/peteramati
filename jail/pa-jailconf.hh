@@ -10,22 +10,24 @@
 
 // Result of a `pajailconf` query. `allowed` says whether the queried directory
 // is permitted; for an allowed jail, `permdir` is the permission directory --
-// the literal prefix of the matching `enablejail` glob, below which pa-jail may
-// create components. `disabled_by` names the matching glob, used to explain a
-// denial.
+// the shortest literal prefix among the matching `enablejail` globs, below which
+// pa-jail may create components. When a jail is denied, `disabled_lineno` is the
+// 1-based config line of the `disablejail` directive responsible (0 if none --
+// e.g. the jail was simply never enabled), used to explain the denial. It tracks
+// only the jaildir axis, never the skeleton.
 struct jailperm {
     bool allowed = false;
     std::string skeletondir;
     std::string permdir;
-    std::string disabled_by;
+    int disabled_lineno = 0;
 
     explicit operator bool() const {
         return allowed;
     }
-    // Error-message fragment naming the responsible glob, or "" if none.
+    // Error-message fragment indicating the disabling line
     std::string disable_message() const {
-        if (!disabled_by.empty()) {
-            return "  (disabled by " + disabled_by + ")\n";
+        if (disabled_lineno > 0) {
+            return "  (disabled on line " + std::to_string(disabled_lineno) + ")\n";
         }
         return std::string();
     }
