@@ -2,7 +2,13 @@
 
 Status: living document — original audit + plan, with completed items marked.
 Parts of Phase 1 have landed (supplementary-group drop, `no_new_privs`, the
-`snprintf` fix); the config parser is extracted and unit-tested. Updated 2026-06.
+`snprintf` fix). The config parser is extracted and unit-tested; it parses the
+resource-limit (`limit`/cgroup) directives, the `memory.*` names, and the pool
+config (`cgroupbase`, `[cgroup PATH]`, `pool_limits`) — §6.3, §6.5. At run time
+pa-jail builds a per-jail cgroup hierarchy (one pool `/sys/fs/cgroup/pa-jail`,
+per-run leaves) and enforces `pids.max`/`cpu.max`. **Picking back up:** the
+parser's pool support (`cgroupbase`/pool limits/`memory.*` application) is not yet
+wired into the runtime — see "Next" at the end of §6.5. Updated 2026-06.
 Author: (generated audit + plan)
 Scope: `jail/pa-jail.cc`, `jail/GNUmakefile`, `/etc/pa-jail.conf`, and the
 invocation path in `src/queueitem.php` + `src/psetconfig.php`.
@@ -65,12 +71,11 @@ What it does today for a run:
 
 ## 3. Missing container-security features (ranked)
 
-1. **No resource limits at all** — no cgroups, no `setrlimit`. No fork-bomb
-   protection (`RLIMIT_NPROC`/`pids.max`), no memory cap (`RLIMIT_AS`/
-   `memory.max`), no CPU-time cap, no `RLIMIT_FSIZE`, `RLIMIT_NOFILE`,
-   `RLIMIT_CORE`. Only the wall-clock/idle timeout throttles anything. A
-   fork bomb or memory balloon is bounded only by host-global kernel defaults.
-   **Highest risk: a student can take down the grading host.**
+1. **Resource limits — partially addressed.** Per-jail cgroup `pids.max` (fork
+   bombs) and `cpu.max` (CPU rate) are now enforced from config (§6, §6.5). Still
+   missing: a **memory cap** (`memory.max`/`RLIMIT_AS`) — so a memory balloon is
+   still bounded only by host-global defaults — and the per-process `rlimit.*`
+   belt-and-suspenders (`RLIMIT_FSIZE`, `RLIMIT_NOFILE`, `RLIMIT_CORE`, …).
 2. **No network isolation** — no `CLONE_NEWNET`. Jailed code shares the host
    network namespace: full outbound (and host-reachable inbound) network. No
    config knob exists.
@@ -115,11 +120,12 @@ fuzzer, and an empty argument now quotes to `''` instead of vanishing.)
 All of these land in the child between `pivot_root` and `execve`, except the
 cgroup setup (which is set up by the parent before/around `clone`).
 
-1. **cgroup v2 limits.** Create a per-run cgroup under a delegated subtree;
-   write `pids.max`, `memory.max` (+ `memory.swap.max`), optionally `cpu.max`;
-   place the child in it (write `cgroup.procs`, or `clone3` + `CLONE_INTO_CGROUP`).
-   Kills fork bombs and memory balloons deterministically — what the timeout
-   cannot do. Driven by config (see §6).
+1. ✅ **Done (`pids.max`, `cpu.max`) — cgroup v2 limits.** A per-run leaf cgroup
+   is created and the namespace's init is placed in it before student code runs;
+   `pids.max`/`cpu.max` come from config (§6). Kills fork bombs deterministically
+   — verified end-to-end (`pids.max=15` caps a fork loop at 13). `memory.max`
+   (+ `memory.swap.max`) is the next controller to add (one table row + one
+   writer); see §6.5 for the runtime design and deployment requirements.
 2. **`setrlimit` belt-and-suspenders** in the child before exec: `RLIMIT_NPROC`,
    `RLIMIT_AS` (or rely on cgroup), `RLIMIT_FSIZE`, `RLIMIT_NOFILE`,
    `RLIMIT_CORE=0`, `RLIMIT_CPU`. (See §6 for the config surface.)
@@ -155,17 +161,21 @@ cgroup setup (which is set up by the parent before/around `clone`).
     binary or swap the tree.
 13. `CLONE_NEWUTS`; consider `hidepid=2` on the proc mount.
 
-Phase 1 items 3, 4, and 6, and Phase 3 item 12, have landed. The remaining
-near-mandatory work before trusting this with adversarial untrusted code on a
-shared host is items 1–2 (cgroup / `setrlimit`) and item 5 (mount-flag
-enforcement).
+Phase 1 items 3, 4, and 6, Phase 3 item 12, and the cgroup half of item 1
+(`pids.max`/`cpu.max`) have landed. The remaining near-mandatory work before
+trusting this with adversarial untrusted code on a shared host is the rest of
+items 1–2 (`memory.max`, then the `setrlimit` belt-and-suspenders) and item 5
+(mount-flag enforcement).
 
 ## 6. Resource-limit configuration
 
 ### 6.1 `pa-jail.conf` matching and `.ini`-style sections
 
 *(Status: sections, `pathmatch`, and cascade removal are **implemented** in
-`pa-jailconf.cc`; `rlimit` directives in 6.3–6.6 remain a plan.)*
+`pa-jailconf.cc`; `limit` directive **parsing** (§6.3) is implemented, returning
+resolved limits in `jailperm::limits`; and the per-jail cgroup limits are
+**applied** at run time (§6.5). `setrlimit` for the `rlimit.*` limits and the
+`--limit` override remain a plan.)*
 
 `pa-jail.conf` is loaded root-owned, non-writable, `O_NOFOLLOW`, <=8 KB, and
 parsed line by line. Each `enablejail`/`disablejail` (and the `skeleton`
@@ -194,7 +204,7 @@ A header opens a section **gated on the jail directory** `JAILPAT` (matched with
 queried jaildir matches `JAILPAT`. Inside a section, directives may be given with
 **no pattern argument**, and each then acts on its own natural axis:
 
-- `enablejail` / `disablejail` (and `rlimit ...`, planned) target the **jaildir**:
+- `enablejail` / `disablejail` (and `limit ...`) target the **jaildir**:
   argless, they apply to `JAILPAT` itself.
 - `enableskeleton` / `disableskeleton` target a **skeleton directory**, which is
   a *different thing* from the jaildir. So an argless `enableskeleton` is **not**
@@ -213,16 +223,20 @@ level), which generalizes the original "bare argless `enablejail` means global".
 The skeleton axis is the exception above.
 
 ```
-# global scope: defaults for every jail
-rlimit nproc=64,nofile=256,fsize=256m,core=0,cpu=120
+# global scope: defaults for every jail (per-jail pids/cpu via cgroup,
+# per-process belt-and-suspenders via rlimit.*)
+limit pids.max=64,cpu.max=1,rlimit.nofile=256,rlimit.fsize=256m,rlimit.core=0
 
 [/jails/run/*]
 enablejail
-rlimit nproc=128
+limit pids.max=128
 
 [/jails/build/*]
 enablejail
-rlimit nproc=512,as=4g,cpu=600
+limit pids.max=512,cpu.max=4,rlimit.as=4g
+
+# equivalently, without sections, via the two-argument form:
+limit /jails/build/* pids.max=512,cpu.max=4,rlimit.as=4g
 ```
 
 ### 6.2 Sections gate on the jail directory
@@ -278,32 +292,76 @@ from glob specificity. An argless `enablejail` in `[JAILPAT]` contributes
 Removed along the way: the implicit "deny is greedy" subtree cascade (replaced by
 explicit `**`).
 
-### 6.3 `rlimit` value grammar
+### 6.3 `limit` directive: forms, scope, and value grammar
+
+*(Status: the parser — both directive forms, the value grammar, and the two
+starting limits — is **implemented** in `pa-jailconf.cc` and unit-tested in
+`test-pa-jailconf` (`test_pajailconf_limit`); the two cgroup limits are also
+**applied** at run time (cgroup setup in `pa-jail.cc`, §6.5). `setrlimit` for the
+`rlimit.*` limits remains a plan.)*
+
+Two directive forms:
 
 ```
-rlimit <name>=<value>[,<name>=<value>...]
+limit <name>=<value>[,<name>=<value>...]            # current scope
+limit <JDIR> <name>=<value>[,<name>=<value>...]     # only jails matching JDIR
 ```
 
-- `<value>` is a non-negative integer with an optional unit, or `unlimited` /
-  `inf`.
-- Units: `k`/`m`/`g` (1024-based) for byte limits; `s`/`m`/`h` for `cpu`; plain
-  integer for counts.
-- A `!` suffix (`nproc=512!`) pins the value as authoritative: the command line
-  cannot loosen or override it (see 6.4).
+The one-argument form applies to the **current scope**: at top level it is a
+global default for every jail; inside a `[JAILPAT]` section it applies to that
+section's jaildir (like an argless `enablejail`). The two-argument form applies
+only on jails whose directory matches `JDIR` — a `pathmatch` glob resolved
+exactly like an `enablejail` pattern (absolute, or section-relative inside a
+section), and, inside a section, gated additionally by the section pattern.
+Resolution is a single pass with **per-name last-write-wins overlay**: a global
+default is overridden by a later matching section or two-arg directive.
 
-Recognized names (map to `RLIMIT_*`):
+**Value grammar.** `<value>` is a non-negative number with an optional unit, or
+`unlimited` / `inf` / `max` for the infinite form. Units depend on the limit:
+`k`/`m`/`g` (1024-based) for byte limits; `s`/`m`/`h` for cumulative-time limits;
+plain integer for counts; for a CPU *rate* (`cpu.max`), a decimal in cores
+(`1.5`) or a percentage of one core (`150%`), stored internally as millicores
+(1000 = one core). A `!` suffix (`pids.max=512!`) pins the value: the command
+line cannot loosen or override it (see 6.4). A malformed value, or an unknown
+limit name, is fatal (`die`) — a limit never silently degrades to "unlimited".
 
-| name      | RLIMIT_        | unit family |
-|-----------|----------------|-------------|
-| `cpu`     | RLIMIT_CPU     | seconds     |
-| `as`      | RLIMIT_AS      | bytes       |
-| `data`    | RLIMIT_DATA    | bytes       |
-| `stack`   | RLIMIT_STACK   | bytes       |
-| `fsize`   | RLIMIT_FSIZE   | bytes       |
-| `nofile`  | RLIMIT_NOFILE  | count       |
-| `nproc`   | RLIMIT_NPROC   | count       |
-| `core`    | RLIMIT_CORE    | bytes       |
-| `memlock` | RLIMIT_MEMLOCK | bytes       |
+**Naming convention — real kernel names, namespaced by mechanism.** One name
+binds exactly one mechanism (no fan-out), and the name is the *real* kernel name,
+so the mechanism — and thus the scope — is legible without a translation table:
+
+- a **cgroup-v2** limit is named by its interface filename (`pids.max`,
+  `cpu.max`, `memory.max`) and is enforced **per-jail** on this jail's process
+  tree — the default, and the safe one;
+- an **rlimit** is named `rlimit.<name>` (`rlimit.cpu`, `rlimit.nofile`) and is
+  **per-process**.
+
+The one scope subtlety: `rlimit.nproc` (`RLIMIT_NPROC`) is **per-uid /
+system-wide**, so it can leak across concurrent jails sharing a uid. That is why
+the per-jail process cap is the distinctly-named cgroup `pids.max`, never an
+unqualified `nproc`; an operator who wants the per-uid bound must name
+`rlimit.nproc` explicitly.
+
+Recognized names (the starting set is the two per-jail cgroup limits; the others
+are the planned near neighbors, added one table row at a time):
+
+| name           | scope        | mechanism / file  | unit              | status |
+|----------------|--------------|-------------------|-------------------|--------|
+| `pids.max`     | per-jail     | cgroup `pids.max` | count             | ✅ implemented |
+| `cpu.max`      | per-jail     | cgroup `cpu.max`  | rate (millicores) | ✅ implemented |
+| `memory.max`   | per-jail     | cgroup `memory.max` | bytes           | planned |
+| `rlimit.cpu`   | per-process  | `RLIMIT_CPU`      | seconds           | planned |
+| `rlimit.as`    | per-process  | `RLIMIT_AS`       | bytes             | planned |
+| `rlimit.fsize` | per-process  | `RLIMIT_FSIZE`    | bytes             | planned |
+| `rlimit.nofile`| per-process  | `RLIMIT_NOFILE`   | count             | planned |
+| `rlimit.core`  | per-process  | `RLIMIT_CORE`     | bytes             | planned |
+| `rlimit.nproc` | per-uid      | `RLIMIT_NPROC`    | count             | planned |
+
+Two name-vs-semantics notes. (1) `cpu.max` is a per-jail *rate*, not a
+cumulative-seconds cap — cgroups have no "kill after N CPU-seconds" knob; the
+per-process cumulative cap is the separately-named `rlimit.cpu`. Its value is our
+cores/percent grammar (→ millicores), **not** the kernel file's raw
+`"$QUOTA $PERIOD"` pair, which pa-jail computes at apply time. (2) `pids.max` is
+a clean passthrough — the conf integer is exactly what is written to the file.
 
 Keeping limits in `pa-jail.conf` puts them in the existing root-owned trust
 anchor with directory matching and ownership checks, so the (less trusted)
@@ -312,15 +370,15 @@ caller can only tighten them, never loosen them.
 ### 6.4 Command-line override
 
 ```
---rlimit <name>=<value>[,<name>=<value>...]
+--limit <name>=<value>[,<name>=<value>...]
 ```
 
 Repeatable; later wins. The effective limit per name resolves as
-global-default -> matching-section -> `--rlimit`, **but the command line may only
+global-default -> matching-section -> `--limit`, **but the command line may only
 make a limit more restrictive, never looser**: when a conf value exists, the
 applied value is `min(conf, cmdline)` (treating `unlimited` as +inf). A
 `!`-pinned conf value ignores the command line entirely. If neither conf nor
-command line sets a name, that rlimit is left at its inherited value, so the
+command line sets a name, that limit is left at its inherited value, so the
 feature is opt-in.
 
 ### 6.5 Implementation (now in `pa-jailconf`)
@@ -358,24 +416,185 @@ Implemented so far:
   `disablejail` (0 if the jail was simply never enabled); it tracks the jaildir
   axis only, and `disable_message()` renders it for the error.
 
-Still a plan (rlimit work):
+Implemented since (`limit`/cgroup parsing):
 
-- `parse_rlimits(dir)` returns the resolved limits for `dir`
-  (`std::array<std::optional<rlim_t>, RLIM_NLIMITS>` plus a "pinned" bitset),
-  applying the global-then-section overlay.
-- A shared `parse_rlimit_value(name, str)` handles units / `unlimited`; parse
-  errors `die()` (fail-safe, never silently "unlimited").
-- `setrlimit()` is applied in the child just before the permanent privilege drop
-  (so `RLIMIT_NPROC` is in force for the student's `fork`s); logged under
-  `verbose`.
+- `pajailconf::get` now resolves limits in the same forward pass and returns
+  them in `jailperm::limits` (a `jaillimits`: one `jaillimit{set, unlimited,
+  pinned, value}` per `jaillimit_id`). The global-then-section overlay is
+  per-name last-write-wins; the two directive forms and section gating are §6.3.
+- `parse_limit_value` handles units / `unlimited` / the `!` pin; parse errors
+  and unknown names `die()` (fail-safe, never silently "unlimited"). Units coded:
+  `count` (`pids.max`), `rate` (`cpu.max`, millicores), `bytes`
+  (`memory.max`/`memory.high`, 1024-based `k`/`m`/`g`). A `seconds` unit lands
+  with the `rlimit.*` limits that need it.
+- `limit_descs[]` is the name→(unit) table; a new limit is one enum value plus
+  one row. Each row will gain its mechanism binding (cgroup file / `RLIMIT_*`)
+  when application is wired.
+
+Implemented since (cgroup application — `pa-jail.cc`):
+
+- **All cgroup work runs in the host-ns root parent**, before/around `clone`, so
+  it uses ordinary `/sys/fs/cgroup` paths and full root credentials and never
+  reaches into the pivoted jail (the supervisor and `exec_go` are untouched).
+  All jails share **one pool cgroup `<base>/pa-jail`** (created once, left idle —
+  the future hook for a *combined* cap across all jails — "Next" item 1); each run gets its
+  own leaf `<base>/pa-jail/<pid>` under it. `cgroup_setup` delegates the needed
+  controllers down the chain — into the base's `subtree_control` (a no-op on
+  systemd hosts, which already delegate `cpu`/`pids` at the root) and then into
+  the pool's — and writes the limits to the leaf (`pids.max`; `cpu.max` as a
+  `quota period` pair derived from the millicore rate). Pool-level limits aren't
+  wired yet; this is the default, configuration-free hierarchy.
+- **Race-free placement via `clone3` + `CLONE_INTO_CGROUP`** (Linux 5.7+). The
+  cloned child is born *inside* the leaf, so its limits apply from the first
+  instruction and student code (forked much later) can never run unconfined —
+  no separate `cgroup.procs` write, no synchronization. (An earlier cut placed
+  the child after `clone` and held it on a pipe barrier until placed; the
+  "benign race" assumption there was wrong in practice — the supervisor could
+  fork the student before the parent's write landed — so atomic birth-placement
+  is the right fix.) Only the cgroup path uses `clone3`; runs with no limits
+  keep the plain `clone()`. The supervisor counts against `pids.max` (a few
+  procs of overhead — set the limit accordingly).
+- **Compile-time gating, runtime fail-closed.** The cgroup machinery is built
+  only when the headers provide `clone3`/`CLONE_INTO_CGROUP` (`PA_HAVE_CGROUP`);
+  on older headers it compiles out, so pa-jail still **builds and runs normally
+  for non-cgroup use**. A config that *sets* a cgroup limit on such a build
+  `die()`s with a clear "rebuild on a newer host or remove the limits" message
+  rather than silently running unconfined — the check is at run time, keyed on
+  whether a limit was actually requested, not a hard build error.
+- **Cleanup is lazy, not a lingering process.** Removing a leaf needs root
+  (you can only `rmdir` a child of the root-owned pool as root), and the
+  supervisor can't help — by the time it ends it has pivoted away from
+  `/sys/fs/cgroup` and dropped to the caller (so it handles untrusted student
+  I/O without root). Rather than keep a privileged reaper alive for the whole
+  run, **each setup reclaims the empty leaves of previous finished runs**
+  (`cgroup_reclaim_stale`: scan the pool and `rmdir` every `<N>` leaf whose
+  owning pa-jail process `N` is gone). A running jail is skipped two ways — its owner is alive
+  and its leaf is populated (`rmdir` would fail) — so concurrent runs are
+  undisturbed. Cost: a finished run's empty leaf lingers until the next run
+  (steady-state ≈ concurrency; empty cgroups are essentially free). This keeps
+  cleanup in root but only in the transient setup parent that is inherently
+  root, with no new privileged process and no weakening of the "caller can only
+  tighten" guarantee (a caller-`rmdir` would require a caller-writable cgroup
+  ancestor, which would let the caller migrate the student out of its limits).
+- **Fail-safe:** any cgroup write error `die()`s (a configured limit never
+  silently fails to apply); `--verbose` logs every `mkdir`/`echo`.
+
+Implemented since (pools — config parser only, `pa-jailconf`; **runtime not yet
+wired**, see "Next" below):
+
+- **`memory.max` / `memory.high`** limit names (bytes), so jails and pools can
+  cap memory. New `jaillimit_id`s + `limit_descs[]` rows + the `bytes` unit.
+- **`cgroupbase PATH`** directive → `jailperm::cgroupbase`: the pool a jail's leaf
+  is created under. Valid as a global default and inside `[JAILPAT]` sections
+  (section overrides global, last-match-wins); defaults to `default_cgroupbase`
+  (`/sys/fs/cgroup/pa-jail`, the same path the runtime hardcodes today). `$SELF`
+  and `$SELF/sub` are stored **verbatim** (expanded only at apply time).
+- **Typed `[cgroup PATH]` sections** define a pool's own limits. The header
+  parser classifies the first bracket word: `cgroup` → a pool section, which the
+  jaildir query *skips* (a pool's limits never leak into a jail's `limits`);
+  anything else is a `[JAILPAT]` as before.
+- **`pajailconf::pool_limits(PATH)`** returns a pool's resolved limits — the union
+  of `limit` directives in `[cgroup P]` sections whose `P` *literally* equals
+  `PATH` (the same string `cgroupbase` carries, `$SELF` included). Pool `limit`s
+  take only the no-JDIR form.
+- Tested in `test_pajailconf_cgroup` / `test_pajailconf_limit`. Deferred:
+  rejecting `rlimit.*` inside `[cgroup …]` (no such names exist yet; a comment in
+  `pool_limits` marks the spot).
+
+**Deployment requirement (cgroup limits only).** To *use* cgroup limits you need
+Linux 5.7+ at build time (headers with `clone3`/`CLONE_INTO_CGROUP`) and at run
+time, a cgroup v2 unified hierarchy, and `<base>` a **delegated** cgroup: one
+that pa-jail is allowed to create child cgroups under *and* that has the
+`cpu`/`pids` controllers enabled for its children (in the base's
+`cgroup.subtree_control`), so the per-run leaves can carry `pids.max`/`cpu.max`.
+None of this constrains a build or run that uses no cgroup limits; and any
+shortfall (old build, old kernel, `clone3` error) fails closed, never silently
+unconfined.
+
+- Running as root on a normal systemd host, `/sys/fs/cgroup` (the real root)
+  already qualifies: root may create leaves there and migrate any process in,
+  and systemd has enabled the controllers — so the default base just works.
+- A process **confined** to its own cgroup subtree (e.g. inside Docker, where it
+  lives in `/sys/fs/cgroup/docker/<id>/`) cannot create a leaf at the real root
+  or migrate a process out of its subtree, so the default base silently no-ops
+  (the jail stays uncapped). It needs a base prepared *inside* its own subtree:
+  enable the controllers there — first moving the existing processes into a
+  child, since cgroup v2's "no internal processes" rule forbids enabling
+  controllers on a cgroup that holds processes. systemd's `Delegate=yes`
+  (optionally `DelegateControllers=cpu pids`) sets this up for a service.
+
+The pool is currently the compile-time `/sys/fs/cgroup/pa-jail`. The parser
+already accepts `cgroupbase` (incl. `$SELF`) to point it at whatever delegated
+subtree a deployment provides; wiring that into the runtime is "Next" item 1
+below.
+
+### Next — pick up here (in priority order)
+
+The **parser is complete** for pools (above); the **runtime still hardcodes** the
+default pool and applies only `pids.max`/`cpu.max` to the leaf. The config surface
+looks like:
+
+```
+cgroupbase /sys/fs/cgroup/grading          # default pool for all jails ($SELF[/sub] ok)
+
+[cgroup /sys/fs/cgroup/grading]            # that pool's own (aggregate) limits
+limit pids.max=4000,memory.high=48g,memory.max=56g,cpu.max=16
+
+[/jails/build/*]
+enablejail
+cgroupbase /sys/fs/cgroup/grading-build    # route these jails to a different pool
+limit pids.max=512,memory.max=4g           # each jail's own (per-leaf) limits
+```
+
+1. **Wire pools into the runtime** (`cgroup_setup`, `pa-jail.cc`). The parser hands
+   you `perm.cgroupbase` and `pajailconf::pool_limits(path)`; the runtime still
+   builds `cgroup_base + "/pa-jail"`.
+   - Plumb `perm.cgroupbase` into `cgroup_setup` the same way `limits` is plumbed
+     (`jailownerinfo::set_limits` → add the cgroupbase string; it comes from the
+     identity `jaildir.perm`, not the bind scaffold).
+   - Resolve the pool path: a leading `$SELF` → pa-jail's own cgroup from
+     `/proc/self/cgroup` (v2 `0::/<path>` → `/sys/fs/cgroup<path>`), else literal.
+     **Validate** it sits under the cgroup-v2 mount and contains no `..` (cheap
+     defense; the conf is root-owned but still). Use it as the pool instead of the
+     hardcoded `<base>/pa-jail`.
+   - Write `pool_limits(perm.cgroupbase)` onto the pool cgroup itself (its
+     `pids.max`/`cpu.max`/`memory.*`), so jails in a pool share an aggregate cap.
+     cgroup v2 makes the effective limit `min(leaf, pool, …ancestors)`, so per-jail
+     and pool caps compose for free. Delegate `memory` too when a memory limit is
+     present.
+   - `cgroup_reclaim_stale` already scans the pool dir — it generalizes unchanged.
+2. **Apply `memory.max`/`memory.high`** to the leaf in `cgroup_setup` (parse is
+   done — two more `cgroup_write`s, plus add `memory` to the delegated-controllers
+   set when a memory limit is set). Optionally `memory.swap.max`.
+3. **`rlimit.*` limits** — add the names (`rlimit.cpu`, `rlimit.nofile`, …) with
+   their `RLIMIT_*` binding + a `seconds` unit, applied via `setrlimit()` in the
+   child just before the permanent privilege drop. Then **reject `rlimit.*` inside
+   `[cgroup …]`** — pools are cgroup-only (the spot is commented in `pool_limits`).
+4. **Command-line `--limit` override** (§6.4) — `min(conf, cmdline)` per name,
+   `!`-pinned conf values ignore the command line.
+
+**Testing note for a fresh agent.** `make check` exercises only the parser
+(`test-pa-jailconf`); the privileged runtime has **no automated tests**. Verify
+runtime changes two ways: (a) `pa-jail run --dry-run --verbose …` prints the exact
+`mkdir`/`echo`/`rmdir` cgroup command sequence without touching the system; (b) for
+real enforcement, a `docker run --privileged --cgroupns=host gcc:14` container with
+cgroup v2 — register a tiny **static** fork-counter binary as the jail user's shell
+(add it to `/etc/shells`) so `pids.max` can be confirmed without a working libc
+inside the jail. Note Docker confines a container to its own cgroup subtree, so to
+exercise the real-root default you need `--cgroupns=host` (and the host cgroup root
+must delegate `cpu`/`pids`).
 
 ### 6.6 Interaction with cgroups
 
 `setrlimit` is per-process and weak for memory (each child may map up to
-`RLIMIT_AS`); cgroup `memory.max`/`pids.max` are the real enforcement. Treat
-rlimits as the cheap defense-in-depth first step; the same section syntax can
-later carry cgroup knobs (`cgmemory`, `cgpids`, `cgcpu`) through the identical
-parser and precedence.
+`RLIMIT_AS`) and useless against fork bombs as an aggregate cap; cgroup
+`memory.max`/`pids.max` are the real, per-jail enforcement. Rather than a
+parallel `cgX` vocabulary, cgroups and rlimits share the **one** `limit`
+directive and parser: the *name* is the real kernel name and selects the
+mechanism (§6.3), with the per-jail cgroup limits as the safe default and
+`rlimit.*` limits as defense-in-depth where a per-process bound is wanted. So
+`pids.max` is the primary fork-bomb defense and `rlimit.*` limits are the cheap
+belt-and-suspenders, all through the identical precedence.
 
 ## 7. `shell_quote` note
 

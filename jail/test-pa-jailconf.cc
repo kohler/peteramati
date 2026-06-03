@@ -595,6 +595,184 @@ void test_pajailconf_query() {
     }
 }
 
+void test_pajailconf_cgroup() {
+    // no `cgroupbase` directive -> the built-in default pool
+    pajailconf jc("enablejail /jails/**\n");
+    assert(jc.get("/jails/a").cgroupbase == default_cgroupbase);
+
+    // a top-level `cgroupbase` is the global default for every jail
+    jc = pajailconf("enablejail /jails/**\ncgroupbase /sys/fs/cgroup/grading\n");
+    assert(jc.get("/jails/a").cgroupbase == "/sys/fs/cgroup/grading");
+
+    // a section-scoped `cgroupbase` overrides only matching jaildirs; others keep
+    // the global default (last-match-wins, gated by the section)
+    jc = pajailconf("enablejail /jails/**\n"
+                    "cgroupbase /pool/default\n"
+                    "[/jails/build/*]\ncgroupbase /pool/build\n");
+    assert(jc.get("/jails/build/x").cgroupbase == "/pool/build");
+    assert(jc.get("/jails/run/x").cgroupbase == "/pool/default");
+
+    // `$SELF`-relative forms are stored verbatim (expanded only at apply time)
+    jc = pajailconf("enablejail /jails/**\ncgroupbase $SELF/grading\n");
+    assert(jc.get("/jails/a").cgroupbase == "$SELF/grading");
+
+    // `[cgroup PATH]` sections define pool limits, looked up by literal PATH
+    jc = pajailconf("enablejail /jails/**\n"
+                    "[cgroup /sys/fs/cgroup/pa-jail]\n"
+                    "limit pids.max=4000,memory.max=24g\n");
+    {
+        jaillimits pl = jc.pool_limits("/sys/fs/cgroup/pa-jail");
+        assert(pl[JLIMIT_PIDS_MAX].set && pl[JLIMIT_PIDS_MAX].value == 4000);
+        assert(pl[JLIMIT_MEMORY_MAX].value == 24ULL << 30);
+        assert(!pl[JLIMIT_CPU_MAX].set);
+    }
+    // an undefined pool has no limits
+    assert(!jc.pool_limits("/sys/fs/cgroup/other")[JLIMIT_PIDS_MAX].set);
+    // and a pool section does NOT leak into a jaildir query's own limits
+    assert(!jc.get("/jails/a").limits[JLIMIT_PIDS_MAX].set);
+
+    // the default pool joins by literal path: cgroupbase default <-> [cgroup default]
+    jc = pajailconf(std::string("enablejail /jails/**\n[cgroup ")
+                    + default_cgroupbase + "]\nlimit pids.max=1000\n");
+    {
+        jailperm p = jc.get("/jails/a");
+        assert(p.cgroupbase == default_cgroupbase);
+        assert(jc.pool_limits(p.cgroupbase)[JLIMIT_PIDS_MAX].value == 1000);
+    }
+
+    // multiple pools carry distinct limits; jails route to them via cgroupbase
+    jc = pajailconf("enablejail /jails/**\n"
+                    "[cgroup /pool/run]\nlimit pids.max=128\n"
+                    "[cgroup /pool/build]\nlimit pids.max=512,memory.max=32g\n"
+                    "[/jails/build/*]\ncgroupbase /pool/build\n");
+    assert(jc.pool_limits("/pool/run")[JLIMIT_PIDS_MAX].value == 128);
+    assert(jc.pool_limits("/pool/build")[JLIMIT_PIDS_MAX].value == 512);
+    assert(jc.pool_limits("/pool/build")[JLIMIT_MEMORY_MAX].value == 32ULL << 30);
+    assert(jc.get("/jails/build/x").cgroupbase == "/pool/build");
+
+    // a `$SELF`-relative pool joins literally (the parser never expands it)
+    jc = pajailconf("enablejail /jails/**\n"
+                    "cgroupbase $SELF/grading\n"
+                    "[cgroup $SELF/grading]\nlimit pids.max=200\n");
+    assert(jc.pool_limits("$SELF/grading")[JLIMIT_PIDS_MAX].value == 200);
+    assert(jc.pool_limits(jc.get("/jails/a").cgroupbase)[JLIMIT_PIDS_MAX].value == 200);
+
+    // multiple limit lines in one pool accumulate (last wins per name)
+    jc = pajailconf("[cgroup /p]\nlimit pids.max=64,cpu.max=1\nlimit pids.max=256\n");
+    assert(jc.pool_limits("/p")[JLIMIT_PIDS_MAX].value == 256);
+    assert(jc.pool_limits("/p")[JLIMIT_CPU_MAX].value == 1000);
+}
+
+void test_pajailconf_limit() {
+    // a global one-arg `limit` is a default applied to every allowed jail;
+    // unnamed limits stay unset (the feature is opt-in)
+    pajailconf jc("enablejail /jails/**\nlimit pids.max=128,cpu.max=1.5\n");
+    jailperm p = jc.get("/jails/a");
+    assert(p.enabled);
+    assert(p.limits[JLIMIT_PIDS_MAX].set);
+    assert(!p.limits[JLIMIT_PIDS_MAX].unlimited);
+    assert(!p.limits[JLIMIT_PIDS_MAX].pinned);
+    assert(p.limits[JLIMIT_PIDS_MAX].value == 128);
+    assert(p.limits[JLIMIT_CPU_MAX].set);
+    assert(p.limits[JLIMIT_CPU_MAX].value == 1500);     // cpu.max is millicores
+    // a jail with no `limit` directive has no limits set
+    jc = pajailconf("enablejail /jails/**\n");
+    assert(!jc.get("/jails/a").limits[JLIMIT_PIDS_MAX].set);
+    assert(!jc.get("/jails/a").limits[JLIMIT_CPU_MAX].set);
+
+    // CPU rates: cores (decimal) and percentages both fold to millicores
+    jc = pajailconf("enablejail /j\nlimit cpu.max=1\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 1000);
+    jc = pajailconf("enablejail /j\nlimit cpu.max=0.5\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 500);
+    jc = pajailconf("enablejail /j\nlimit cpu.max=2\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 2000);
+    jc = pajailconf("enablejail /j\nlimit cpu.max=50%\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 500);
+    jc = pajailconf("enablejail /j\nlimit cpu.max=150%\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 1500);
+    jc = pajailconf("enablejail /j\nlimit cpu.max=12.5%\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 125);
+    // fractional digits beyond the stored precision truncate
+    jc = pajailconf("enablejail /j\nlimit cpu.max=1.2345\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 1234);
+
+    // memory.max / memory.high are byte limits with 1024-based k/m/g suffixes
+    jc = pajailconf("enablejail /j\nlimit memory.max=4096\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].set);
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].value == 4096);
+    jc = pajailconf("enablejail /j\nlimit memory.max=512k\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].value == 512ULL * 1024);
+    jc = pajailconf("enablejail /j\nlimit memory.high=2M\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_HIGH].value == 2ULL * 1024 * 1024);
+    jc = pajailconf("enablejail /j\nlimit memory.max=8g\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].value == 8ULL * 1024 * 1024 * 1024);
+    // throttle + hard cap together
+    jc = pajailconf("enablejail /j\nlimit memory.high=20g,memory.max=24g\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_HIGH].value == 20ULL << 30);
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].value == 24ULL << 30);
+    jc = pajailconf("enablejail /j\nlimit memory.max=max\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].unlimited);
+
+    // `unlimited`/`inf`/`max` are the infinite forms; value is ignored
+    jc = pajailconf("enablejail /j\nlimit pids.max=unlimited\n");
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].set);
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].unlimited);
+    jc = pajailconf("enablejail /j\nlimit pids.max=inf,cpu.max=max\n");
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].unlimited);
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].unlimited);
+
+    // a `!` suffix pins the value
+    jc = pajailconf("enablejail /j\nlimit pids.max=64!\n");
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].value == 64);
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].pinned);
+    jc = pajailconf("enablejail /j\nlimit pids.max=64\n");
+    assert(!jc.get("/j").limits[JLIMIT_PIDS_MAX].pinned);
+
+    // last write wins, per name; the overlay leaves untouched names alone
+    jc = pajailconf("enablejail /jails/**\nlimit pids.max=64,cpu.max=1\nlimit pids.max=256\n");
+    assert(jc.get("/jails/a").limits[JLIMIT_PIDS_MAX].value == 256);
+    assert(jc.get("/jails/a").limits[JLIMIT_CPU_MAX].value == 1000);
+
+    // two-arg `limit JDIR LIMITS` applies only on jails matching JDIR
+    jc = pajailconf("enablejail /jails/**\nlimit /jails/run/* pids.max=128\n");
+    assert(jc.get("/jails/run/a").limits[JLIMIT_PIDS_MAX].value == 128);
+    assert(!jc.get("/jails/build/a").limits[JLIMIT_PIDS_MAX].set);
+    // JDIR honors `**` like any other pattern
+    jc = pajailconf("enablejail /jails/**\nlimit /jails/run/** pids.max=128\n");
+    assert(jc.get("/jails/run/a").limits[JLIMIT_PIDS_MAX].value == 128);
+    assert(jc.get("/jails/run/a/b").limits[JLIMIT_PIDS_MAX].value == 128);
+    assert(!jc.get("/jails/build").limits[JLIMIT_PIDS_MAX].set);
+
+    // global default, then a two-arg override for a subset: overlay precedence
+    jc = pajailconf("enablejail /jails/**\nlimit pids.max=64\nlimit /jails/big/* pids.max=512\n");
+    assert(jc.get("/jails/small").limits[JLIMIT_PIDS_MAX].value == 64);
+    assert(jc.get("/jails/big/x").limits[JLIMIT_PIDS_MAX].value == 512);
+
+    // an argless `limit` inside a section applies to the section's jaildir
+    jc = pajailconf("[/jails/run/*]\nenablejail\nlimit pids.max=128\n");
+    assert(jc.get("/jails/run/a").enabled);
+    assert(jc.get("/jails/run/a").limits[JLIMIT_PIDS_MAX].value == 128);
+    assert(!jc.get("/jails/run/a/b").limits[JLIMIT_PIDS_MAX].set);  // outside section
+
+    // a section's relative JDIR is section-relative; gated by BOTH the section
+    // and the directive's own pattern
+    jc = pajailconf("[/jails/**]\nenablejail\nlimit run/* pids.max=200\n");
+    assert(jc.get("/jails/run/a").limits[JLIMIT_PIDS_MAX].value == 200);
+    assert(!jc.get("/jails/build/a").limits[JLIMIT_PIDS_MAX].set);  // pattern misses
+    assert(!jc.get("/other/run/a").limits[JLIMIT_PIDS_MAX].set);    // section misses
+
+    // distinct sections carry distinct limits
+    jc = pajailconf("[/jails/a]\nenablejail\nlimit pids.max=10\n"
+                    "[/jails/b]\nenablejail\nlimit pids.max=20\n");
+    assert(jc.get("/jails/a").limits[JLIMIT_PIDS_MAX].value == 10);
+    assert(jc.get("/jails/b").limits[JLIMIT_PIDS_MAX].value == 20);
+
+    // a global default overlaid by a per-section value
+    jc = pajailconf("limit pids.max=64\n[/jails/run]\nenablejail\nlimit pids.max=128\n");
+    assert(jc.get("/jails/run").limits[JLIMIT_PIDS_MAX].value == 128);
+}
+
 void test_path_absolute() {
     // an explicit `cwd` makes these independent of the real working directory;
     // every `cwd` passed in ends in `/`, matching what the getcwd path produces
@@ -895,6 +1073,8 @@ int main() {
     test_pajailconf_sections();
     test_pajailconf_disable_lineno();
     test_pajailconf_query();
+    test_pajailconf_limit();
+    test_pajailconf_cgroup();
     test_path_absolute();
     test_path_pa_validate();
     test_shell_quote();

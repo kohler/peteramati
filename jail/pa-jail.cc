@@ -39,6 +39,7 @@
 #if __linux__
 #include <mntent.h>
 #include <sched.h>
+#include <linux/sched.h>        // struct clone_args, CLONE_INTO_CGROUP
 #include <sys/signalfd.h>
 #include <sys/sysmacros.h>
 #include <sys/syscall.h>
@@ -1821,6 +1822,197 @@ void esfd::write_event(jbuffer& jbuf) {
 }
 
 
+// cgroup v2 resource limits.
+//
+// Everything here runs in the host-ns root parent (before/around `clone`), so it
+// uses ordinary `/sys/fs/cgroup` paths and full root credentials, and never has
+// to reach into the pivoted jail. All jails live under one pool cgroup
+// `<base>/pa-jail` (so they can later be limited together); each run gets its own
+// leaf `<base>/pa-jail/<pid>` under it carrying that jail's limits, and the
+// cloned child (and so all student code) is born into the leaf. Cleanup needs
+// root (you can only rmdir a child of the root-owned pool as root), so rather
+// than keep a privileged reaper alive for the whole run, each setup reclaims the
+// empty leaves of *previous* finished runs -- folding cleanup into work the root
+// parent must do anyway.
+#if __linux__
+
+// clone3 with CLONE_INTO_CGROUP (Linux 5.7+) starts the child already inside the
+// target cgroup, so its limits apply from birth -- no placement race.
+// `struct clone_args`/`CLONE_INTO_CGROUP` come from <linux/sched.h>, `SYS_clone3`
+// from <sys/syscall.h>. If the build's kernel headers predate that, cgroup
+// support is compiled out (PA_HAVE_CGROUP 0): the binary still builds and runs,
+// but a configured cgroup limit fails closed at run time (cgroup_setup below)
+// rather than silently running unconfined.
+#if defined(CLONE_INTO_CGROUP) && defined(SYS_clone3)
+# define PA_HAVE_CGROUP 1
+#else
+# define PA_HAVE_CGROUP 0
+#endif
+
+#if PA_HAVE_CGROUP
+static const char* cgroup_base = "/sys/fs/cgroup";    // cgroup v2 unified mount
+static const char* cgroup_pool_name = "pa-jail";      // pool = <base>/pa-jail
+
+// Write `value` to a cgroup control file. Fail-safe: any error dies, so a
+// configured limit never silently fails to apply. (Runs only in the parent,
+// before `clone`, so a die here is clean.)
+static void cgroup_write(const std::string& path, const std::string& value) {
+    if (verbose) {
+        fprintf(verbosefile, "echo %s > %s\n", value.c_str(), path.c_str());
+    }
+    if (dryrun) {
+        return;
+    }
+    int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+    if (fd < 0) {
+        perror_die("cgroup " + path);
+    }
+    ssize_t n = write(fd, value.data(), value.size());
+    int e = errno;
+    close(fd);
+    if (n != (ssize_t) value.size()) {
+        errno = e;
+        perror_die("cgroup " + path);
+    }
+}
+
+static void cgroup_mkdir(const std::string& path) {
+    if (verbose) {
+        fprintf(verbosefile, "mkdir %s\n", path.c_str());
+    }
+    if (!dryrun && mkdir(path.c_str(), 0755) != 0 && errno != EEXIST) {
+        perror_die("mkdir " + path);
+    }
+}
+
+// Is `ctrl` listed in a cgroup.controllers / subtree_control string (a run of
+// space/newline-separated controller names)?
+static bool cgroup_has_controller(const std::string& list, const char* ctrl) {
+    size_t n = strlen(ctrl), pos = 0;
+    while (pos < list.size()) {
+        size_t end = pos;
+        while (end < list.size() && !isspace((unsigned char) list[end])) {
+            ++end;
+        }
+        if (end - pos == n && memcmp(list.data() + pos, ctrl, n) == 0) {
+            return true;
+        }
+        for (pos = end; pos < list.size() && isspace((unsigned char) list[pos]); ++pos) {
+        }
+    }
+    return false;
+}
+
+// Enable each controller in `need` in `dir`'s subtree_control, so dir's children
+// can carry it. Already-delegated controllers are skipped, so on a systemd host
+// (which already delegates cpu/pids at the root) this is a no-op for the base.
+static void cgroup_delegate(const std::string& dir,
+                            const std::vector<const char*>& need) {
+    std::string enabled = dryrun ? std::string()
+        : file_get_contents(dir + "/cgroup.subtree_control", 0);
+    for (const char* c : need) {
+        if (!cgroup_has_controller(enabled, c)) {
+            cgroup_write(dir + "/cgroup.subtree_control", std::string("+") + c);
+        }
+    }
+}
+
+// Reclaim the leaves of previous finished runs: rmdir each `<pool>/<N>` whose
+// owning pa-jail process `N` is gone. A still-running jail is skipped two ways --
+// its owner is alive, and its leaf is populated so rmdir would fail anyway -- so
+// neither a running nor a concurrently-starting run is disturbed. Best-effort:
+// failures are ignored (at worst an empty dir lingers to the next run).
+static void cgroup_reclaim_stale(const std::string& pool) {
+    DIR* d = opendir(pool.c_str());
+    if (!d) {
+        return;
+    }
+    while (struct dirent* de = readdir(d)) {
+        char* end;
+        long pid = strtol(de->d_name, &end, 10);
+        if (end == de->d_name || *end != '\0' || pid <= 0
+            || kill((pid_t) pid, 0) == 0 || errno != ESRCH) {
+            continue;           // not a `<pid>` leaf, or its owner may be alive
+        }
+        std::string leaf = pool + "/" + de->d_name;
+        if (verbose) {
+            fprintf(verbosefile, "rmdir %s\n", leaf.c_str());
+        }
+        if (!dryrun) {
+            rmdir(leaf.c_str());        // fails harmlessly if not yet empty
+        }
+    }
+    closedir(d);
+}
+
+// Create and configure the per-run leaf cgroup from `limits`, returning its
+// path (empty if no cgroup limits are set, i.e. the feature is opt-in).
+static std::string cgroup_setup(const jaillimits& limits) {
+    const jaillimit& pids = limits[JLIMIT_PIDS_MAX];
+    const jaillimit& cpu = limits[JLIMIT_CPU_MAX];
+    if (!pids.set && !cpu.set) {
+        return std::string();
+    }
+
+    std::vector<const char*> need;
+    if (pids.set) {
+        need.push_back("pids");
+    }
+    if (cpu.set) {
+        need.push_back("cpu");
+    }
+
+    // The base delegates the controllers down to the pool, and the pool down to
+    // its per-run leaves. The pool is created once and left in place (idle pools
+    // are free); a leaf gets a controller as soon as its parent pool delegates it.
+    std::string base = cgroup_base;
+    std::string pool = base + "/" + cgroup_pool_name;
+    cgroup_delegate(base, need);
+    cgroup_mkdir(pool);
+    cgroup_delegate(pool, need);
+
+    // clean up leaves from previous finished runs, then make this run's leaf (the
+    // explicit rmdir clears a stale leaf left by a crashed run that reused our
+    // pid; reclaim skips that one because we, its owner, are alive)
+    cgroup_reclaim_stale(pool);
+    std::string leaf = pool + "/" + std::to_string(getpid());
+    if (!dryrun) {
+        rmdir(leaf.c_str());
+    }
+    cgroup_mkdir(leaf);
+
+    if (pids.set) {
+        cgroup_write(leaf + "/pids.max",
+                     pids.unlimited ? "max" : std::to_string(pids.value));
+    }
+    if (cpu.set) {
+        // cpu.max is "$QUOTA $PERIOD" in microseconds; we keep PERIOD at 100ms
+        // and turn millicores into a quota: quota_us = millicores * 100.
+        std::string v = cpu.unlimited
+            ? "max 100000"
+            : std::to_string(cpu.value * 100) + " 100000";
+        cgroup_write(leaf + "/cpu.max", v);
+    }
+    return leaf;
+}
+
+#else  // !PA_HAVE_CGROUP
+
+// Built without cgroup support (kernel headers older than 5.7). Fail closed if
+// the config actually sets a cgroup limit; otherwise behave as if none was given.
+static std::string cgroup_setup(const jaillimits& limits) {
+    if (limits[JLIMIT_PIDS_MAX].set || limits[JLIMIT_CPU_MAX].set) {
+        die("cgroup limits configured, but this pa-jail was built without cgroup "
+            "support (needs Linux kernel headers >= 5.7); rebuild on a newer host "
+            "or remove the limits\n");
+    }
+    return std::string();
+}
+
+#endif  // PA_HAVE_CGROUP
+#endif  // __linux__
+
+
 class jailownerinfo {
   public:
     uid_t owner_ = ROOT;
@@ -1835,6 +2027,7 @@ class jailownerinfo {
     void set_inputfd(int inputfd);
     void set_timeout(double timeout, double idle_timeout);
     void set_foreground(bool foreground);
+    void set_limits(const jaillimits& limits);
     void exec(int argc, char** argv, jaildirinfo& jaildir);
     int exec_go();
 
@@ -1846,6 +2039,7 @@ class jailownerinfo {
     double timeout_ = -1.0;
     double idle_timeout_ = -1.0;
     bool foreground_= false;
+    jaillimits limits_;
     struct timeval start_time_;
     struct timeval expiry_;
     struct timeval active_time_;
@@ -2005,6 +2199,10 @@ void jailownerinfo::set_foreground(bool foreground) {
     this->foreground_ = foreground;
 }
 
+void jailownerinfo::set_limits(const jaillimits& limits) {
+    this->limits_ = limits;
+}
+
 void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
@@ -2099,23 +2297,51 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
 
     // enter the jail
 #if __linux__
-    char* new_stack = (char*) malloc(256 * 1024);
-    if (!new_stack) {
-        die("Out of memory\n");
-    }
+    // set up the per-run cgroup (no-op unless cgroup limits are configured)
+    std::string cgleaf = cgroup_setup(limits_);
     if (verbose) {
         fprintf(verbosefile, "-clone-\n");
     }
     int child;
-    if (!dryrun) {
-        child = clone(exec_clone_function, new_stack + 256 * 1024,
-                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | SIGCHLD, this);
-    } else {
+    if (dryrun) {
         exec_clone_function(this);
         exit(0);
-    }
-    if (child == -1) {
-        perror_die("clone");
+    } else if (cgleaf.empty()) {
+        char* new_stack = (char*) malloc(256 * 1024);
+        if (!new_stack) {
+            die("Out of memory\n");
+        }
+        child = clone(exec_clone_function, new_stack + 256 * 1024,
+                      CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | SIGCHLD, this);
+        if (child == -1) {
+            perror_die("clone");
+        }
+    } else {
+#if PA_HAVE_CGROUP
+        // clone3 + CLONE_INTO_CGROUP: the child is born inside the leaf, so its
+        // limits apply from the start and student code (forked much later) can
+        // never run unconfined -- no placement race, no barrier. The leaf is
+        // reclaimed by a later run's setup; no privileged process lingers.
+        int cgfd = open(cgleaf.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+        if (cgfd < 0) {
+            perror_die("cgroup " + cgleaf);
+        }
+        struct clone_args ca = {};
+        ca.flags = CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | CLONE_INTO_CGROUP;
+        ca.exit_signal = SIGCHLD;
+        ca.cgroup = (uint64_t) cgfd;
+        long pid = syscall(SYS_clone3, &ca, sizeof(ca));
+        if (pid < 0) {
+            perror_die("clone3 (cgroup limits need Linux 5.7+)");
+        } else if (pid == 0) {
+            close(cgfd);
+            _exit(exec_go());
+        }
+        close(cgfd);
+        child = (int) pid;
+#else
+        die("internal error: cgroup leaf without cgroup support\n");  // unreachable
+#endif
     }
 #else
     int child = fork();
@@ -3365,6 +3591,9 @@ int main(int argc, char** argv) {
         jailuser.set_inputfd(inputfd);
         jailuser.set_timeout(timeout, idle_timeout);
         jailuser.set_foreground(foreground);
+        // limits come from the identity jail (which selected the config), not
+        // the build/bind scaffold
+        jailuser.set_limits(jaildir.perm.limits);
         jailuser.exec(argc - (optind + 2), argv + optind + 2, buildjail);
     }
 
