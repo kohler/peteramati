@@ -365,26 +365,29 @@ void test_pajailconf() {
 
     // skeleton allowance parallels jail allowance, keyed on the skeleton dir
     jc = pajailconf("enablejail /jails/**\nenableskeleton /skel/*\n");
-    assert(jc.get("/jails/a", "/skel/x").skeletondir == "/skel/x/");
-    assert(jc.get("/jails/a", "/skel/x/").skeletondir == "/skel/x/");
-    assert(jc.get("/jails/a", "/skel/x").allowed);
-    assert(jc.get("/jails/a", "/other").skeletondir == "");
-    assert(jc.get("/jails/a").skeletondir == "");
-    assert(jc.get("/jails/a").allowed);
+    jailperm perm("/jails/a", "/skel/x");
+    jc.parse(perm);
+    assert(perm.skeletondir == "/skel/x/");
+    assert(perm.skeleton_enabled);
+    assert(perm.enabled);
+    assert(!jc.get("/jails/a", "/other").skeleton_enabled);
+    assert(!jc.get("/jails/a").skeleton_enabled);
+    assert(jc.get("/jails/a").enabled);
 
     // a bare `enableskeleton` enables nothing by itself
     jc = pajailconf("enablejail /jails/**\nenableskeleton\n");
-    assert(jc.get("/jails/a", "/skel/x").skeletondir == "");
+    assert(!jc.get("/jails/a", "/skel/x").skeleton_enabled);
 
     // `disableskeleton` overrides a prior enable (last match wins)
     jc = pajailconf("enablejail /jails/**\nenableskeleton /skel/*\ndisableskeleton /skel/bad\n");
     assert(jc.get("/jails/a", "/skel/ok").skeletondir == "/skel/ok/");
-    assert(jc.get("/jails/a", "/skel/bad").skeletondir == "");
+    assert(jc.get("/jails/a", "/skel/ok").skeleton_enabled);
+    assert(!jc.get("/jails/a", "/skel/bad").skeleton_enabled);
 
     // a skeleton enable must not affect the jail's permdir (without the guard,
     // the `/jails/*` skeleton pattern would set permdir to "/jails/")
     jc = pajailconf("enablejail /jails/a\nenableskeleton /jails/*\n");
-    assert(jc.get("/jails/a", "/jails/skel").skeletondir == "/jails/skel/");
+    assert(jc.get("/jails/a", "/jails/skel").skeleton_enabled);
     assert(jc.get("/jails/a", "/jails/skel").permdir == "/jails/a/");
 }
 
@@ -393,9 +396,9 @@ void test_pajailconf_sections() {
     // applies to the section's jaildir and derives permdir from the section
     // pattern -- as if it had carried that pattern as its argument.
     pajailconf jc("[/jails/run*]\nenablejail\n");
-    assert(jc.get("/jails/run").allowed);
+    assert(jc.get("/jails/run").enabled);
     assert(jc.get("/jails/run").permdir == "/jails/");
-    assert(jc.get("/jails/runa").allowed);
+    assert(jc.get("/jails/runa").enabled);
     assert(jc.get("/jails/runa").permdir == "/jails/");
     assert(!jc.get("/jails/other"));        // jaildir outside the section glob
     assert(!jc.get("/jails"));
@@ -403,36 +406,36 @@ void test_pajailconf_sections() {
 
     // a fully-literal section: permdir is the jaildir itself
     jc = pajailconf("[/data/jailbind]\nenablejail\n");
-    assert(jc.get("/data/jailbind").allowed);
+    assert(jc.get("/data/jailbind").enabled);
     assert(jc.get("/data/jailbind").permdir == "/data/jailbind/");
     assert(!jc.get("/data/jailbind/sub"));  // no cascade
 
     // a subtree section (`**`) gates the whole subtree; permdir is the prefix
     jc = pajailconf("[/jails/**]\nenablejail\n");
-    assert(jc.get("/jails/a").allowed);
+    assert(jc.get("/jails/a").enabled);
     assert(jc.get("/jails/a").permdir == "/jails/");
-    assert(jc.get("/jails/a/b").allowed);
+    assert(jc.get("/jails/a/b").enabled);
     assert(jc.get("/jails/a/b").permdir == "/jails/");
     assert(!jc.get("/other"));
 
     // an explicit pattern inside a section is gated by BOTH the section and its
     // own pattern (a directive matching the section but not the pattern is inert)
     jc = pajailconf("[/jails/**]\nenablejail /jails/run/*\n");
-    assert(jc.get("/jails/run/x").allowed);
+    assert(jc.get("/jails/run/x").enabled);
     assert(jc.get("/jails/run/x").permdir == "/jails/run/");
     assert(!jc.get("/jails/build/x"));      // in section, but pattern misses
 
     // `[]` and `[/**]` reset to the global scope: an argless directive there is
     // global (does not, by itself, locally enable any jaildir)
     jc = pajailconf("[/jails/a]\nenablejail\n[]\nenablejail /jails/b\n");
-    assert(jc.get("/jails/a").allowed);
+    assert(jc.get("/jails/a").enabled);
     assert(jc.get("/jails/a").permdir == "/jails/a/");
-    assert(jc.get("/jails/b").allowed);
+    assert(jc.get("/jails/b").enabled);
     assert(jc.get("/jails/b").permdir == "/jails/b/");
 
     // a per-jaildir disable inside a section vetoes only matching jaildirs
     jc = pajailconf("enablejail /jails/**\n[/jails/secret]\ndisablejail\n");
-    assert(jc.get("/jails/ok").allowed);
+    assert(jc.get("/jails/ok").enabled);
     assert(!jc.get("/jails/secret"));
 
     // SKELETONS ARE PER-JAILDIR. Inside `[/foo]`, `enableskeleton SKEL` means
@@ -440,22 +443,24 @@ void test_pajailconf_sections() {
     // on the skeleton dir. A BARE `enableskeleton` enables nothing -- it is NOT
     // `enableskeleton /foo`.
     jc = pajailconf("[/jails/a]\nenablejail\nenableskeleton /skel/x\n");
-    assert(jc.get("/jails/a", "/skel/x").allowed);
-    assert(jc.get("/jails/a", "/skel/x").skeletondir == "/skel/x/");
-    assert(jc.get("/jails/a", "/skel/y").skeletondir == "");   // wrong skeleton
-    assert(jc.get("/jails/a").skeletondir == "");              // none requested
+    assert(jc.get("/jails/a", "/skel/x").enabled);
+    assert(jc.get("/jails/a", "/skel/x").skeleton_enabled);
+    assert(!jc.get("/jails/a", "/skel/y").skeleton_enabled);   // wrong skeleton
+    assert(!jc.get("/jails/a").skeleton_enabled);              // none requested
 
     jc = pajailconf("[/jails/a]\nenablejail\nenableskeleton\n");
-    assert(jc.get("/jails/a", "/skel/x").skeletondir == "");   // bare = nothing
-    assert(jc.get("/jails/a", "/jails/a").skeletondir == "");  // NOT `... /jails/a`
+    assert(!jc.get("/jails/a", "/skel/x").skeleton_enabled);   // bare = nothing
+    assert(!jc.get("/jails/a", "/jails/a").skeleton_enabled);  // NOT `... /jails/a`
 
     // distinct jaildirs can carry distinct skeletons
     jc = pajailconf("[/jails/a]\nenablejail\nenableskeleton /skelA/*\n"
                     "[/jails/b]\nenablejail\nenableskeleton /skelB/*\n");
     assert(jc.get("/jails/a", "/skelA/1").skeletondir == "/skelA/1/");
-    assert(jc.get("/jails/a", "/skelB/1").skeletondir == "");
+    assert(jc.get("/jails/a", "/skelA/1").skeleton_enabled);
+    assert(!jc.get("/jails/a", "/skelB/1").skeleton_enabled);
     assert(jc.get("/jails/b", "/skelB/1").skeletondir == "/skelB/1/");
-    assert(jc.get("/jails/b", "/skelA/1").skeletondir == "");
+    assert(jc.get("/jails/b", "/skelB/1").skeleton_enabled);
+    assert(!jc.get("/jails/b", "/skelA/1").skeleton_enabled);
 
     // permdir is the SHORTEST matching literal prefix, independent of file order:
     // the broadest grant wins, so a narrower overlapping rule never shrinks the
@@ -472,7 +477,7 @@ void test_pajailconf_sections() {
     // a section added over a broad grant (e.g. just to scope future rlimits)
     // does not tighten the create boundary
     jc = pajailconf("enablejail /jails/**\n[/jails/run/special]\nenablejail\n");
-    assert(jc.get("/jails/run/special").allowed);
+    assert(jc.get("/jails/run/special").enabled);
     assert(jc.get("/jails/run/special").permdir == "/jails/");
 }
 
@@ -501,7 +506,7 @@ void test_pajailconf_disable_lineno() {
 
     // allowed despite an earlier (overridden) disable: the stamped line is dropped
     jc = pajailconf("disablejail /jails/x\nenablejail /jails/x\n");
-    assert(jc.get("/jails/x").allowed);
+    assert(jc.get("/jails/x").enabled);
     assert(jc.get("/jails/x").disabled_lineno == 0);
 
     // blank and comment lines count toward the line number
@@ -527,9 +532,67 @@ void test_pajailconf_disable_lineno() {
     // the skeleton axis never stamps a (jaildir) line number: a disabled skeleton
     // leaves the jail allowed with disabled_lineno == 0
     jc = pajailconf("enablejail /jails/a\nenableskeleton /skel/*\ndisableskeleton /skel/x\n");
-    assert(jc.get("/jails/a", "/skel/x").allowed);              // jail allowed
-    assert(jc.get("/jails/a", "/skel/x").skeletondir == "");    // skeleton denied
+    assert(jc.get("/jails/a", "/skel/x").enabled);              // jail allowed
+    assert(!jc.get("/jails/a", "/skel/x").skeleton_enabled);    // skeleton denied
     assert(jc.get("/jails/a", "/skel/x").disabled_lineno == 0);
+}
+
+void test_pajailconf_query() {
+    pajailconf jc("enablejail /jails/**\n");
+
+    // the constructor (via get) slash-terminates the query, so a non-terminated
+    // dir is fixed up and enabled -- and parse() leaves the fixed-up value alone
+    assert(jc.get("/jails/a"));
+    assert(jc.get("/jails/a").dir == "/jails/a/");
+    assert(jc.get("/jails/a/").dir == "/jails/a/");
+    // but the constructor does NOT make a relative dir absolute, so it stays
+    // disabled (a relative jaildir never matches an absolute pattern)
+    assert(!jc.get("jails/a"));
+    assert(!jc.get("jails/a/"));
+
+    // parse() reads `dir`/`skeletondir` verbatim -- it never rewrites them. A dir
+    // assigned directly (bypassing the constructor's fix-up) that is not absolute
+    // and slash-terminated is fail-safe disabled.
+    auto parsed = [&](std::string dir, std::string skel = std::string()) {
+        jailperm perm;                  // default ctor: no fix-up
+        perm.dir = std::move(dir);
+        perm.skeletondir = std::move(skel);
+        jc.parse(perm);
+        return perm;
+    };
+    assert(parsed("/jails/a/"));                     // well-formed -> enabled
+    assert(parsed("/jails/a/").dir == "/jails/a/");  // parse() didn't touch it
+    assert(!parsed("/jails/a"));                      // no trailing slash
+    assert(!parsed("jails/a/"));                      // relative
+    assert(!parsed("jails/a"));                       // relative + no slash
+    assert(!parsed(""));                              // empty
+    // the malformed dir survives parse() intact, so an error can still name it
+    {
+        jailperm perm;
+        perm.dir = "/jails/a";
+        jc.parse(perm);
+        assert(!perm);
+        assert(perm.dir == "/jails/a");
+    }
+
+    // skeletondir: a malformed value leaves the jail enabled but the skeleton
+    // disabled (skeleton_enabled also requires absolute + slash-terminated)
+    jc = pajailconf("enablejail /jails/**\nenableskeleton /skel/*\n");
+    assert(parsed("/jails/a/", "/skel/x/").enabled);
+    assert(parsed("/jails/a/", "/skel/x/").skeleton_enabled);     // well-formed
+    assert(parsed("/jails/a/", "/skel/x").enabled);               // jail unaffected
+    assert(!parsed("/jails/a/", "/skel/x").skeleton_enabled);     // no trailing slash
+    assert(!parsed("/jails/a/", "skel/x/").skeleton_enabled);     // relative
+    // the malformed skeletondir also survives parse() intact
+    {
+        jailperm perm;
+        perm.dir = "/jails/a/";
+        perm.skeletondir = "/skel/x";
+        jc.parse(perm);
+        assert(perm.enabled);
+        assert(!perm.skeleton_enabled);
+        assert(perm.skeletondir == "/skel/x");
+    }
 }
 
 void test_path_absolute() {
@@ -831,6 +894,7 @@ int main() {
     test_pajailconf();
     test_pajailconf_sections();
     test_pajailconf_disable_lineno();
+    test_pajailconf_query();
     test_path_absolute();
     test_path_pa_validate();
     test_shell_quote();

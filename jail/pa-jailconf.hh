@@ -8,21 +8,34 @@
 
 // pa-jail.conf
 
-// Result of a `pajailconf` query. `allowed` says whether the queried directory
-// is permitted; for an allowed jail, `permdir` is the permission directory --
-// the shortest literal prefix among the matching `enablejail` globs, below which
-// pa-jail may create components. When a jail is denied, `disabled_lineno` is the
-// 1-based config line of the `disablejail` directive responsible (0 if none --
-// e.g. the jail was simply never enabled), used to explain the denial. It tracks
-// only the jaildir axis, never the skeleton.
+// A `pajailconf` query and its result. (`dir`, `skeletondir`) are the inputs --
+// the jail directory and an optional skeleton; the other fields are filled in
+// by `parse()`. `enabled`/`skeleton_enabled` say whether each is permitted; for
+// an enabled jail `permdir` is the create boundary (the shortest literal prefix
+// among the matching `enablejail` globs, below which pa-jail may create
+// components). If `!enabled`, `disabled_lineno` is the 1-based line of the
+// responsible `disablejail` (0 if none -- e.g. never enabled), used to explain
+// it.
 struct jailperm {
-    bool allowed = false;
+    std::string dir;
     std::string skeletondir;
     std::string permdir;
+    bool enabled = false;
+    bool skeleton_enabled = false;
     int disabled_lineno = 0;
 
+    jailperm() = default;
+    jailperm(std::string dir_, std::string skeletondir_ = std::string())
+        : dir(std::move(dir_)), skeletondir(std::move(skeletondir_)) {
+        if (!dir.empty() && !dir.ends_with('/')) {
+            dir.push_back('/');
+        }
+        if (!skeletondir.empty() && !skeletondir.ends_with('/')) {
+            skeletondir.push_back('/');
+        }
+    }
     explicit operator bool() const {
-        return allowed;
+        return enabled;
     }
     // Error-message fragment indicating the disabling line
     std::string disable_message() const {
@@ -35,9 +48,15 @@ struct jailperm {
 
 struct pajailconf {
     pajailconf();
-    pajailconf(const std::string& str);
+    pajailconf(std::string_view str);
 
-    jailperm get(std::string dir, std::string skeletondir = std::string()) const;
+    void parse(jailperm&) const;
+
+    inline jailperm get(std::string dir, std::string skeletondir = std::string()) const {
+        jailperm perm(std::move(dir), std::move(skeletondir));
+        parse(perm);
+        return perm;
+    }
 
 private:
     char buf_[8192];

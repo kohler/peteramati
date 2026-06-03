@@ -42,7 +42,7 @@ pajailconf::pajailconf() {
     close(fd);
 }
 
-pajailconf::pajailconf(const std::string& s) {
+pajailconf::pajailconf(std::string_view s) {
     if (s.size() >= sizeof(buf_)) {
         die("pajailconf: String too big, max %zu bytes\n", sizeof(buf_));
     }
@@ -53,8 +53,15 @@ pajailconf::pajailconf(const std::string& s) {
 static std::string_view pop_word(std::string_view& line) {
     const char* s = line.data();
     const char* end = s + line.size();
-    while (s != end && !isspace((unsigned char) *s)) {
-        ++s;
+    if (*s == '[') {
+        while (s != end && *s != ']') {
+            ++s;
+        }
+        s += s != end;
+    } else {
+        while (s != end && !isspace((unsigned char) *s)) {
+            ++s;
+        }
     }
     std::string_view result(line.data(), s - line.data());
     while (s != end && isspace((unsigned char) *s)) {
@@ -64,18 +71,22 @@ static std::string_view pop_word(std::string_view& line) {
     return result;
 }
 
-jailperm pajailconf::get(std::string dir, std::string skeletondir) const {
+void pajailconf::parse(jailperm& perm) const {
+    // fail early on bad `perm.dir`
+    perm.enabled = perm.skeleton_enabled = false;
+    perm.permdir = std::string();
+    if (perm.dir.empty()
+        || !perm.dir.starts_with('/')
+        || !perm.dir.ends_with('/')) {
+        return;
+    }
+
     const char* pos = buf_;
     const char* last = buf_ + len_;
     bool allow_jail[2] = {false /* local */, true /* global */};
     bool allow_skeleton[2] = {false, true};
     std::string section;
     bool skip_section = false;
-    jailperm perm;
-    dir = path_endslash(dir);
-    if (!skeletondir.empty()) {
-        skeletondir = path_endslash(skeletondir);
-    }
 
     // permdir (the create boundary) is the SHORTEST matching enablejail prefix:
     // order-independent, and honors the broadest grant so a narrower overlapping
@@ -105,15 +116,13 @@ jailperm pajailconf::get(std::string dir, std::string skeletondir) const {
         pos = lpos + (lpos != last);
         ++lineno;
 
-        // ignore blank lines and comments
-        if (line.empty() || line[0] == '#') {
-            continue;
-        }
-
         // separate into words
         args.clear();
-        while (!line.empty()) {
+        while (!line.empty() && line[0] != '#') {
             args.push_back(pop_word(line));
+        }
+        if (args.empty()) {       // blank line or only comment
+            continue;
         }
 
         // check for section
@@ -129,7 +138,7 @@ jailperm pajailconf::get(std::string dir, std::string skeletondir) const {
                 skip_section = false;
             } else {
                 section = path_endslash(std::string(action.substr(1, action.size() - 2)));
-                skip_section = !pathmatch(section, dir);
+                skip_section = !pathmatch(section, perm.dir);
             }
             continue;
         }
@@ -181,7 +190,7 @@ jailperm pajailconf::get(std::string dir, std::string skeletondir) const {
         }
 
         // check subdirectory match
-        auto d = allowance == allow_jail ? dir : skeletondir;
+        const auto& d = allowance == allow_jail ? perm.dir : perm.skeletondir;
         if (pathmatch(pattern, d)) {
             if (allowance == allow_jail && value) {
                 consider_permdir(pattern);
@@ -192,14 +201,14 @@ jailperm pajailconf::get(std::string dir, std::string skeletondir) const {
         }
     }
 
-    perm.allowed = allow_jail[0] && allow_jail[1];
-    if (perm.allowed) {
+    perm.enabled = allow_jail[0] && allow_jail[1];
+    if (perm.enabled) {
         perm.disabled_lineno = 0;
     } else {
         perm.permdir = std::string();
     }
-    if (allow_skeleton[0] && allow_skeleton[1]) {
-        perm.skeletondir = skeletondir;
-    }
-    return perm;
+    perm.skeleton_enabled = allow_skeleton[0]
+        && allow_skeleton[1]
+        && perm.skeletondir.starts_with('/')
+        && perm.skeletondir.ends_with('/');
 }

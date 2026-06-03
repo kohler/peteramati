@@ -1205,14 +1205,11 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
 // main program
 
 struct jaildirinfo {
-    std::string dir;
+    jailperm perm;
     std::string parent;
-    int parentfd;
+    int parentfd = -1;
     std::string component;
-    bool allowed;
-    std::string permdir;
-    dev_t dev;
-    std::string skeletondir;
+    dev_t dev = -1;
 
     jaildirinfo(const char* str, const std::string& skeletondir,
                 jailaction action, pajailconf& jailconf);
@@ -1227,54 +1224,61 @@ private:
     void remove_recursive(int dirfd, std::string component, std::string name);
 };
 
-jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
-                         jailaction action, pajailconf& jailconf)
-    : dir(path_pa_validate(path_absolute(str))),
-      parentfd(-1), allowed(false), dev(-1),
-      skeletondir(skeletonstr) {
-    if (dir.empty() || dir == "/" || dir[0] != '/') {
-        fprintf(stderr, "%s: Bad jail filename\n", str);
+jaildirinfo::jaildirinfo(const char* dirstr, const std::string& skeletonstr,
+                         jailaction action, pajailconf& jailconf) {
+    perm.dir = path_pa_validate(path_absolute(dirstr));
+    if (perm.dir.empty() || perm.dir == "/" || perm.dir[0] != '/') {
+        fprintf(stderr, "%s: Bad jail directory\n", dirstr);
         exit(1);
     }
-    dir = path_endslash(dir);
-    if (!skeletondir.empty()) {
-        skeletondir = path_endslash(path_absolute(skeletondir));
+    if (!perm.dir.ends_with('/')) {
+        perm.dir.push_back('/');
     }
-    jailperm perm = jailconf.get(dir, skeletondir);
+    if (!skeletonstr.empty()) {
+        perm.skeletondir = path_pa_validate(path_absolute(skeletonstr));
+        if (perm.skeletondir.empty() || perm.skeletondir == "/" || perm.skeletondir[0] != '/') {
+            fprintf(stderr, "%s: Bad skeleton directory\n", skeletonstr.c_str());
+            exit(1);
+        }
+        if (!perm.skeletondir.ends_with('/')) {
+            perm.skeletondir.push_back('/');
+        }
+    }
+    jailconf.parse(perm);
     if (!perm) {
         die("%s: Jail disabled in /etc/pa-jail.conf\n%s",
-            dir.c_str(), perm.disable_message().c_str());
-    } else if (!skeletondir.empty() && perm.skeletondir.empty()) {
+            perm.dir.c_str(), perm.disable_message().c_str());
+    } else if (!skeletonstr.empty() && !perm.skeleton_enabled) {
         die("%s: Skeleton disabled in /etc/pa-jail.conf\n",
-            skeletondir.c_str());
+            perm.skeletondir.c_str());
     }
-    permdir = perm.permdir;
-    skeletondir = perm.skeletondir;
 
     size_t last_pos = 0;
     int fd = -1;
     bool dryrunning = false;
-    while (last_pos != dir.length()) {
+    while (last_pos != perm.dir.size()) {
         // extract component
         size_t next_pos = last_pos;
-        while (next_pos && next_pos < dir.length() && dir[next_pos] != '/') {
+        while (next_pos
+               && next_pos < perm.dir.size()
+               && perm.dir[next_pos] != '/') {
             ++next_pos;
         }
         if (!next_pos) {
             ++next_pos;
         }
-        parent = dir.substr(0, last_pos);
-        component = dir.substr(last_pos, next_pos - last_pos);
-        std::string thisdir = dir.substr(0, next_pos);
+        parent = perm.dir.substr(0, last_pos);
+        component = perm.dir.substr(last_pos, next_pos - last_pos);
+        std::string thisdir = perm.dir.substr(0, next_pos);
         last_pos = next_pos;
-        while (last_pos != dir.length() && dir[last_pos] == '/') {
+        while (last_pos != perm.dir.size() && perm.dir[last_pos] == '/') {
             ++last_pos;
         }
 
         // check whether we are below the permission directory
-        bool allowed_here = !permdir.empty()
-            && last_pos >= permdir.length()
-            && dir.substr(0, permdir.length()) == permdir;
+        bool allowed_here = !perm.permdir.empty()
+            && last_pos >= perm.permdir.length()
+            && perm.dir.substr(0, perm.permdir.length()) == perm.permdir;
 
         // open it and swap it in
         if (parentfd >= 0) {
@@ -1306,7 +1310,7 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
             dirtable.insert(std::make_pair(thisdir, 0));
             fd = openat(parentfd, component.c_str(), O_CLOEXEC | O_NOFOLLOW);
             // turn off suid+sgid on created root directory
-            if (last_pos == dir.length() && (fd >= 0 || dryrun)
+            if (last_pos == perm.dir.size() && (fd >= 0 || dryrun)
                 && v_fchmod(fd, 0755, thisdir) != 0) {
                 fprintf(stderr, "chmod %s: %s\n", thisdir.c_str(), strerror(errno));
                 exit(1);
@@ -1328,7 +1332,7 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
         if (fstat(fd, &s) != 0) {
             perror_die(thisdir);
         }
-        bool final_target = last_pos == dir.length();
+        bool final_target = last_pos == perm.dir.size();
         // The final target is the jail root that we will `pivot_root` into and
         // run untrusted code under. Even at/below `permdir` (where we otherwise
         // trust the permission tree), a *pre-existing* jail root that is not
@@ -1358,15 +1362,15 @@ jaildirinfo::jaildirinfo(const char* str, const std::string& skeletonstr,
 }
 
 void jaildirinfo::check() {
-    assert(!permdir.empty() && permdir[permdir.length() - 1] == '/');
-    assert(dir.starts_with(permdir));
+    assert(!perm.permdir.empty() && perm.permdir.back() == '/');
+    assert(perm.dir.starts_with(perm.permdir));
 }
 
 // Chown `{dir}/home/` to be owned by root, and `{dir}/home/{user}`
 // to be owned by `user:user`.
 void jaildirinfo::chown_home() {
     populate_mount_table();
-    std::string dirbuf = dir + "home/";
+    std::string dirbuf = perm.dir + "home/";
     int dirfd = openat(parentfd, (component + "/home").c_str(),
                        O_CLOEXEC | O_NOFOLLOW);
     struct stat dirst;
@@ -1385,14 +1389,14 @@ void jaildirinfo::chown_home() {
 void jaildirinfo::chown_recursive(const std::string& path,
                                   uid_t owner, gid_t group) {
     populate_mount_table();
-    assert(path.starts_with(dir) && path.size() > dir.size());
+    assert(path.starts_with(perm.dir) && path.size() > perm.dir.size());
     int dirfd = openat(parentfd, component.c_str(),
                        O_PATH | O_CLOEXEC | O_NOFOLLOW);
     if (dirfd == -1) {
-        perror_die(dir);
+        perror_die(perm.dir);
     }
     // walk down to parent directory of `path`
-    size_t pos = dir.size();
+    size_t pos = perm.dir.size();
     size_t lastpos = path.size() - (path.back() == '/');
     size_t dirpos = path.rfind('/', lastpos - 1);
     assert(pos > 0 && dirpos >= pos - 1 && dirpos < lastpos);
@@ -1524,7 +1528,7 @@ void jaildirinfo::chown_recursive(int dirfd, std::string& dirbuf,
 }
 
 void jaildirinfo::remove() {
-    remove_recursive(parentfd, component, path_endslash(dir));
+    remove_recursive(parentfd, component, path_endslash(perm.dir));
 }
 
 void jaildirinfo::remove_recursive(int parentdirfd, std::string component,
@@ -2148,7 +2152,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
 }
 
 int jailownerinfo::exec_go() {
-    std::string jdir = jaildir_->dir;
+    std::string jdir = jaildir_->perm.dir;
     assert(jdir.back() == '/');
     std::string unmounted_jdir = unmounted(jdir);
     if (unmounted_jdir.back() != '/') {
@@ -3259,7 +3263,7 @@ int main(int argc, char** argv) {
 
     // kill the sandbox if asked
     if (action == do_rm) {
-        jaildir.dir = path_endslash(jaildir.dir);
+        assert(jaildir.perm.dir.ends_with("/"));
         if (!dryrun && !foreground) {
             pid_t p = fork();
             if (p > 0) {
@@ -3272,9 +3276,7 @@ int main(int argc, char** argv) {
         // INCLUDING MY HOME DIRECTORY
         populate_mount_table();
         for (auto it = mount_table.begin(); it != mount_table.end(); ++it) {
-            if (it->first.length() >= jaildir.dir.length()
-                && memcmp(it->first.data(), jaildir.dir.data(),
-                          jaildir.dir.length()) == 0)
+            if (it->first.starts_with(jaildir.perm.dir))
                 handle_umount(it);
         }
         // remove the jail
@@ -3283,19 +3285,19 @@ int main(int argc, char** argv) {
     }
 
     // check skeleton directory
-    if (!jaildir.skeletondir.empty()) {
-        if (v_ensuredir(jaildir.skeletondir, 0755) < 0) {
-            perror_die(jaildir.skeletondir);
+    if (!jaildir.perm.skeletondir.empty()) {
+        if (v_ensuredir(jaildir.perm.skeletondir, 0755) < 0) {
+            perror_die(jaildir.perm.skeletondir);
         }
-        linkdir = path_noendslash(jaildir.skeletondir);
+        linkdir = path_noendslash(jaildir.perm.skeletondir);
     }
 
     // create the home directory
     if (!jailuser.owner_home_.empty()) {
-        if (v_ensuredir(jaildir.dir + "/home", 0755) < 0) {
-            perror_die(jaildir.dir + "/home");
+        if (v_ensuredir(jaildir.perm.dir + "/home", 0755) < 0) {
+            perror_die(jaildir.perm.dir + "/home");
         }
-        std::string jailhome = jaildir.dir + jailuser.owner_home_;
+        std::string jailhome = jaildir.perm.dir + jailuser.owner_home_;
         int r = v_ensuredir(jailhome, 0700);
         uid_t want_owner = action == do_add ? caller_owner : jailuser.owner_;
         gid_t want_group = action == do_add ? caller_group : jailuser.group_;
@@ -3322,25 +3324,25 @@ int main(int argc, char** argv) {
         if (f.empty()) {
             die("--chown-user directory must not be empty\n");
         }
-        auto xf = path_pa_validate(path_absolute(f, jaildir.dir));
+        auto xf = path_pa_validate(path_absolute(f, jaildir.perm.dir));
         if (xf.empty()) {
             die("%s: Invalid --chown-user directory\n",
                 f.c_str());
-        } else if (!xf.starts_with(jaildir.dir)) {
+        } else if (!xf.starts_with(jaildir.perm.dir)) {
             // `jaildir.dir` ends in `/` while `xf` (from path_pa_validate) does
             // not, so this requires `xf` to be a strict subdirectory: the jail
             // root itself is intentionally excluded, since chowning it to the
             // ephemeral user would be an escape vector. Don't "fix" this by
             // normalizing the trailing slash.
             die("%s: --chown-user directory must be within %s\n",
-                f.c_str(), jaildir.dir.c_str());
+                f.c_str(), jaildir.perm.dir.c_str());
         }
         jaildir.chown_recursive(xf, jailuser.owner_, jailuser.group_);
     }
 
     // construct the jail
     mount_status = optind + 2 < argc;
-    dstroot = path_noendslash(buildjail.dir);
+    dstroot = path_noendslash(buildjail.perm.dir);
     assert(dstroot != "/");
     if (!manifest.empty()) {
         mode_t old_umask = umask(0);
