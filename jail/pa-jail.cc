@@ -3192,7 +3192,8 @@ static bool range_strtol(long& v, const char* a, const char* b) {
     return a == b;
 }
 
-int main(int argc, char** argv) {
+// May throw an exception
+static int jail_main(int argc, char** argv) {
     // parse arguments
     jailaction action = do_start;
     bool chown_home = false, foreground = false;
@@ -3603,4 +3604,13 @@ int main(int argc, char** argv) {
     }
 
     exit(0);
+}
+
+int main(int argc, char** argv) {
+    try {
+        return jail_main(argc, argv);
+    } catch (const pajailconf_error& e) {
+        fprintf(stderr, "%s\n", e.message().c_str());
+        exit(1);
+    }
 }

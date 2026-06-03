@@ -5,6 +5,27 @@
 #pragma once
 #include <string>
 #include <string_view>
+#include <stdexcept>
+
+// Thrown by `pajailconf` (its constructors, `parse`, and `pool_limits`) on any
+// configuration error: a malformed directive or limit value, an unknown limit
+// name, or an unreadable/oversize/non-root-owned config file. `lineno` is the
+// 1-based config line the error is attributed to, or 0 for file-level errors
+// with no line.
+struct pajailconf_error : std::runtime_error {
+    int lineno;
+
+    explicit pajailconf_error(std::string msg, int lineno_ = 0)
+        : std::runtime_error(std::move(msg)), lineno(lineno_) {
+    }
+    // The message, prefixed with the config line number when one is known.
+    std::string message() const {
+        if (lineno > 0) {
+            return "line " + std::to_string(lineno) + ": " + what();
+        }
+        return std::string(what());
+    }
+};
 
 // pa-jail.conf
 
@@ -104,9 +125,10 @@ struct pajailconf {
     void parse(jailperm&) const;
 
     // Resolved limits of the pool cgroup `path` -- the union of the `limit`
-    // directives in `[cgroup PATH]` sections whose PATH literally equals `path`
-    // (the same string a jail's `cgroupbase` carries). Cgroup-controller limits
-    // only.
+    // directives in `[cgroup]` sections (which apply to every pool) and
+    // `[cgroup PATH]` sections whose PATH literally equals `path` (the same
+    // string a jail's `cgroupbase` carries), overlaid in file order (last write
+    // wins per name). Cgroup-controller limits only.
     jaillimits pool_limits(std::string_view path) const;
 
     inline jailperm get(std::string dir, std::string skeletondir = std::string()) const {

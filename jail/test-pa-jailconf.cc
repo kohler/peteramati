@@ -6,6 +6,17 @@
 #include <cstdint>
 #include <string>
 
+// True if `f()` throws a `pajailconf_error`.
+template <typename F>
+static bool throws_config_error(F&& f) {
+    try {
+        f();
+        return false;
+    } catch (const pajailconf_error&) {
+        return true;
+    }
+}
+
 void test_pathmatch() {
     // slashes are significant; no insensitivity
     assert(pathmatch("/foo", "/foo"));
@@ -661,6 +672,25 @@ void test_pajailconf_cgroup() {
     jc = pajailconf("[cgroup /p]\nlimit pids.max=64,cpu.max=1\nlimit pids.max=256\n");
     assert(jc.pool_limits("/p")[JLIMIT_PIDS_MAX].value == 256);
     assert(jc.pool_limits("/p")[JLIMIT_CPU_MAX].value == 1000);
+
+    // a bare `[cgroup]` applies to every pool, overlaid with the pool's own
+    // `[cgroup PATH]` limits (last write wins per name, in file order)
+    jc = pajailconf("[cgroup]\nlimit pids.max=64,cpu.max=2\n"
+                    "[cgroup /p]\nlimit pids.max=256\n");
+    assert(jc.pool_limits("/p")[JLIMIT_PIDS_MAX].value == 256);    // pool overrides
+    assert(jc.pool_limits("/p")[JLIMIT_CPU_MAX].value == 2000);    // inherited from `[cgroup]`
+    assert(jc.pool_limits("/other")[JLIMIT_PIDS_MAX].value == 64); // only the `[cgroup]` limits
+    assert(jc.pool_limits("/other")[JLIMIT_CPU_MAX].value == 2000);
+
+    // `[cgroup]` is a pool section, so a jaildir query skips its limits
+    jc = pajailconf("enablejail /jails/**\n[cgroup]\nlimit pids.max=64\n");
+    assert(jc.get("/jails/a").enabled);
+    assert(!jc.get("/jails/a").limits[JLIMIT_PIDS_MAX].set);
+
+    // malformed `[...]` headers are errors: a multi-word non-cgroup section,
+    // and a `[cgroup ...]` that is neither `[cgroup]` nor `[cgroup PATH]`
+    assert(throws_config_error([] { pajailconf("[/a /b]\nenablejail /a\n").get("/a"); }));
+    assert(throws_config_error([] { pajailconf("[cgroup /p /q]\n").get("/a"); }));
 }
 
 void test_pajailconf_limit() {

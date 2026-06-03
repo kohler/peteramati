@@ -489,14 +489,17 @@ wired**, see "Next" below):
   (section overrides global, last-match-wins); defaults to `default_cgroupbase`
   (`/sys/fs/cgroup/pa-jail`, the same path the runtime hardcodes today). `$SELF`
   and `$SELF/sub` are stored **verbatim** (expanded only at apply time).
-- **Typed `[cgroup PATH]` sections** define a pool's own limits. The header
+- **Typed `[cgroup PATH]` sections** define a pool's own limits; a bare
+  **`[cgroup]`** (no path) defines limits applied to *every* pool. The header
   parser classifies the first bracket word: `cgroup` → a pool section, which the
   jaildir query *skips* (a pool's limits never leak into a jail's `limits`);
-  anything else is a `[JAILPAT]` as before.
+  anything else is a `[JAILPAT]` as before. A multi-word header that is neither a
+  valid `[cgroup]`/`[cgroup PATH]` nor a single `[JAILPAT]` is an error.
 - **`pajailconf::pool_limits(PATH)`** returns a pool's resolved limits — the union
-  of `limit` directives in `[cgroup P]` sections whose `P` *literally* equals
-  `PATH` (the same string `cgroupbase` carries, `$SELF` included). Pool `limit`s
-  take only the no-JDIR form.
+  of `limit` directives in bare `[cgroup]` sections (every pool) and `[cgroup P]`
+  sections whose `P` *literally* equals `PATH` (the same string `cgroupbase`
+  carries, `$SELF` included), overlaid in file order (last write wins per name).
+  Pool `limit`s take only the no-JDIR form.
 - Tested in `test_pajailconf_cgroup` / `test_pajailconf_limit`. Deferred:
   rejecting `rlimit.*` inside `[cgroup …]` (no such names exist yet; a comment in
   `pool_limits` marks the spot).
