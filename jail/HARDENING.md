@@ -321,14 +321,31 @@ section), and, inside a section, gated additionally by the section pattern.
 Resolution is a single pass with **per-name last-write-wins overlay**: a global
 default is overridden by a later matching section or two-arg directive.
 
-**Value grammar.** `<value>` is a non-negative number with an optional unit, or
-`unlimited` / `inf` / `max` for the infinite form. Units depend on the limit:
+**Value grammar.** `<value>` is a non-negative number with an optional unit,
+`unlimited` / `inf` / `max` for the infinite form, or `unset` to clear the limit
+(drop an inherited default, leaving it unset). Units depend on the limit:
 `k`/`m`/`g` (1024-based) for byte limits; `s`/`m`/`h` for cumulative-time limits;
 plain integer for counts; for a CPU *rate* (`cpu.max`), a decimal in cores
 (`1.5`) or a percentage of one core (`150%`), stored internally as millicores
 (1000 = one core). A `!` suffix (`pids.max=512!`) pins the value: the command
 line cannot loosen or override it (see 6.4). A malformed value, or an unknown
 limit name, is fatal (`die`) — a limit never silently degrades to "unlimited".
+
+**The `cgroup` pseudo-limit.** `cgroup` is the one name that is not a single
+limit: it acts on *every* cgroup-controller limit (`pids.max`, `cpu.max`,
+`memory.max`, `memory.high`) at once. Two values, both for dropping inherited
+defaults on a trusted jail:
+
+- `cgroup=unlimited` — *set* them all to unlimited. The jail still gets a cgroup
+  leaf, with every file written `max` (in a cgroup, but uncapped).
+- `cgroup=unset` — *clear* them all (`set=false`). If nothing else sets a cgroup
+  limit, the jail uses no cgroup at all — `init`/`run` skip cgroups entirely.
+
+Both overlay per name like any other limit (a later `pids.max=64` overrides just
+that one — e.g. `cgroup=unset,pids.max=64` means "only a pids cap"), and a `!`
+suffix pins all of them. Only `unlimited` / `unset` are accepted; any other
+`cgroup=` value is an error — it is a deliberate "drop the caps" knob, not a way
+to set a value across controllers.
 
 **Naming convention — real kernel names, namespaced by mechanism.** One name
 binds exactly one mechanism (no fan-out), and the name is the *real* kernel name,
@@ -524,19 +541,35 @@ unconfined.
 - Running as root on a normal systemd host, `/sys/fs/cgroup` (the real root)
   already qualifies: root may create leaves there and migrate any process in,
   and systemd has enabled the controllers — so the default base just works.
-- A process **confined** to its own cgroup subtree (e.g. inside Docker, where it
-  lives in `/sys/fs/cgroup/docker/<id>/`) cannot create a leaf at the real root
-  or migrate a process out of its subtree, so the default base silently no-ops
-  (the jail stays uncapped). It needs a base prepared *inside* its own subtree:
-  enable the controllers there — first moving the existing processes into a
-  child, since cgroup v2's "no internal processes" rule forbids enabling
-  controllers on a cgroup that holds processes. systemd's `Delegate=yes`
-  (optionally `DelegateControllers=cpu pids`) sets this up for a service.
+- A process **confined** to its own cgroup subtree (e.g. inside a container,
+  where its cgroup-namespace root is a non-root cgroup full of processes) can't
+  enable controllers there while those processes are present — and cgroup v2
+  reports the violation one level *down* (a child delegation fails), not as an
+  `EBUSY` at the root. The fix is to move the processes into a child first, then
+  enable the controllers. systemd's `Delegate=yes` (optionally
+  `DelegateControllers=cpu pids memory`) does this for a service.
 
-The pool is currently the compile-time `/sys/fs/cgroup/pa-jail`. The parser
-already accepts `cgroupbase` (incl. `$SELF`) to point it at whatever delegated
-subtree a deployment provides; wiring that into the runtime is "Next" item 1
-below.
+**`pa-jail init JAILDIR`** performs that one-time bootstrap as a real subcommand
+(alongside `run`/`rm`/`mv`). `JAILDIR` is a jail directory, like every other
+subcommand's first argument: `init` resolves the **`cgroupbase` that `run
+JAILDIR` would use** from `/etc/pa-jail.conf` (so per-section pools are handled,
+and the cgroup path is never repeated on the command line). Like the per-run
+path, it is **opt-in**: it enables exactly the controllers JAILDIR's limits
+(leaf + pool) need on that base and its parent, and if JAILDIR has no cgroup
+limits it does **nothing at all** (no cgroup v2 check, no pool, no evacuation).
+When there is work, it **evacuates** the parent's processes into a `pa-jail.host`
+child when needed (the container case — only when the parent is a non-root cgroup
+that still holds processes). It is best-effort and idempotent: a controller that
+can't be delegated is reported and skipped (a per-jail limit needing it then
+fails closed at run time), a second `init` is a no-op, and on a real systemd host
+it's a near-no-op — the root already delegates the controllers and holds only
+unmovable kernel threads. Run it once per boot, before any jails (e.g. from a systemd
+unit, or a container's entrypoint), passing a jaildir for each pool you use.
+This keeps the *per-run* path out of the business of migrating processes it
+doesn't own.
+
+The default pool is `/sys/fs/cgroup/pa-jail`; the `cgroupbase` directive (incl.
+`$SELF`) points it elsewhere, resolved per jaildir.
 
 ### Next — pick up here (in priority order)
 

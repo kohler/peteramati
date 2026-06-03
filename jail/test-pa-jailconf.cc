@@ -752,6 +752,40 @@ void test_pajailconf_limit() {
     assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].unlimited);
     assert(jc.get("/j").limits[JLIMIT_CPU_MAX].unlimited);
 
+    // `cgroup=unlimited` sets every cgroup limit to unlimited at once
+    jc = pajailconf("enablejail /j\nlimit cgroup=unlimited\n");
+    for (int id = 0; id != JLIMIT_COUNT; ++id) {
+        assert(jc.get("/j").limits[id].set);
+        assert(jc.get("/j").limits[id].unlimited);
+    }
+    // it overlays like any other limit (a later specific limit overrides)
+    jc = pajailconf("enablejail /j\nlimit cgroup=unlimited,pids.max=64\n");
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].value == 64);
+    assert(!jc.get("/j").limits[JLIMIT_PIDS_MAX].unlimited);
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].unlimited);
+    // a `!` suffix pins all of them
+    jc = pajailconf("enablejail /j\nlimit cgroup=unlimited!\n");
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].pinned);
+
+    // `cgroup=unset` clears every cgroup limit (overriding inherited defaults)
+    jc = pajailconf("enablejail /j\nlimit pids.max=64,memory.max=1g\nlimit cgroup=unset\n");
+    for (int id = 0; id != JLIMIT_COUNT; ++id) {
+        assert(!jc.get("/j").limits[id].set);
+    }
+    // and overlays: clear all, then set one
+    jc = pajailconf("enablejail /j\nlimit cgroup=unset,pids.max=64\n");
+    assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].value == 64);
+    assert(!jc.get("/j").limits[JLIMIT_MEMORY_MAX].set);
+
+    // only `unlimited` / `unset` are accepted after `cgroup=`
+    assert(throws_config_error([] { pajailconf("enablejail /j\nlimit cgroup=64\n").get("/j"); }));
+    assert(throws_config_error([] { pajailconf("enablejail /j\nlimit cgroup=max\n").get("/j"); }));
+
+    // `=unset` clears one named limit (symmetric with `=unlimited`)
+    jc = pajailconf("enablejail /j\nlimit pids.max=64,cpu.max=2\nlimit pids.max=unset\n");
+    assert(!jc.get("/j").limits[JLIMIT_PIDS_MAX].set);
+    assert(jc.get("/j").limits[JLIMIT_CPU_MAX].value == 2000);   // others untouched
+
     // a `!` suffix pins the value
     jc = pajailconf("enablejail /j\nlimit pids.max=64!\n");
     assert(jc.get("/j").limits[JLIMIT_PIDS_MAX].value == 64);

@@ -145,19 +145,6 @@ static std::string pajail_command(const jail_run& jr) {
 // already built (at /build/pa-jail in the image, or ./pa-jail locally).
 static std::string gen_script(const jail_run& jr) {
     std::string s = "set -e\n";
-    if (jr.cgroup_prep) {
-        // Delegate the cgroup controllers at the cgroup root so per-jail leaves
-        // can carry limits. Needed inside a container (its cgroup root holds
-        // processes and delegates nothing); a no-op where already delegated
-        // (e.g. a systemd host). The `no internal processes` rule forbids
-        // enabling controllers while the root holds processes, so move them out.
-        s += "if ! grep -qw pids /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null; then "
-             "mkdir -p /sys/fs/cgroup/pajinit; "
-             "for p in $(cat /sys/fs/cgroup/cgroup.procs 2>/dev/null); do "
-             "echo $p > /sys/fs/cgroup/pajinit/cgroup.procs 2>/dev/null || true; done; "
-             "echo +pids > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true; "
-             "fi\n";
-    }
     // a jail user with a home under /home and an allowed shell
     s += "id pajtest >/dev/null 2>&1 || useradd -m -d /home/pajtest -s "
         + shq(jr.user_shell) + " pajtest 2>/dev/null\n";
@@ -168,7 +155,13 @@ static std::string gen_script(const jail_run& jr) {
     std::string parent = jr.jaildir.substr(0, jr.jaildir.rfind('/'));
     s += "mkdir -p " + shq(parent.empty() ? "/" : parent)
         + " && chmod 755 " + shq(parent.empty() ? "/" : parent) + "\n";
-
+    if (jr.cgroup_prep) {
+        // bootstrap the jail's cgroup base (delegate controllers, evacuating the
+        // container's cgroup root) via the real `init` subcommand; needs the
+        // config above to resolve the jaildir's cgroupbase
+        s += shq(pajail_path()) + " init" + (pa_verbose ? " -V" : "")
+            + " " + shq(jr.jaildir) + "\n";
+    }
     s += jr.setup;
     s += pajail_command(jr) + "\n";
     return s;

@@ -149,15 +149,16 @@ enum { UNIT_COUNT, UNIT_RATE, UNIT_BYTES };
 struct limit_desc {
     const char* name;
     int unit;
+    bool cgroup;        // a cgroup-controller limit (set en masse by `cgroup=...`)
 };
 
 // Indexed by `jaillimit_id`; order must match the enum. Names are the real
 // kernel names (cgroup interface filename, or `rlimit.<name>`).
 static const limit_desc limit_descs[JLIMIT_COUNT] = {
-    { "pids.max",    UNIT_COUNT },
-    { "cpu.max",     UNIT_RATE },
-    { "memory.max",  UNIT_BYTES },
-    { "memory.high", UNIT_BYTES }
+    { "pids.max",    UNIT_COUNT, true },
+    { "cpu.max",     UNIT_RATE,  true },
+    { "memory.max",  UNIT_BYTES, true },
+    { "memory.high", UNIT_BYTES, true }
 };
 
 static int limit_lookup(std::string_view name) {
@@ -275,9 +276,30 @@ void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out) c
             pinned = true;
             val.remove_suffix(1);
         }
+        if (name == "cgroup") {
+            // `cgroup=unlimited` sets every cgroup-controller limit to unlimited;
+            // `cgroup=unset` clears them (so cgroup setup is skipped if nothing
+            // else sets one). No other `cgroup=` value is accepted.
+            bool unset = val == "unset";
+            if (!unset && val != "unlimited") {
+                throw error("limit: `cgroup` only accepts `unlimited` or `unset`");
+            }
+            jaillimit lim{!unset, !unset, pinned, 0};   // unset clears, else unlimited
+            for (int i = 0; i != JLIMIT_COUNT; ++i) {
+                if (limit_descs[i].cgroup) {
+                    out[i] = lim;
+                }
+            }
+            continue;
+        }
         int id = limit_lookup(name);
         if (id < 0) {
             throw error("limit: Unknown limit `{}`", name);
+        }
+        if (val == "unset") {
+            // clear this limit (e.g. drop an inherited default)
+            out[id] = jaillimit{false, false, pinned, 0};
+            continue;
         }
         bool unlimited = false;
         unsigned long long v = parse_limit_value(limit_descs[id].unit, val, unlimited);
