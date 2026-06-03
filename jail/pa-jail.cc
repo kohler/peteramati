@@ -229,22 +229,27 @@ static int v_ensuredir(std::string pathname, mode_t mode) {
 }
 
 static int x_link(const char* oldpath, const char* newpath) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "rm -f %s\nln %s %s\n", newpath, oldpath, newpath);
+    }
     if (!dryrun) {
-        if (unlink(newpath) == -1 && errno != ENOENT)
+        if (unlink(newpath) == -1 && errno != ENOENT) {
             return perror_fail("rm %s: %s\n", newpath);
-        if (link(oldpath, newpath) != 0)
+        }
+        if (link(oldpath, newpath) != 0) {
             return perror_fail("ln %s: %s\n", (std::string(oldpath) + " " + std::string(newpath)).c_str());
+        }
     }
     return 0;
 }
 
 static int x_chmod(const char* path, mode_t mode) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "chmod 0%o %s\n", mode, path);
-    if (!dryrun && chmod(path, mode) != 0)
+    }
+    if (!dryrun && chmod(path, mode) != 0) {
         return perror_fail("chmod %s: %s\n", path);
+    }
     return 0;
 }
 
@@ -258,23 +263,27 @@ static bool x_mknod_eexist_ok(const char* path, mode_t mode, dev_t dev) {
 
 static const char* dev_name(mode_t m, dev_t d) {
     static char buf[128];
-    if (S_ISCHR(m))
+    if (S_ISCHR(m)) {
         snprintf(buf, sizeof(buf), "c %d %d", major(d), minor(d));
-    else if (S_ISBLK(m))
+    } else if (S_ISBLK(m)) {
         snprintf(buf, sizeof(buf), "b %d %d", major(d), minor(d));
-    else if (S_ISFIFO(m))
+    } else if (S_ISFIFO(m)) {
         return "p";
-    else
+    } else {
         snprintf(buf, sizeof(buf), "%u %u", (unsigned) m, (unsigned) d);
+    }
     return buf;
 }
 
 static int x_mknod(const char* path, mode_t mode, dev_t dev) {
-    if (verbose)
+    if (verbose) {
         fprintf(verbosefile, "mknod -m 0%o %s %s\n", mode, path, dev_name(mode, dev));
-    if (!dryrun && mknod(path, mode, dev) != 0
-        && (errno != EEXIST || !x_mknod_eexist_ok(path, mode, dev)))
+    }
+    if (!dryrun
+        && mknod(path, mode, dev) != 0
+        && (errno != EEXIST || !x_mknod_eexist_ok(path, mode, dev))) {
         return perror_fail("mknod %s: %s\n", path);
+    }
     return 0;
 }
 
@@ -311,25 +320,27 @@ static int x_copy_utimes(const char* path, const struct stat& st) {
 #else
         ts[1] = st.st_mtimespec;
 #endif
-        if (utimensat(-1, path, ts, AT_SYMLINK_NOFOLLOW) != 0)
+        if (utimensat(-1, path, ts, AT_SYMLINK_NOFOLLOW) != 0) {
             return perror_fail("utimensat %s: %s\n", path);
+        }
     }
     return 0;
 }
 
 static std::pair<pid_t, int> x_waitpid(pid_t child, int flags) {
     int status;
-    while (1) {
+    while (true) {
         pid_t w = waitpid(child, &status, flags);
-        if (w > 0 && WIFEXITED(status))
+        if (w > 0 && WIFEXITED(status)) {
             return std::make_pair(w, WEXITSTATUS(status));
-        else if (w > 0)
+        } else if (w > 0) {
             return std::make_pair(w, 128 + WTERMSIG(status));
-        else if (w == 0) {
+        } else if (w == 0) {
             errno = EAGAIN;
             return std::make_pair((pid_t) -1, -1);
-        } else if (w == -1 && errno != EINTR)
+        } else if (w == -1 && errno != EINTR) {
             return std::make_pair((pid_t) -1, -1);
+        }
     }
 }
 
@@ -480,9 +491,8 @@ std::string mountslot::debug_mountopts_args(unsigned long opts) const {
 #endif
     if (!arg.empty()) {
         return " -o " + arg;
-    } else {
-        return arg;
     }
+    return arg;
 }
 
 std::string mountslot::debug_mount_command(std::string dst, unsigned long opts) const {
@@ -545,9 +555,8 @@ bool mountslot::mountable(std::string src, std::string dst) const {
             delayed_mounts.push_back(src);
             delayed_mounts.push_back(dst);
             return false;
-        } else {
-            return true;
         }
+        return true;
     }
     return false;
 }
@@ -777,9 +786,8 @@ static int x_cp_p(const std::string& src, const std::string& dst) {
         return 0;
     } else if (status != -1) {
         return perror_fail("/bin/cp %s: Bad exit status\n", dst.c_str());
-    } else {
-        return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
     }
+    return perror_fail("/bin/cp %s: Did not exit\n", dst.c_str());
 }
 
 static inline int stat_mtimes_same(const struct stat& st1, const struct stat& st2) {
@@ -931,8 +939,9 @@ static int handle_copy(std::string src, std::string subdst,
 }
 
 inline const char* opt_wordskip(const char* s) {
-    while (*s != ']' && *s != ';' && !isspace((unsigned char) *s))
+    while (*s != ']' && *s != ';' && !isspace((unsigned char) *s)) {
         ++s;
+    }
     return s;
 }
 
@@ -942,10 +951,12 @@ inline bool opt_eq(const char* opt, const char* endopt,
 }
 
 static std::string file_get_contents_error(std::string msg, int errorness) {
-    if (errorness > 0)
+    if (errorness > 0) {
         fprintf(stderr, "%s\n", msg.c_str());
-    if (errorness > 1)
+    }
+    if (errorness > 1) {
         exit(1);
+    }
     return "";
 }
 
