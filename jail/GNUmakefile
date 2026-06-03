@@ -3,6 +3,15 @@ BINDIR = $(DESTDIR)$(PREFIX)/bin
 # SANFLAGS = -fsanitize=address -fsanitize=undefined
 SANFLAGS =
 
+# Support out-of-tree builds via `make -f SRCDIR/GNUmakefile`. `$(srcdir)` is
+# this makefile's directory (`.` for an in-tree build); objects and binaries
+# are written to the current (build) directory. `vpath` finds sources in
+# `$(srcdir)`.
+srcdir := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+vpath %.cc $(srcdir)
+vpath %.c $(srcdir)
+vpath %.hh $(srcdir)
+
 all: pa-timeout pa-jail pa-jail-owner
 
 pa-jail: pa-jutil.o pa-jailconf.o pa-jail.o
@@ -29,10 +38,10 @@ pa-jail-owner: pa-jail
 	fi
 
 pa-timeout: pa-timeout.c
-	$(CC) -std=gnu11 -W -Wall -g -O2 -o $@ $^
+	$(CC) -std=gnu11 -W -Wall -g -O2 -I$(srcdir) -o $@ $^
 
 pa-writefifo: pa-writefifo.c
-	$(CC) -std=gnu11 -W -Wall -g -O2 -o $@ $^
+	$(CC) -std=gnu11 -W -Wall -g -O2 -I$(srcdir) -o $@ $^
 
 clean:
 	rm -rf pa-jail pa-timeout pa-writefifo test-pa-jailconf *.o *.dSYM
@@ -40,7 +49,7 @@ clean:
 install: pa-jail pa-timeout
 	install -d $(BINDIR)
 	install -mu+rwxs,g+rxs,o+rx pa-jail $(BINDIR)
-	install pa-timeout pa-trace $(BINDIR)
+	install pa-timeout $(srcdir)/pa-trace $(BINDIR)
 
 always:
 	@:
