@@ -840,13 +840,13 @@ static int do_copy(const std::string& dst, const std::string& src,
             return 1;
         }
     } else if (S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode)) {
-        // XXX special handling for /dev/ptmx; there is probably a
-        // cleaner way
         if (x_rm_f(dst)) {
             return 1;
-        } else if (src.length() == 9 && src == "/dev/ptmx") {
-            return x_symlink("pts/ptmx", dst.c_str());
         }
+        // A manifest may list /dev/ptmx as a char device (pa-trace captures it):
+        // it is mknod'd here like any other node, then exec_go() replaces it with
+        // the `pts/ptmx` symlink the jail's newinstance devpts needs -- so no
+        // /dev/ptmx special case is required here.
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
         if (x_mknod(dst.c_str(), mode, ss.st_rdev)) {
             return 1;
@@ -2411,6 +2411,12 @@ int jailownerinfo::exec_go() {
     }
     handle_mount("/proc", jdir + "proc", true);
     handle_mount("/dev/pts", jdir + "dev/pts", true);
+    // /dev/pts is mounted `newinstance`, so its pty multiplexor is
+    // /dev/pts/ptmx. posix_openpt() requires a /dev/ptmx → /dev/pts/ptmx
+    // symlink to this new multiplexor; we install it unconditionally.
+    std::string ptmx = jdir + "dev/ptmx";
+    x_rm_f(ptmx);
+    x_symlink("pts/ptmx", ptmx.c_str());
     handle_mount("/tmp", jdir + "tmp", true);
     handle_mount("/run", jdir + "run", true);
 #endif
@@ -3521,10 +3527,11 @@ static int jail_main(int argc, char** argv) {
 
     // create the home directory
     if (!jailuser.owner_home_.empty()) {
-        if (v_ensuredir(jaildir.perm.dir + "/home", 0755) < 0) {
-            perror_die(jaildir.perm.dir + "/home");
+        assert(jaildir.perm.dir.ends_with('/') && jailuser.owner_home_.starts_with('/'));
+        if (v_ensuredir(jaildir.perm.dir + "home", 0755) < 0) {
+            perror_die(jaildir.perm.dir + "home");
         }
-        std::string jailhome = jaildir.perm.dir + jailuser.owner_home_;
+        std::string jailhome = jaildir.perm.dir + jailuser.owner_home_.substr(1);
         int r = v_ensuredir(jailhome, 0700);
         uid_t want_owner = action == do_add ? caller_owner : jailuser.owner_;
         gid_t want_group = action == do_add ? caller_group : jailuser.group_;
@@ -3534,6 +3541,7 @@ static int jail_main(int argc, char** argv) {
         }
         // also create in skeleton, but ignore errors
         if (!linkdir.empty()) {
+            assert(!linkdir.ends_with('/'));
             (void) v_ensuredir(linkdir + "/home", 0755);
             std::string linkhome = linkdir + jailuser.owner_home_;
             r = v_ensuredir(linkhome, 0700);
