@@ -20,8 +20,13 @@ pa-jail: pa-jutil.o pa-jailconf.o pa-jail.o
 test-pa-jailconf: pa-jutil.o pa-jailconf.o test-pa-jailconf.o
 	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) -o $@ $^
 
-pa-jail.o pa-jailconf.o pa-jutil.o test-pa-jailconf.o: %.o: %.cc
-	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) -c -o $@ $<
+# end-to-end driver; runs the pa-jail binary (locally or, with --docker, in a
+# container). Standalone, so it builds on both Linux and macOS.
+test-pa-jail: test-pa-jail.o
+	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) -o $@ $^
+
+pa-jail.o pa-jailconf.o pa-jutil.o test-pa-jailconf.o test-pa-jail.o: %.o: %.cc
+	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) -I$(srcdir) -c -o $@ $<
 
 pa-jail.o pa-jailconf.o test-pa-jailconf.o: pa-jailconf.hh
 pa-jail.o pa-jailconf.o pa-jutil.o test-pa-jailconf.o: pa-jutil.hh
@@ -44,7 +49,7 @@ pa-writefifo: pa-writefifo.c
 	$(CC) -std=gnu11 -W -Wall -g -O2 -I$(srcdir) -o $@ $^
 
 clean:
-	rm -rf pa-jail pa-timeout pa-writefifo test-pa-jailconf *.o *.dSYM
+	rm -rf pa-jail pa-timeout pa-writefifo test-pa-jailconf test-pa-jail *.o *.dSYM
 
 install: pa-jail pa-timeout
 	install -d $(BINDIR)
@@ -54,10 +59,18 @@ install: pa-jail pa-timeout
 always:
 	@:
 
-.PHONY: all clean install always pa-jail-owner check check-docker
+.PHONY: all clean install always pa-jail-owner check check-docker check-jail check-jail-docker
 
 check: test-pa-jailconf
 	./test-pa-jailconf
+
+# Run the end-to-end jail tests in an ephemeral container (needs Docker; works
+# from macOS). `make check-jail` runs them locally instead (needs root + Linux).
+check-jail-docker: test-pa-jail
+	./test-pa-jail --docker
+
+check-jail: test-pa-jail
+	./test-pa-jail
 
 # Build and run the test suite in an ephemeral Linux container. Useful when the
 # host's endpoint-security software quarantines freshly-built binaries, and as a

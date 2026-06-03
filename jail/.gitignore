@@ -2,4 +2,5 @@
 pa-jail
 pa-timeout
 pa-writefifo
+test-pa-jail
 test-pa-jailconf

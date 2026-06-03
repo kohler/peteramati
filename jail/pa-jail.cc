@@ -1207,6 +1207,7 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
 
 struct jaildirinfo {
     jailperm perm;
+    pajailconf* conf_ = nullptr;        // the config `perm` was resolved from
     std::string parent;
     int parentfd = -1;
     std::string component;
@@ -1227,6 +1228,7 @@ private:
 
 jaildirinfo::jaildirinfo(const char* dirstr, const std::string& skeletonstr,
                          jailaction action, pajailconf& jailconf) {
+    conf_ = &jailconf;
     perm.dir = path_pa_validate(path_absolute(dirstr));
     if (perm.dir.empty() || perm.dir == "/" || perm.dir[0] != '/') {
         fprintf(stderr, "%s: Bad jail directory\n", dirstr);
@@ -1849,16 +1851,41 @@ void esfd::write_event(jbuffer& jbuf) {
 # define PA_HAVE_CGROUP 0
 #endif
 
+// Each cgroup-v2 limit binds one controller and one interface file. (Used to
+// decide which controllers to delegate and which files to write; needed in both
+// build variants, so it sits outside the PA_HAVE_CGROUP guard.)
+struct cgroup_limit_info {
+    int id;                     // jaillimit_id
+    const char* controller;     // cgroup.subtree_control name
+    const char* file;           // interface filename under the cgroup
+};
+static const cgroup_limit_info cgroup_limit_infos[] = {
+    { JLIMIT_PIDS_MAX,    "pids",   "pids.max" },
+    { JLIMIT_CPU_MAX,     "cpu",    "cpu.max" },
+    { JLIMIT_MEMORY_MAX,  "memory", "memory.max" },
+    { JLIMIT_MEMORY_HIGH, "memory", "memory.high" }
+};
+
+// True if `lim` sets any cgroup-controller limit. (All current limits are cgroup
+// limits; future `rlimit.*` limits would not appear in the table above.)
+static bool cgroup_any(const jaillimits& lim) {
+    for (const cgroup_limit_info& info : cgroup_limit_infos) {
+        if (lim[info.id].set) {
+            return true;
+        }
+    }
+    return false;
+}
+
 #if PA_HAVE_CGROUP
 static const char* cgroup_base = "/sys/fs/cgroup";    // cgroup v2 unified mount
-static const char* cgroup_pool_name = "pa-jail";      // pool = <base>/pa-jail
 
 // Write `value` to a cgroup control file. Fail-safe: any error dies, so a
 // configured limit never silently fails to apply. (Runs only in the parent,
 // before `clone`, so a die here is clean.)
 static void cgroup_write(const std::string& path, const std::string& value) {
     if (verbose) {
-        fprintf(verbosefile, "echo %s > %s\n", value.c_str(), path.c_str());
+        fprintf(verbosefile, "echo %s > %s\n", shell_quote(value).c_str(), path.c_str());
     }
     if (dryrun) {
         return;
@@ -1945,30 +1972,101 @@ static void cgroup_reclaim_stale(const std::string& pool) {
     closedir(d);
 }
 
-// Create and configure the per-run leaf cgroup from `limits`, returning its
-// path (empty if no cgroup limits are set, i.e. the feature is opt-in).
-static std::string cgroup_setup(const jaillimits& limits) {
-    const jaillimit& pids = limits[JLIMIT_PIDS_MAX];
-    const jaillimit& cpu = limits[JLIMIT_CPU_MAX];
-    if (!pids.set && !cpu.set) {
+// The value to write to a limit's interface file: `max` for unlimited, else the
+// number -- except `cpu.max`, which is "$QUOTA $PERIOD" in microseconds (PERIOD
+// pinned at 100ms, QUOTA = millicores * 100).
+static std::string cgroup_limit_value(int id, const jaillimit& l) {
+    if (id == JLIMIT_CPU_MAX) {
+        return l.unlimited ? "max 100000"
+                           : std::to_string(l.value * 100) + " 100000";
+    }
+    return l.unlimited ? "max" : std::to_string(l.value);
+}
+
+// Append the controllers that `lim`'s set limits need to `need` (deduplicated).
+static void cgroup_add_controllers(const jaillimits& lim,
+                                   std::vector<const char*>& need) {
+    for (const cgroup_limit_info& info : cgroup_limit_infos) {
+        if (!lim[info.id].set) {
+            continue;
+        }
+        bool present = false;
+        for (const char* c : need) {
+            present = present || strcmp(c, info.controller) == 0;
+        }
+        if (!present) {
+            need.push_back(info.controller);
+        }
+    }
+}
+
+// Write each set limit in `lim` to its interface file under `dir`.
+static void cgroup_write_limits(const std::string& dir, const jaillimits& lim) {
+    for (const cgroup_limit_info& info : cgroup_limit_infos) {
+        if (lim[info.id].set) {
+            cgroup_write(dir + "/" + info.file,
+                         cgroup_limit_value(info.id, lim[info.id]));
+        }
+    }
+}
+
+// Resolve a `cgroupbase` config value to an absolute cgroup-v2 path. A leading
+// `$SELF` expands to pa-jail's own cgroup, read from /proc/self/cgroup (the v2
+// `0::/<path>` line); any other value is literal. The result must sit under the
+// v2 mount and contain no `..` (cheap defense -- the conf is root-owned, but).
+static std::string cgroup_resolve_pool(const std::string& base) {
+    std::string path;
+    if (base == "$SELF" || base.starts_with("$SELF/")) {
+        std::string self = file_get_contents("/proc/self/cgroup", 2);
+        size_t nl = self.find('\n');
+        std::string_view line(self.data(), nl == std::string::npos ? self.size() : nl);
+        if (!line.starts_with("0::/")) {
+            die("cgroup: cannot resolve $SELF: no cgroup v2 line in /proc/self/cgroup\n");
+        }
+        // our cgroup path after `0::`, with the root `/` reduced to "" so the
+        // join below never doubles a slash
+        std::string selfpath = path_noendslash(std::string(line.substr(3)));
+        if (selfpath == "/") {
+            selfpath.clear();
+        }
+        path = cgroup_base + selfpath + base.substr(5);     // text after `$SELF`
+    } else {
+        path = base;
+    }
+    path = path_noendslash(path);
+    if (!path.starts_with(std::string(cgroup_base) + "/")
+        || path.find("/../") != std::string::npos
+        || path.ends_with("/..")) {
+        die("cgroup: invalid pool path `%s` (must be under %s, no `..`)\n",
+            path.c_str(), cgroup_base);
+    }
+    return path;
+}
+
+// Create and configure this run's leaf cgroup, returning its path (empty if no
+// cgroup limit is set anywhere, i.e. the feature is opt-in). The pool is the
+// jail's `cgroupbase` (resolved); the leaf is `<pool>/<pid>`. cgroup v2 makes the
+// effective limit `min(leaf, pool, ...ancestors)`, so per-jail leaf limits and a
+// shared pool cap compose for free.
+static std::string cgroup_setup(const pajailconf& conf, const jailperm& perm) {
+    const jaillimits& leaf_lim = perm.limits;
+    jaillimits pool_lim = conf.pool_limits(perm.cgroupbase);
+    if (!cgroup_any(leaf_lim) && !cgroup_any(pool_lim)) {
         return std::string();
     }
 
+    // controllers needed by either the per-jail leaf or the shared pool
     std::vector<const char*> need;
-    if (pids.set) {
-        need.push_back("pids");
-    }
-    if (cpu.set) {
-        need.push_back("cpu");
-    }
+    cgroup_add_controllers(leaf_lim, need);
+    cgroup_add_controllers(pool_lim, need);
 
-    // The base delegates the controllers down to the pool, and the pool down to
-    // its per-run leaves. The pool is created once and left in place (idle pools
-    // are free); a leaf gets a controller as soon as its parent pool delegates it.
-    std::string base = cgroup_base;
-    std::string pool = base + "/" + cgroup_pool_name;
-    cgroup_delegate(base, need);
+    // The pool's parent delegates the controllers down to the pool, and the pool
+    // down to its per-run leaves. The pool is created once and left in place
+    // (idle pools are free) and carries the aggregate cap shared by its jails.
+    std::string pool = cgroup_resolve_pool(perm.cgroupbase);
+    cgroup_delegate(path_noendslash(path_parentdir(pool)), need);
     cgroup_mkdir(pool);
+    cgroup_write_limits(pool, pool_lim);
     cgroup_delegate(pool, need);
 
     // clean up leaves from previous finished runs, then make this run's leaf (the
@@ -1980,19 +2078,7 @@ static std::string cgroup_setup(const jaillimits& limits) {
         rmdir(leaf.c_str());
     }
     cgroup_mkdir(leaf);
-
-    if (pids.set) {
-        cgroup_write(leaf + "/pids.max",
-                     pids.unlimited ? "max" : std::to_string(pids.value));
-    }
-    if (cpu.set) {
-        // cpu.max is "$QUOTA $PERIOD" in microseconds; we keep PERIOD at 100ms
-        // and turn millicores into a quota: quota_us = millicores * 100.
-        std::string v = cpu.unlimited
-            ? "max 100000"
-            : std::to_string(cpu.value * 100) + " 100000";
-        cgroup_write(leaf + "/cpu.max", v);
-    }
+    cgroup_write_limits(leaf, leaf_lim);
     return leaf;
 }
 
@@ -2000,8 +2086,8 @@ static std::string cgroup_setup(const jaillimits& limits) {
 
 // Built without cgroup support (kernel headers older than 5.7). Fail closed if
 // the config actually sets a cgroup limit; otherwise behave as if none was given.
-static std::string cgroup_setup(const jaillimits& limits) {
-    if (limits[JLIMIT_PIDS_MAX].set || limits[JLIMIT_CPU_MAX].set) {
+static std::string cgroup_setup(const pajailconf& conf, const jailperm& perm) {
+    if (cgroup_any(perm.limits) || cgroup_any(conf.pool_limits(perm.cgroupbase))) {
         die("cgroup limits configured, but this pa-jail was built without cgroup "
             "support (needs Linux kernel headers >= 5.7); rebuild on a newer host "
             "or remove the limits\n");
@@ -2027,19 +2113,18 @@ class jailownerinfo {
     void set_inputfd(int inputfd);
     void set_timeout(double timeout, double idle_timeout);
     void set_foreground(bool foreground);
-    void set_limits(const jaillimits& limits);
-    void exec(int argc, char** argv, jaildirinfo& jaildir);
+    void exec(int argc, char** argv, jaildirinfo& jaildir, jaildirinfo& permjail);
     int exec_go();
 
   private:
     std::vector<const char*> newenv_;
     char** argv_ = nullptr;
-    jaildirinfo* jaildir_;
+    jaildirinfo* jaildir_ = nullptr;
+    jaildirinfo* permjail_ = nullptr;
     int inputfd_ = -1;
     double timeout_ = -1.0;
     double idle_timeout_ = -1.0;
     bool foreground_= false;
-    jaillimits limits_;
     struct timeval start_time_;
     struct timeval expiry_;
     struct timeval active_time_;
@@ -2199,11 +2284,7 @@ void jailownerinfo::set_foreground(bool foreground) {
     this->foreground_ = foreground;
 }
 
-void jailownerinfo::set_limits(const jaillimits& limits) {
-    this->limits_ = limits;
-}
-
-void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
+void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir, jaildirinfo& permjail) {
     // adjust environment; make sure we have a PATH
     char homebuf[8192];
     snprintf(homebuf, sizeof(homebuf), "HOME=%s", owner_home_.c_str());
@@ -2284,6 +2365,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
 
     // store other arguments
     this->jaildir_ = &jaildir;
+    this->permjail_ = &permjail;
     gettimeofday(&this->start_time_, nullptr);
     if (this->timeout_ > 0) {
         this->expiry_ = timer_add_delay(this->start_time_, this->timeout_);
@@ -2298,7 +2380,7 @@ void jailownerinfo::exec(int argc, char** argv, jaildirinfo& jaildir) {
     // enter the jail
 #if __linux__
     // set up the per-run cgroup (no-op unless cgroup limits are configured)
-    std::string cgleaf = cgroup_setup(limits_);
+    std::string cgleaf = cgroup_setup(*permjail_->conf_, permjail_->perm);
     if (verbose) {
         fprintf(verbosefile, "-clone-\n");
     }
@@ -3600,10 +3682,7 @@ static int jail_main(int argc, char** argv) {
         jailuser.set_inputfd(inputfd);
         jailuser.set_timeout(timeout, idle_timeout);
         jailuser.set_foreground(foreground);
-        // limits come from the identity jail (which selected the config), not
-        // the build/bind scaffold
-        jailuser.set_limits(jaildir.perm.limits);
-        jailuser.exec(argc - (optind + 2), argv + optind + 2, buildjail);
+        jailuser.exec(argc - (optind + 2), argv + optind + 2, buildjail, jaildir);
     }
 
     // close timing and lock file if appropriate

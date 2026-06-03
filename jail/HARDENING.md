@@ -5,10 +5,13 @@ Parts of Phase 1 have landed (supplementary-group drop, `no_new_privs`, the
 `snprintf` fix). The config parser is extracted and unit-tested; it parses the
 resource-limit (`limit`/cgroup) directives, the `memory.*` names, and the pool
 config (`cgroupbase`, `[cgroup PATH]`, `pool_limits`) — §6.3, §6.5. At run time
-pa-jail builds a per-jail cgroup hierarchy (one pool `/sys/fs/cgroup/pa-jail`,
-per-run leaves) and enforces `pids.max`/`cpu.max`. **Picking back up:** the
-parser's pool support (`cgroupbase`/pool limits/`memory.*` application) is not yet
-wired into the runtime — see "Next" at the end of §6.5. Updated 2026-06.
+pa-jail builds the cgroup hierarchy from config: each jail's leaf lives under the
+pool named by its `cgroupbase` (default `/sys/fs/cgroup/pa-jail`, `$SELF`-relative
+forms resolved against `/proc/self/cgroup`), the pool carries the aggregate
+`pool_limits`, and `pids.max`/`cpu.max`/`memory.max`/`memory.high` are enforced on
+both leaf and pool. **Picking back up:** the remaining "Next" items are the
+per-process `rlimit.*` limits and the `--limit` command-line override — see the
+end of §6.5. Updated 2026-06.
 Author: (generated audit + plan)
 Scope: `jail/pa-jail.cc`, `jail/GNUmakefile`, `/etc/pa-jail.conf`, and the
 invocation path in `src/queueitem.php` + `src/psetconfig.php`.
@@ -30,8 +33,10 @@ What it does today for a run:
    (`setresuid/setresgid(ROOT)`).
 2. `clone()`s the child with `CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID`.
 3. Makes `/` recursively slave (`MS_REC|MS_SLAVE`), mounts `/proc`,
-   `/dev/pts`, `/tmp`, `/run`, then `pivot_root`s into the jail and detaches
-   the old root (`umount2(..., MNT_DETACH)`).
+   `/dev/pts` (`newinstance`), `/tmp`, `/run`, and links `/dev/ptmx` →
+   `pts/ptmx` (so the always-allocated pty works without a manifest entry),
+   then `pivot_root`s into the jail and detaches the old root
+   (`umount2(..., MNT_DETACH)`).
 4. Permanently drops to the unprivileged jail user
    (`setresgid(g,g,g)`/`setresuid(u,u,u)`) **before** `execve`, resets all
    signal handlers, `setsid`.
@@ -436,14 +441,16 @@ Implemented since (cgroup application — `pa-jail.cc`):
 - **All cgroup work runs in the host-ns root parent**, before/around `clone`, so
   it uses ordinary `/sys/fs/cgroup` paths and full root credentials and never
   reaches into the pivoted jail (the supervisor and `exec_go` are untouched).
-  All jails share **one pool cgroup `<base>/pa-jail`** (created once, left idle —
-  the future hook for a *combined* cap across all jails — "Next" item 1); each run gets its
-  own leaf `<base>/pa-jail/<pid>` under it. `cgroup_setup` delegates the needed
-  controllers down the chain — into the base's `subtree_control` (a no-op on
-  systemd hosts, which already delegate `cpu`/`pids` at the root) and then into
-  the pool's — and writes the limits to the leaf (`pids.max`; `cpu.max` as a
-  `quota period` pair derived from the millicore rate). Pool-level limits aren't
-  wired yet; this is the default, configuration-free hierarchy.
+  Each jail's leaf lives under the **pool named by its `cgroupbase`** (default
+  `/sys/fs/cgroup/pa-jail`); the pool is created once, left in place, and carries
+  the aggregate `pool_limits` shared by its jails, with each run getting its own
+  leaf `<pool>/<pid>`. `cgroup_setup` delegates the needed controllers down the
+  chain — into the pool parent's `subtree_control` (a no-op on systemd hosts,
+  which already delegate `cpu`/`pids` at the root) and then into the pool's — and
+  writes `pids.max`/`cpu.max`/`memory.max`/`memory.high` (a table-driven
+  `cgroup_write_limits`; `cpu.max` as a `quota period` pair from the millicore
+  rate) to both the pool and the leaf. cgroup v2 composes them as `min(leaf,
+  pool, …)`.
 - **Race-free placement via `clone3` + `CLONE_INTO_CGROUP`** (Linux 5.7+). The
   cloned child is born *inside* the leaf, so its limits apply from the first
   instruction and student code (forked much later) can never run unconfined —
@@ -487,7 +494,7 @@ wired**, see "Next" below):
 - **`cgroupbase PATH`** directive → `jailperm::cgroupbase`: the pool a jail's leaf
   is created under. Valid as a global default and inside `[JAILPAT]` sections
   (section overrides global, last-match-wins); defaults to `default_cgroupbase`
-  (`/sys/fs/cgroup/pa-jail`, the same path the runtime hardcodes today). `$SELF`
+  (`/sys/fs/cgroup/pa-jail`, the runtime's default pool). `$SELF`
   and `$SELF/sub` are stored **verbatim** (expanded only at apply time).
 - **Typed `[cgroup PATH]` sections** define a pool's own limits; a bare
   **`[cgroup]`** (no path) defines limits applied to *every* pool. The header
@@ -533,9 +540,8 @@ below.
 
 ### Next — pick up here (in priority order)
 
-The **parser is complete** for pools (above); the **runtime still hardcodes** the
-default pool and applies only `pids.max`/`cpu.max` to the leaf. The config surface
-looks like:
+Pools are now **wired into the runtime** and `memory.max`/`memory.high` are
+applied; the config surface looks like:
 
 ```
 cgroupbase /sys/fs/cgroup/grading          # default pool for all jails ($SELF[/sub] ok)
@@ -549,43 +555,46 @@ cgroupbase /sys/fs/cgroup/grading-build    # route these jails to a different po
 limit pids.max=512,memory.max=4g           # each jail's own (per-leaf) limits
 ```
 
-1. **Wire pools into the runtime** (`cgroup_setup`, `pa-jail.cc`). The parser hands
-   you `perm.cgroupbase` and `pajailconf::pool_limits(path)`; the runtime still
-   builds `cgroup_base + "/pa-jail"`.
-   - Plumb `perm.cgroupbase` into `cgroup_setup` the same way `limits` is plumbed
-     (`jailownerinfo::set_limits` → add the cgroupbase string; it comes from the
-     identity `jaildir.perm`, not the bind scaffold).
-   - Resolve the pool path: a leading `$SELF` → pa-jail's own cgroup from
-     `/proc/self/cgroup` (v2 `0::/<path>` → `/sys/fs/cgroup<path>`), else literal.
-     **Validate** it sits under the cgroup-v2 mount and contains no `..` (cheap
-     defense; the conf is root-owned but still). Use it as the pool instead of the
-     hardcoded `<base>/pa-jail`.
-   - Write `pool_limits(perm.cgroupbase)` onto the pool cgroup itself (its
-     `pids.max`/`cpu.max`/`memory.*`), so jails in a pool share an aggregate cap.
-     cgroup v2 makes the effective limit `min(leaf, pool, …ancestors)`, so per-jail
-     and pool caps compose for free. Delegate `memory` too when a memory limit is
-     present.
-   - `cgroup_reclaim_stale` already scans the pool dir — it generalizes unchanged.
-2. **Apply `memory.max`/`memory.high`** to the leaf in `cgroup_setup` (parse is
-   done — two more `cgroup_write`s, plus add `memory` to the delegated-controllers
-   set when a memory limit is set). Optionally `memory.swap.max`.
-3. **`rlimit.*` limits** — add the names (`rlimit.cpu`, `rlimit.nofile`, …) with
+Done (`cgroup_setup`, `pa-jail.cc`):
+
+- **Pools wired in.** `cgroup_setup(conf, perm)` takes the identity jail's `perm`
+  (plumbed via `jaildirinfo::conf_` + `jailownerinfo::permjail_`); the pool is
+  `cgroup_resolve_pool(perm.cgroupbase)` (a leading `$SELF` → our own cgroup from
+  `/proc/self/cgroup`'s `0::/<path>` line, validated under the v2 mount with no
+  `..`), and the leaf is `<pool>/<pid>`. The pool's parent delegates the needed
+  controllers down to it, the pool down to its leaves; `cgroup_reclaim_stale`
+  generalized unchanged.
+- **All four cgroup limits applied** on both leaf and pool via a table-driven
+  `cgroup_write_limits` (`cgroup_limit_infos[]` maps id → controller + file), and
+  `memory` joins the delegated set when any `memory.*` limit is set. `pool_limits`
+  is written onto the pool, so per-jail and pool caps compose as
+  `min(leaf, pool, …)`. Verified by `--dry-run --verbose` (exact command sequence
+  for default / literal / `$SELF` bases + path validation) and a live
+  `--privileged` container (pool `pids.max=200` + leaf `pids.max=15` both created
+  and applied). Still optional: `memory.swap.max`.
+
+Remaining:
+
+1. **`rlimit.*` limits** — add the names (`rlimit.cpu`, `rlimit.nofile`, …) with
    their `RLIMIT_*` binding + a `seconds` unit, applied via `setrlimit()` in the
    child just before the permanent privilege drop. Then **reject `rlimit.*` inside
    `[cgroup …]`** — pools are cgroup-only (the spot is commented in `pool_limits`).
-4. **Command-line `--limit` override** (§6.4) — `min(conf, cmdline)` per name,
+2. **Command-line `--limit` override** (§6.4) — `min(conf, cmdline)` per name,
    `!`-pinned conf values ignore the command line.
 
 **Testing note for a fresh agent.** `make check` exercises only the parser
 (`test-pa-jailconf`); the privileged runtime has **no automated tests**. Verify
 runtime changes two ways: (a) `pa-jail run --dry-run --verbose …` prints the exact
 `mkdir`/`echo`/`rmdir` cgroup command sequence without touching the system; (b) for
-real enforcement, a `docker run --privileged --cgroupns=host gcc:14` container with
-cgroup v2 — register a tiny **static** fork-counter binary as the jail user's shell
-(add it to `/etc/shells`) so `pids.max` can be confirmed without a working libc
-inside the jail. Note Docker confines a container to its own cgroup subtree, so to
-exercise the real-root default you need `--cgroupns=host` (and the host cgroup root
-must delegate `cpu`/`pids`).
+real enforcement, a `docker run --privileged gcc:14` container with cgroup v2 —
+free the cgroup root of processes (move them into a child cgroup) and enable the
+controllers in its `cgroup.subtree_control`, then register a tiny **static**
+fork-counter binary as the jail user's shell (in `/etc/shells`) and copy it into
+the jail with `-F /path/to/forksh`. A `pids.max=15` run then prints `FORKCAP at 13
+children` (15 − supervisor − shell). Because pa-jail now links `/dev/ptmx` on every
+run (§1), the jail needs **no** `/dev/*` manifest entries for the pty to work — the
+fork binary is the only file the manifest must copy. (`--cgroupns=host` is only
+needed to exercise the *host's* real cgroup root rather than the container's own.)
 
 ### 6.6 Interaction with cgroups
 
