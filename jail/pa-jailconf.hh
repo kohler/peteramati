@@ -3,6 +3,8 @@
 // See LICENSE for open-source distribution terms
 
 #pragma once
+#include <cassert>
+#include <array>
 #include <string>
 #include <string_view>
 #include <stdexcept>
@@ -41,27 +43,86 @@ struct pajailconf_error : std::runtime_error {
 // uid; the per-jail process cap is the distinctly-named `pids.max`. One name
 // binds exactly one mechanism -- there is no fan-out.
 //
-// The starting set is the two per-jail cgroup limits below. Adding a limit is a
-// new `jaillimit_id` plus a row in `limit_descs[]` (pa-jailconf.cc).
+// Adding a limit is a new `jaillimit_id` plus a row in `jaillimitinfo::infos[]`
+// (pa-jailconf.cc); an rlimit's row carries its `RLIMIT_*`. The cgroup limits
+// range over `[JLIMIT_CGROUP_FIRST, JLIMIT_CGROUP_LAST)` and the per-process
+// rlimits over `[JLIMIT_RLIMIT_FIRST, JLIMIT_RLIMIT_LAST)`; anything after the
+// rlimits (e.g. `tmpfs.size`) is neither, and is applied by its own mechanism.
 enum jaillimit_id {
-    JLIMIT_PIDS_MAX = 0,// cgroup pids.max    -- max processes in the jail (count)
-    JLIMIT_CPU_MAX,     // cgroup cpu.max     -- jail CPU rate, in millicores
-                        //                       (1000 == one core; 1500 == "1.5")
-    JLIMIT_MEMORY_MAX,  // cgroup memory.max  -- jail memory hard cap (bytes)
-    JLIMIT_MEMORY_HIGH, // cgroup memory.high -- jail memory throttle level (bytes)
-    JLIMIT_COUNT
+    JLIMIT_PIDS_MAX = 0,  // cgroup pids.max    -- max processes in the jail (count)
+    JLIMIT_CPU_MAX,       // cgroup cpu.max     -- jail CPU rate, in millicores
+                          //                       (1000 == one core; 1500 == "1.5")
+    JLIMIT_MEMORY_MAX,    // cgroup memory.max  -- jail memory hard cap (bytes)
+    JLIMIT_MEMORY_HIGH,   // cgroup memory.high -- jail memory throttle level (bytes)
+    JLIMIT_MEMORY_SWAP_MAX,// cgroup memory.swap.max -- jail swap hard cap (bytes)
+    JLIMIT_RLIMIT_CPU,    // RLIMIT_CPU    -- per-process CPU time (seconds)
+    JLIMIT_RLIMIT_AS,     // RLIMIT_AS     -- per-process address space (bytes)
+    JLIMIT_RLIMIT_FSIZE,  // RLIMIT_FSIZE  -- per-process max file size (bytes)
+    JLIMIT_RLIMIT_NOFILE, // RLIMIT_NOFILE -- per-process open files (count)
+    JLIMIT_RLIMIT_CORE,   // RLIMIT_CORE   -- per-process core-dump size (bytes)
+    JLIMIT_RLIMIT_NPROC,  // RLIMIT_NPROC  -- per-uid process count (system-wide)
+    JLIMIT_TMPFS_SIZE,    // mount  tmpfs.size  -- jail /tmp tmpfs `size=` cap (bytes)
+    JLIMIT_COUNT,
+
+    JLIMIT_CGROUP_FIRST = 0,
+    JLIMIT_CGROUP_LAST = JLIMIT_RLIMIT_CPU,
+    JLIMIT_RLIMIT_FIRST = JLIMIT_RLIMIT_CPU,
+    JLIMIT_RLIMIT_LAST = JLIMIT_TMPFS_SIZE
+};
+
+// Limit value units. UNIT_SECONDS (a cumulative-time limit, `s`/`m`/`h`) is used
+// by `rlimit.cpu`.
+enum jaillimit_unit {
+    UNIT_COUNT,
+    UNIT_RATE,
+    UNIT_BYTES,
+    UNIT_SECONDS
+};
+
+struct jaillimitinfo {
+    std::string_view name;
+    jaillimit_unit unit;
+    bool cgroup;
+    int rlimit;
+
+    constexpr bool is_cgroup() const {
+        return cgroup;
+    }
+    std::string_view cgroup_controller() const {
+        assert(cgroup);
+        return name.substr(0, name.find('.'));
+    }
+    std::string_view cgroup_file() const {
+        assert(cgroup);
+        return name;
+    }
+    int rlimit_resource() const {
+        assert(!cgroup && rlimit != -1);
+        return rlimit;
+    }
+
+    static const std::array<jaillimitinfo, JLIMIT_COUNT> infos;
+    static const jaillimitinfo& get(int n) {
+        return infos[n];
+    }
+    static int lookup(std::string_view name);
 };
 
 // One resolved limit value. `set` is false when no directive named this limit,
 // in which case it is left inherited (the feature is opt-in). `unlimited` maps
 // to cgroup "max" (RLIM_INFINITY for rlimits); `value` is then ignored.
 // `pinned` (a `!` suffix in the conf) forbids the command line from loosening
-// the value -- see HARDENING.md 6.4. The unit of `value` is per-limit (see the
-// `jaillimit_id` comments).
+// the value -- see HARDENING.md 6.4. `soft` (a `?` suffix) means best-effort: if
+// this limit cannot be *enforced* (no cgroup support, an undelegated controller,
+// an unavailable rlimit), the run proceeds without it instead of failing -- the
+// mechanism behind default limits (see HARDENING.md 6.6). The two are orthogonal
+// and combine (`64!?`). The unit of `value` is per-limit (see the `jaillimit_id`
+// comments).
 struct jaillimit {
     bool set = false;
     bool unlimited = false;
     bool pinned = false;
+    bool soft = false;
     unsigned long long value = 0;
 };
 
@@ -141,3 +202,17 @@ private:
     char buf_[8192];
     size_t len_;
 };
+
+// Parse a `--limit` command-line value (`NAME=VALUE[,NAME=VALUE...]`, same grammar
+// as a conf `limit` directive) into `out`, overlaying like the conf does (so
+// repeated `--limit` flags accumulate, last write wins per name). Throws
+// `pajailconf_error` on a malformed item or unknown limit name.
+void parse_limit_override(std::string_view limits, jaillimits& out);
+
+// Fold a command-line override `over` into the conf-resolved limits `base`, in
+// place. The command line may only *tighten*: per name, a `!`-pinned conf value
+// ignores the override; otherwise the result is the more restrictive of the two
+// (smaller value, `unlimited` = +infinity, and hard if either side is hard --
+// soft only if both are). A name set only on the command line is introduced
+// (tightening from the inherited/unlimited default). See HARDENING.md 6.4.
+void apply_limit_override(jaillimits& base, const jaillimits& over);

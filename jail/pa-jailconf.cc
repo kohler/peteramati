@@ -4,13 +4,21 @@
 
 #include "pa-jailconf.hh"
 #include "pa-jutil.hh"
-#include <format>
 #include <cstring>
 #include <cerrno>
+#include <format>
 #include <vector>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
+
+#ifndef RLIMIT_AS
+#define RLIMIT_AS (-1)
+#endif
+#ifndef RLIMIT_NPROC
+#define RLIMIT_NPROC (-1)
+#endif
 
 namespace {
 struct pajailconf_parser {
@@ -34,8 +42,11 @@ struct pajailconf_parser {
         return pajailconf_error(std::format(format, std::forward<Args>(args)...), lineno);
     }
 
-    // Limit parsing, with errors attributed to the current line.
-    void parse_limits(std::string_view limits, jaillimits& out) const;
+    // Limit parsing, with errors attributed to the current line. When
+    // `cgroup_only`, a non-cgroup (`rlimit.*`) name is an error -- pools are
+    // cgroup-only.
+    void parse_limits(std::string_view limits, jaillimits& out,
+                      bool cgroup_only = false) const;
     unsigned long long parse_limit_value(int unit, std::string_view s, bool& unlimited) const;
     unsigned long long parse_uint(std::string_view s) const;
     unsigned long long parse_decimal_scaled(std::string_view s, unsigned long long scale) const;
@@ -142,28 +153,26 @@ pajailconf::pajailconf(std::string_view s) {
     len_ = s.size();
 }
 
-// Limit value units. (A `seconds` unit arrives with the rlimit limits that need
-// it, e.g. `rlimit.cpu`.)
-enum { UNIT_COUNT, UNIT_RATE, UNIT_BYTES };
-
-struct limit_desc {
-    const char* name;
-    int unit;
-    bool cgroup;        // a cgroup-controller limit (set en masse by `cgroup=...`)
-};
-
 // Indexed by `jaillimit_id`; order must match the enum. Names are the real
 // kernel names (cgroup interface filename, or `rlimit.<name>`).
-static const limit_desc limit_descs[JLIMIT_COUNT] = {
-    { "pids.max",    UNIT_COUNT, true },
-    { "cpu.max",     UNIT_RATE,  true },
-    { "memory.max",  UNIT_BYTES, true },
-    { "memory.high", UNIT_BYTES, true }
-};
+const std::array<jaillimitinfo, JLIMIT_COUNT> jaillimitinfo::infos = {{
+    { "pids.max",      UNIT_COUNT,   true,   -1 },
+    { "cpu.max",       UNIT_RATE,    true,   -1 },
+    { "memory.max",    UNIT_BYTES,   true,   -1 },
+    { "memory.high",   UNIT_BYTES,   true,   -1 },
+    { "memory.swap.max", UNIT_BYTES, true,   -1 },
+    { "rlimit.cpu",    UNIT_SECONDS, false,  RLIMIT_CPU },
+    { "rlimit.as",     UNIT_BYTES,   false,  RLIMIT_AS },
+    { "rlimit.fsize",  UNIT_BYTES,   false,  RLIMIT_FSIZE },
+    { "rlimit.nofile", UNIT_COUNT,   false,  RLIMIT_NOFILE },
+    { "rlimit.core",   UNIT_BYTES,   false,  RLIMIT_CORE },
+    { "rlimit.nproc",  UNIT_COUNT,   false,  RLIMIT_NPROC },
+    { "tmpfs.size",    UNIT_BYTES,   false,  -1 }
+}};
 
-static int limit_lookup(std::string_view name) {
+int jaillimitinfo::lookup(std::string_view name) {
     for (int i = 0; i != JLIMIT_COUNT; ++i) {
-        if (name == limit_descs[i].name) {
+        if (name == infos[i].name) {
             return i;
         }
     }
@@ -236,15 +245,28 @@ unsigned long long pajailconf_parser::parse_limit_value(int unit, std::string_vi
         }
         return parse_decimal_scaled(s, 1000);
     }
-    if (unit == UNIT_BYTES) {
-        // integer with an optional 1024-based unit suffix
+    if (unit == UNIT_BYTES || unit == UNIT_SECONDS) {
+        // integer with an optional unit suffix: 1024-based k/m/g for bytes,
+        // s/m/h (seconds/minutes/hours) for cumulative time; a bare number is
+        // bytes or seconds respectively
         unsigned long long mult = 1;
-        switch (s.back()) {
-        case 'k': case 'K': mult = 1024ULL; break;
-        case 'm': case 'M': mult = 1024ULL * 1024; break;
-        case 'g': case 'G': mult = 1024ULL * 1024 * 1024; break;
+        bool has_suffix = true;
+        if (unit == UNIT_BYTES) {
+            switch (s.back()) {
+            case 'k': case 'K': mult = 1024ULL; break;
+            case 'm': case 'M': mult = 1024ULL * 1024; break;
+            case 'g': case 'G': mult = 1024ULL * 1024 * 1024; break;
+            default: has_suffix = false; break;
+            }
+        } else {
+            switch (s.back()) {
+            case 's': case 'S': mult = 1; break;
+            case 'm': case 'M': mult = 60; break;
+            case 'h': case 'H': mult = 3600; break;
+            default: has_suffix = false; break;
+            }
         }
-        if (mult != 1) {
+        if (has_suffix) {
             s.remove_suffix(1);
         }
         unsigned long long v = parse_uint(s);
@@ -257,9 +279,10 @@ unsigned long long pajailconf_parser::parse_limit_value(int unit, std::string_vi
 }
 
 // Parse a `NAME=VALUE[,NAME=VALUE...]` list, overlaying each named limit onto
-// `out` (last write wins). A `!` suffix on a value pins it. Throws on a
-// malformed item or an unknown limit name.
-void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out) const {
+// `out` (last write wins). Trailing `!` (pin) and `?` (soft) value flags are
+// honored, in any order. Throws on a malformed item or an unknown limit name.
+void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out,
+                                     bool cgroup_only) const {
     while (!limits.empty()) {
         size_t comma = limits.find(',');
         std::string_view item = comma == std::string_view::npos ? limits : limits.substr(0, comma);
@@ -271,9 +294,10 @@ void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out) c
         }
         std::string_view name = item.substr(0, eq);
         std::string_view val = item.substr(eq + 1);
-        bool pinned = false;
-        if (!val.empty() && val.back() == '!') {
-            pinned = true;
+        // trailing `!` (pin) and `?` (soft) flags, in any order
+        bool pinned = false, soft = false;
+        while (!val.empty() && (val.back() == '!' || val.back() == '?')) {
+            (val.back() == '!' ? pinned : soft) = true;
             val.remove_suffix(1);
         }
         if (name == "cgroup") {
@@ -284,26 +308,27 @@ void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out) c
             if (!unset && val != "unlimited") {
                 throw error("limit: `cgroup` only accepts `unlimited` or `unset`");
             }
-            jaillimit lim{!unset, !unset, pinned, 0};   // unset clears, else unlimited
-            for (int i = 0; i != JLIMIT_COUNT; ++i) {
-                if (limit_descs[i].cgroup) {
-                    out[i] = lim;
-                }
+            jaillimit lim{!unset, !unset, pinned, soft, 0};   // unset clears, else unlimited
+            for (int i = JLIMIT_CGROUP_FIRST; i != JLIMIT_CGROUP_LAST; ++i) {
+                out[i] = lim;
             }
             continue;
         }
-        int id = limit_lookup(name);
+        int id = jaillimitinfo::lookup(name);
         if (id < 0) {
             throw error("limit: Unknown limit `{}`", name);
         }
+        if (cgroup_only && !jaillimitinfo::get(id).is_cgroup()) {
+            throw error("limit: `{}` is not a cgroup limit (a `[cgroup]` pool takes cgroup limits only)", name);
+        }
         if (val == "unset") {
             // clear this limit (e.g. drop an inherited default)
-            out[id] = jaillimit{false, false, pinned, 0};
+            out[id] = jaillimit{false, false, pinned, soft, 0};
             continue;
         }
         bool unlimited = false;
-        unsigned long long v = parse_limit_value(limit_descs[id].unit, val, unlimited);
-        out[id] = jaillimit{true, unlimited, pinned, v};
+        unsigned long long v = parse_limit_value(jaillimitinfo::get(id).unit, val, unlimited);
+        out[id] = jaillimit{true, unlimited, pinned, soft, v};
     }
 }
 
@@ -508,15 +533,43 @@ jaillimits pajailconf::pool_limits(std::string_view path) const {
             continue;
         }
 
-        // pool limits take only the `limit NAME=VALUE,...` form (no JDIR axis).
-        // They are cgroup-controller limits; `rlimit.*` would be rejected here
-        // once those names exist.
+        // pool limits take only the `limit NAME=VALUE,...` form (no JDIR axis)
+        // and only cgroup-controller names -- `cgroup_only` rejects `rlimit.*`.
         if (action == "limit") {
             if (parser.args.size() != 2) {
                 throw parser.error("Expected `limit NAME=VALUE,...` in cgroup section");
             }
-            parser.parse_limits(parser.args[1], limits);
+            parser.parse_limits(parser.args[1], limits, true);
         }
     }
     return limits;
+}
+
+void parse_limit_override(std::string_view limits, jaillimits& out) {
+    pajailconf_parser parser(limits);
+    parser.parse_limits(limits, out);
+}
+
+void apply_limit_override(jaillimits& base, const jaillimits& over) {
+    for (int id = 0; id != JLIMIT_COUNT; ++id) {
+        const jaillimit& o = over[id];
+        jaillimit& b = base[id];
+        if (!o.set || b.pinned) {
+            continue;               // nothing to override, or conf pinned it
+        }
+        if (!b.set) {
+            b = o;                  // introduce (tighten from inherited default)
+            b.pinned = false;
+            continue;
+        }
+        // both set, not pinned: keep the more restrictive value (unlimited = +inf)
+        bool over_tighter = b.unlimited ? !o.unlimited
+            : (!o.unlimited && o.value < b.value);
+        if (over_tighter) {
+            b.unlimited = o.unlimited;
+            b.value = o.value;
+        }
+        b.soft = b.soft && o.soft;  // hard wins (stricter enforcement)
+        b.pinned = false;
+    }
 }

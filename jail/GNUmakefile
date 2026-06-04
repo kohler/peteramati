@@ -2,6 +2,12 @@ PREFIX ?= /usr/local
 BINDIR = $(DESTDIR)$(PREFIX)/bin
 # SANFLAGS = -fsanitize=address -fsanitize=undefined
 SANFLAGS =
+DEFS =
+ifeq ($(PA_HAVE_CGROUP),0)
+DEFS += -DPA_HAVE_CGROUP=0
+else ifeq ($(PA_HAVE_CGROUP),1)
+DEFS += -DPA_HAVE_CGROUP=1
+endif
 
 # Support out-of-tree builds via `make -f SRCDIR/GNUmakefile`. `$(srcdir)` is
 # this makefile's directory (`.` for an in-tree build); objects and binaries
@@ -26,7 +32,7 @@ test-pa-jail: test-pa-jail.o
 	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) -o $@ $^
 
 pa-jail.o pa-jailconf.o pa-jutil.o test-pa-jailconf.o test-pa-jail.o: %.o: %.cc
-	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) -I$(srcdir) -c -o $@ $<
+	$(CXX) -std=gnu++20 -W -Wall -g -O2 $(SANFLAGS) $(DEFS) -I$(srcdir) -c -o $@ $<
 
 pa-jail.o pa-jailconf.o test-pa-jailconf.o: pa-jailconf.hh
 pa-jail.o pa-jailconf.o pa-jutil.o test-pa-jailconf.o: pa-jutil.hh
@@ -75,5 +81,6 @@ check-jail: test-pa-jail
 # Build and run the test suite in an ephemeral Linux container. Useful when the
 # host's endpoint-security software quarantines freshly-built binaries, and as a
 # check on pa-jail's real (Linux) target platform. See build-docker.sh.
-check-docker:
+check-docker: test-pa-jail
 	./build-docker.sh
+	./test-pa-jail --docker

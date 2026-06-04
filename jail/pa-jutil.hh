@@ -52,6 +52,13 @@ inline std::string path_noendslash(std::string path) {
     return path;
 }
 
+inline std::string_view path_noendslash(std::string_view path) {
+    while (path.size() > 1 && path.back() == '/') {
+        path.remove_suffix(1);
+    }
+    return path;
+}
+
 // Return the parent directory of `path`, ending in a slash.
 // Examples: `a/b/c`→`a/b/`; `/`→`/`.
 std::string path_parentdir(const std::string& path);
