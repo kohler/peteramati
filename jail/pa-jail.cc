@@ -47,6 +47,7 @@
 #include <sys/sysmacros.h>
 #include <sys/syscall.h>
 #include <sys/prctl.h>
+#include <linux/capability.h>   // capset, CAP_LAST_CAP (raw, no libcap)
 #elif __APPLE__
 #include <sys/param.h>
 #include <sys/ucred.h>
@@ -84,6 +85,7 @@ static bool verbose = false;
 static bool dryrun = false;
 static bool quiet = false;
 static bool doforce = false;
+static bool opt_userns = false;     // `--userns`: run student in a user namespace
 static bool no_onlcr = false;
 static long tsize[2] = {80, 25};
 static FILE* verbosefile = stdout;
@@ -293,6 +295,36 @@ static int x_mknod(const char* path, mode_t mode, dev_t dev) {
         return perror_fail("mknod %s: %s\n", path);
     }
     return 0;
+}
+
+// The only device nodes pa-jail will create inside a jail, matched by the
+// major:minor that actually identifies the kernel driver (not the path a manifest
+// happens to list it under). `mknod` here wields the setuid binary's root
+// authority, and a device node is a live channel to its driver rather than mere
+// data -- so installing an arbitrary node a manifest names (`/dev/mem`, a raw
+// disk, ...) would hand jailed code a kernel-level capability. This is the small
+// set real workloads need; a block device is never among them. `/dev/ptmx` is
+// allowed because a traced manifest may capture it -- exec_go() later swaps it for
+// the `pts/ptmx` symlink the jail's devpts needs. See HARDENING.md (Phase 3 #11).
+static bool dev_node_allowed(mode_t mode, dev_t rdev) {
+    if (!S_ISCHR(mode)) {
+        return false;
+    }
+    static const struct { unsigned major, minor; } allowed[] = {
+        { 1, 3 },   // null
+        { 1, 5 },   // zero
+        { 1, 7 },   // full
+        { 1, 8 },   // random
+        { 1, 9 },   // urandom
+        { 5, 0 },   // tty
+        { 5, 2 }    // ptmx
+    };
+    for (const auto& a : allowed) {
+        if ((unsigned) major(rdev) == a.major && (unsigned) minor(rdev) == a.minor) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static bool x_symlink_eexist_ok(const char* oldpath, const char* newpath) {
@@ -831,6 +863,15 @@ static inline int stat_mtimes_same(const struct stat& st1, const struct stat& st
 
 static int do_copy(const std::string& dst, const std::string& src,
                    const struct stat& ss, bool reuse_link, dev_t jaildev) {
+    // a manifest may name any path, but a device node is a root-authority
+    // capability, not data: refuse anything outside the allowlist before it can be
+    // created (or accepted as a pre-existing match below)
+    if ((S_ISCHR(ss.st_mode) || S_ISBLK(ss.st_mode))
+        && !dev_node_allowed(ss.st_mode, ss.st_rdev)) {
+        std::string what = src + " (" + dev_name(ss.st_mode, ss.st_rdev) + ")";
+        return perror_fail("%s: Device node not permitted in jail\n", what.c_str());
+    }
+
     struct stat ds;
     int r = lstat(dst.c_str(), &ds);
     if (r == 0
@@ -1235,6 +1276,27 @@ static int construct_jail(dev_t jaildev, std::string& str, bool nomount) {
 
 // main program
 
+// Built-in default limits, shipped in the binary as a mini pa-jail.conf parsed by
+// the same machinery as the real config. The top-level `limit` is the per-jail
+// LEAF default (picked up by `parse()`, which skips the `[cgroup]` section); the
+// bare `[cgroup]` section is the shared-POOL aggregate default (picked up by
+// `parse_pool()`). They are seeded UNDER the real config -- parsed first, so a
+// `limit` directive overrides one and `limit NAME=unset` drops it -- and are all
+// soft (`?`), so they apply where the mechanism exists and simply don't where it
+// doesn't. The memory budget is a `%`-of-RAM AGGREGATE on the pool, because a
+// per-jail `%` would oversubscribe across concurrent jails (see HARDENING.md 6.6).
+// Tweak the values here.
+static constexpr std::string_view default_limits_conf =
+    "limit pids.max=1024?,tmpfs.size=512m?,rlimit.core=0?\n"
+    "[cgroup]\n"
+    "limit memory.high=70%?,memory.max=85%?,memory.swap.max=0?\n";
+
+// The built-in defaults, parsed once.
+static const pajailconf& default_conf() {
+    static const pajailconf c{default_limits_conf};
+    return c;
+}
+
 struct jaildirinfo {
     jailperm perm;
     pajailconf* conf_ = nullptr;        // the config `perm` was resolved from
@@ -1277,6 +1339,7 @@ jaildirinfo::jaildirinfo(const char* dirstr, const std::string& skeletonstr,
             perm.skeletondir.push_back('/');
         }
     }
+    default_conf().parse(perm);         // seed built-in defaults, under the config
     jailconf.parse(perm);
     if (!perm) {
         die("%s: Jail disabled in /etc/pa-jail.conf\n%s",
@@ -2175,6 +2238,54 @@ static bool cgroup_any_hard(const jaillimits& lim) {
 
 #endif
 
+// Total memory that `NN%` byte limits resolve against: the machine/VM physical
+// RAM, clamped by the `memory.max` of any cgroup pa-jail runs under (so it's the
+// container's budget when containerized, the VM/host RAM otherwise). Cached.
+static unsigned long long host_mem_bytes() {
+    static unsigned long long cached = 0;
+    if (cached != 0) {
+        return cached;
+    }
+    long pages = sysconf(_SC_PHYS_PAGES), pgsz = sysconf(_SC_PAGE_SIZE);
+    unsigned long long mem = pages > 0 && pgsz > 0
+        ? (unsigned long long) pages * (unsigned long long) pgsz : 0;
+#if __linux__
+    // walk our cgroup up to the v2 root, clamping by each level's memory.max
+    std::string self = file_get_contents("/proc/self/cgroup", 0);
+    size_t nl = self.find('\n');
+    std::string_view line(self.data(), nl == std::string::npos ? self.size() : nl);
+    if (line.starts_with("0::/")) {
+        std::string dir = path_noendslash(cgroup_base + std::string(line.substr(3)));
+        while (true) {
+            std::string v = file_get_contents(dir + "/memory.max", 0);
+            char* end;
+            unsigned long long m = strtoull(v.c_str(), &end, 10);
+            if (end != v.c_str() && m > 0 && (mem == 0 || m < mem)) {
+                mem = m;
+            }
+            if (dir == cgroup_base) {
+                break;
+            }
+            dir = path_noendslash(path_parentdir(dir));
+        }
+    }
+#endif
+    cached = mem ? mem : (1ULL << 30);   // 1 GiB fallback if introspection fails
+    return cached;
+}
+
+// Resolve any `percent` (NN% of total RAM) byte limits in `lim` to absolute bytes.
+// Must run before `apply_limit_override` (so its `min` compares only bytes) and
+// before the limits are applied.
+static void resolve_percent_limits(jaillimits& lim) {
+    for (int id = 0; id != JLIMIT_COUNT; ++id) {
+        if (lim[id].set && lim[id].percent) {
+            lim[id].value = host_mem_bytes() * lim[id].value / 100;
+            lim[id].percent = false;
+        }
+    }
+}
+
 // `pa-jail init JAILDIR`: prepare the cgroup pool `perm` resolves to, by enabling
 // exactly the controllers `perm`'s limits (leaf + pool) need on the pool and its
 // parent, so per-run jails can create leaves that carry those limits. If the jail
@@ -2182,7 +2293,10 @@ static bool cgroup_any_hard(const jaillimits& lim) {
 // per-run path it may relocate foreign processes to satisfy cgroup v2's
 // no-internal-processes rule (needed inside a container). Idempotent.
 static int cgroup_init(const pajailconf& conf, const jailperm& perm) {
-    jaillimits pool_lim = conf.pool_limits(perm.cgroupbase);
+    jaillimits pool_lim;
+    default_conf().parse_pool(pool_lim, perm.cgroupbase);   // built-in defaults
+    conf.parse_pool(pool_lim, perm.cgroupbase);             // real config overlays
+    resolve_percent_limits(pool_lim);
     std::vector<std::string_view> need;
     cgroup_add_controllers(perm.limits, need, PA_HAVE_CGROUP);
     cgroup_add_controllers(pool_lim, need, PA_HAVE_CGROUP);
@@ -2215,8 +2329,11 @@ static int cgroup_init(const pajailconf& conf, const jailperm& perm) {
 // effective limit `min(leaf, pool, ...ancestors)`, so per-jail leaf limits and a
 // shared pool cap compose for free.
 static std::string cgroup_setup(const pajailconf& conf, const jailperm& perm) {
-    const jaillimits& leaf_lim = perm.limits;
-    jaillimits pool_lim = conf.pool_limits(perm.cgroupbase);
+    const jaillimits& leaf_lim = perm.limits;   // already %-resolved in jail_main
+    jaillimits pool_lim;
+    default_conf().parse_pool(pool_lim, perm.cgroupbase);   // built-in defaults
+    conf.parse_pool(pool_lim, perm.cgroupbase);             // real config overlays
+    resolve_percent_limits(pool_lim);
 
     // controllers needed by either the per-jail leaf or the shared pool
     std::vector<std::string_view> need;
@@ -2305,6 +2422,53 @@ static void apply_rlimits(const jaillimits& lim, bool apply) {
         }
     }
 }
+
+#if __linux__
+// Drop every capability from the effective/permitted/inheritable sets, the
+// ambient set, and the bounding set. Used after entering a fresh user namespace
+// (whose creator gets a full set) so the student holds no capabilities even
+// `CAP_SYS_ADMIN` inside its own namespace. Raw syscall to avoid a libcap dep.
+static void cap_drop_all() {
+    prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0);
+    for (int cap = 0; cap <= CAP_LAST_CAP; ++cap) {
+        prctl(PR_CAPBSET_DROP, cap, 0, 0, 0);   // unknown caps simply fail; fine
+    }
+    struct __user_cap_header_struct hdr = {};
+    hdr.version = _LINUX_CAPABILITY_VERSION_3;
+    struct __user_cap_data_struct data[2] = {};
+    if (syscall(SYS_capset, &hdr, data) != 0) {
+        perror_die("capset");
+    }
+}
+
+static void write_idmap(const char* path, const std::string& line) {
+    int fd = open(path, O_WRONLY | O_CLOEXEC);
+    if (fd < 0 || write(fd, line.data(), line.size()) != (ssize_t) line.size()) {
+        perror_die(path);
+    }
+    close(fd);
+}
+
+// Put the about-to-exec student into a fresh user namespace where it keeps its
+// own (non-root) uid/gid via an *identity* map. The namespace's uid 0 ("root in
+// the jail") is therefore unmapped -- it resolves to the host overflow uid
+// (nobody), never real root -- so an in-jail escalation to uid 0 gains nothing on
+// the host. The creator gets a full capability set in the new namespace, so we
+// then drop all capabilities. The uid change made us non-dumpable (which makes
+// /proc/self/uid_map root-owned); PR_SET_DUMPABLE restores write access. Runs as
+// the student `owner`/`group`, just before execve. Fail-closed: any failure dies.
+static void setup_userns(uid_t owner, gid_t group) {
+    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+    if (unshare(CLONE_NEWUSER) != 0) {
+        perror_die("unshare(CLONE_NEWUSER)");
+    }
+    write_idmap("/proc/self/setgroups", "deny");
+    write_idmap("/proc/self/gid_map", std::format("{} {} 1\n", group, group));
+    write_idmap("/proc/self/uid_map", std::format("{} {} 1\n", owner, owner));
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+    cap_drop_all();
+}
+#endif
 
 
 class jailownerinfo {
@@ -2845,6 +3009,10 @@ int jailownerinfo::exec_go() {
     // per-process rlimits (applied in the child below; logged here so they show
     // under --verbose, including --dry-run)
     apply_rlimits(permjail_->perm.limits, false);
+    if (opt_userns && verbose) {
+        fprintf(verbosefile, "unshare --user (identity-map uid %d gid %d; drop caps)\n",
+                (int) owner_, (int) group_);
+    }
 
     // run command
     if (verbose) {
@@ -2908,6 +3076,15 @@ int jailownerinfo::exec_go() {
             for (int sig = 1; sig < NSIG; ++sig) {
                 signal(sig, SIG_DFL);
             }
+
+#if __linux__
+            // `--userns`: enter a user namespace so jail-root is unprivileged on
+            // the host (and drop all capabilities). Last, so the controlling tty
+            // and signal setup above run in the parent namespace.
+            if (opt_userns) {
+                setup_userns(owner_, group_);
+            }
+#endif
 
             int r = execve(argv_[0], (char* const*) argv_,
                            (char* const*) newenv_.data());
@@ -3424,6 +3601,7 @@ Run COMMAND as USER in the JAILDIR jail. JAILDIR must be allowed by\n\
   -I, --idle-timeout TIMEOUT  Kill the jail after TIMEOUT idle seconds\n\
   -q, --quiet               Don't print timeout or termination notices\n\
   -l, --limit NAME=VALUE,...  Tighten resource limits (may not loosen the config)\n\
+      --userns              Run in a user namespace (jail-root maps to nobody)\n\
       --fg                  Run in the foreground\n");
         }
         fprintf(stderr, "  -n, --dry-run             Print actions, don't run them\n\
@@ -3446,6 +3624,7 @@ static struct option longoptions_before[] = {
 #define ARG_EVENT_SOURCE 1003
 #define ARG_BG           1004
 #define ARG_READY        1005
+#define ARG_USERNS       1006
 
 static struct option longoptions_run[] = {
     { "verbose", no_argument, nullptr, 'V' },
@@ -3473,6 +3652,7 @@ static struct option longoptions_run[] = {
     { "ready", optional_argument, nullptr, ARG_READY },
     { "quiet", no_argument, nullptr, 'q' },
     { "limit", required_argument, nullptr, 'l' },
+    { "userns", no_argument, nullptr, ARG_USERNS },
     { nullptr, 0, nullptr, 0 }
 };
 
@@ -3602,7 +3782,9 @@ static int jail_main(int argc, char** argv) {
             } else if (ch == 't' && action == do_run) {
                 timingfilename = optarg;
             } else if (ch == 'l') {
-                parse_limit_override(optarg, limit_override);   // may throw
+                pajailconf::parse_limits(limit_override, optarg); // may throw
+            } else if (ch == ARG_USERNS) {
+                opt_userns = true;
             } else { /* if (ch == 'H') */
                 usage(action);
             }
@@ -3788,20 +3970,27 @@ static int jail_main(int argc, char** argv) {
             fprintf(stderr, "%s: Bad jail directory\n", argv[optind]);
             exit(1);
         }
-        jailperm perm = jailconf.get(dir);
+        jailperm perm(dir);
+        default_conf().parse(perm);         // seed built-in defaults, under the config
+        jailconf.parse(perm);
         if (!perm.enabled) {
             die("%s: Jail disabled in /etc/pa-jail.conf\n%s",
                 perm.dir.c_str(), perm.disable_message().c_str());
         }
+        resolve_percent_limits(perm.limits);
         return cgroup_init(jailconf, perm);
     }
 
     jaildirinfo jaildir(argv[optind], linkarg, action, jailconf);
 
-    // fold any `--limit` overrides into this jail's resolved limits (it may only
-    // tighten, never loosen; a `!`-pinned conf value is immune -- see §6.4)
+    // resolve `NN%`-of-RAM byte limits to bytes, then fold any `--limit` overrides
+    // into this jail's resolved limits (a hard conf limit may only be tightened, a
+    // soft default is replaced outright, a `!`-pinned value is immune -- see §6.4).
+    // Resolve first so the override's `min` compares only absolute byte values.
     if (action == do_run) {
-        apply_limit_override(jaildir.perm.limits, limit_override);
+        resolve_percent_limits(jaildir.perm.limits);
+        resolve_percent_limits(limit_override);
+        jaildir.perm.limits.apply_overrides(limit_override);
     }
 
     // `pa-jail run --bind BINDDIR` builds the jail in a shared scaffold BINDDIR

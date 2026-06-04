@@ -606,6 +606,14 @@ void test_pajailconf_query() {
     }
 }
 
+// Resolve pool `path`'s configured limits into a fresh value (the runtime instead
+// seeds the built-in defaults first; these tests want only what the config sets).
+static jaillimits pool_of(const pajailconf& jc, std::string_view path) {
+    jaillimits limits;
+    jc.parse_pool(limits, path);
+    return limits;
+}
+
 void test_pajailconf_cgroup() {
     // no `cgroupbase` directive -> the built-in default pool
     pajailconf jc("enablejail /jails/**\n");
@@ -632,13 +640,13 @@ void test_pajailconf_cgroup() {
                     "[cgroup /sys/fs/cgroup/pa-jail]\n"
                     "limit pids.max=4000,memory.max=24g\n");
     {
-        jaillimits pl = jc.pool_limits("/sys/fs/cgroup/pa-jail");
+        jaillimits pl = pool_of(jc,"/sys/fs/cgroup/pa-jail");
         assert(pl[JLIMIT_PIDS_MAX].set && pl[JLIMIT_PIDS_MAX].value == 4000);
         assert(pl[JLIMIT_MEMORY_MAX].value == 24ULL << 30);
         assert(!pl[JLIMIT_CPU_MAX].set);
     }
     // an undefined pool has no limits
-    assert(!jc.pool_limits("/sys/fs/cgroup/other")[JLIMIT_PIDS_MAX].set);
+    assert(!pool_of(jc,"/sys/fs/cgroup/other")[JLIMIT_PIDS_MAX].set);
     // and a pool section does NOT leak into a jaildir query's own limits
     assert(!jc.get("/jails/a").limits[JLIMIT_PIDS_MAX].set);
 
@@ -648,7 +656,7 @@ void test_pajailconf_cgroup() {
     {
         jailperm p = jc.get("/jails/a");
         assert(p.cgroupbase == default_cgroupbase);
-        assert(jc.pool_limits(p.cgroupbase)[JLIMIT_PIDS_MAX].value == 1000);
+        assert(pool_of(jc,p.cgroupbase)[JLIMIT_PIDS_MAX].value == 1000);
     }
 
     // multiple pools carry distinct limits; jails route to them via cgroupbase
@@ -656,31 +664,31 @@ void test_pajailconf_cgroup() {
                     "[cgroup /pool/run]\nlimit pids.max=128\n"
                     "[cgroup /pool/build]\nlimit pids.max=512,memory.max=32g\n"
                     "[/jails/build/*]\ncgroupbase /pool/build\n");
-    assert(jc.pool_limits("/pool/run")[JLIMIT_PIDS_MAX].value == 128);
-    assert(jc.pool_limits("/pool/build")[JLIMIT_PIDS_MAX].value == 512);
-    assert(jc.pool_limits("/pool/build")[JLIMIT_MEMORY_MAX].value == 32ULL << 30);
+    assert(pool_of(jc,"/pool/run")[JLIMIT_PIDS_MAX].value == 128);
+    assert(pool_of(jc,"/pool/build")[JLIMIT_PIDS_MAX].value == 512);
+    assert(pool_of(jc,"/pool/build")[JLIMIT_MEMORY_MAX].value == 32ULL << 30);
     assert(jc.get("/jails/build/x").cgroupbase == "/pool/build");
 
     // a `$SELF`-relative pool joins literally (the parser never expands it)
     jc = pajailconf("enablejail /jails/**\n"
                     "cgroupbase $SELF/grading\n"
                     "[cgroup $SELF/grading]\nlimit pids.max=200\n");
-    assert(jc.pool_limits("$SELF/grading")[JLIMIT_PIDS_MAX].value == 200);
-    assert(jc.pool_limits(jc.get("/jails/a").cgroupbase)[JLIMIT_PIDS_MAX].value == 200);
+    assert(pool_of(jc,"$SELF/grading")[JLIMIT_PIDS_MAX].value == 200);
+    assert(pool_of(jc,jc.get("/jails/a").cgroupbase)[JLIMIT_PIDS_MAX].value == 200);
 
     // multiple limit lines in one pool accumulate (last wins per name)
     jc = pajailconf("[cgroup /p]\nlimit pids.max=64,cpu.max=1\nlimit pids.max=256\n");
-    assert(jc.pool_limits("/p")[JLIMIT_PIDS_MAX].value == 256);
-    assert(jc.pool_limits("/p")[JLIMIT_CPU_MAX].value == 1000);
+    assert(pool_of(jc,"/p")[JLIMIT_PIDS_MAX].value == 256);
+    assert(pool_of(jc,"/p")[JLIMIT_CPU_MAX].value == 1000);
 
     // a bare `[cgroup]` applies to every pool, overlaid with the pool's own
     // `[cgroup PATH]` limits (last write wins per name, in file order)
     jc = pajailconf("[cgroup]\nlimit pids.max=64,cpu.max=2\n"
                     "[cgroup /p]\nlimit pids.max=256\n");
-    assert(jc.pool_limits("/p")[JLIMIT_PIDS_MAX].value == 256);    // pool overrides
-    assert(jc.pool_limits("/p")[JLIMIT_CPU_MAX].value == 2000);    // inherited from `[cgroup]`
-    assert(jc.pool_limits("/other")[JLIMIT_PIDS_MAX].value == 64); // only the `[cgroup]` limits
-    assert(jc.pool_limits("/other")[JLIMIT_CPU_MAX].value == 2000);
+    assert(pool_of(jc,"/p")[JLIMIT_PIDS_MAX].value == 256);    // pool overrides
+    assert(pool_of(jc,"/p")[JLIMIT_CPU_MAX].value == 2000);    // inherited from `[cgroup]`
+    assert(pool_of(jc,"/other")[JLIMIT_PIDS_MAX].value == 64); // only the `[cgroup]` limits
+    assert(pool_of(jc,"/other")[JLIMIT_CPU_MAX].value == 2000);
 
     // `[cgroup]` is a pool section, so a jaildir query skips its limits
     jc = pajailconf("enablejail /jails/**\n[cgroup]\nlimit pids.max=64\n");
@@ -694,11 +702,11 @@ void test_pajailconf_cgroup() {
 
     // pools are cgroup-only: an `rlimit.*` (per-process) limit in a `[cgroup]`
     // section is rejected -- in a named pool and in the bare `[cgroup]`
-    assert(throws_config_error([] { pajailconf("[cgroup /p]\nlimit rlimit.nofile=256\n").pool_limits("/p"); }));
-    assert(throws_config_error([] { pajailconf("[cgroup]\nlimit pids.max=64,rlimit.core=0\n").pool_limits("/p"); }));
+    assert(throws_config_error([] { pool_of(pajailconf("[cgroup /p]\nlimit rlimit.nofile=256\n"), "/p"); }));
+    assert(throws_config_error([] { pool_of(pajailconf("[cgroup]\nlimit pids.max=64,rlimit.core=0\n"), "/p"); }));
     // but cgroup limits there are still fine
     jc = pajailconf("[cgroup /p]\nlimit pids.max=64,memory.max=1g\n");
-    assert(jc.pool_limits("/p")[JLIMIT_PIDS_MAX].value == 64);
+    assert(pool_of(jc,"/p")[JLIMIT_PIDS_MAX].value == 64);
 }
 
 // The jaillimitinfo table: each row sits at its `jaillimit_id` index, its name
@@ -792,8 +800,21 @@ void test_pajailconf_limit() {
     // tmpfs.size is a byte limit too (a /tmp mount cap, not cgroup/rlimit)
     jc = pajailconf("enablejail /j\nlimit tmpfs.size=64m\n");
     assert(jc.get("/j").limits[JLIMIT_TMPFS_SIZE].value == 64ULL << 20);
+
+    // a byte limit can be a `NN%` of RAM: the parser leaves it unresolved
+    // (`percent` set, `value` = the percentage), for the runtime to multiply out
+    jc = pajailconf("enablejail /j\nlimit memory.max=85%\n");
+    assert(jc.get("/j").limits[JLIMIT_MEMORY_MAX].set
+           && jc.get("/j").limits[JLIMIT_MEMORY_MAX].percent
+           && jc.get("/j").limits[JLIMIT_MEMORY_MAX].value == 85);
+    jc = pajailconf("enablejail /j\nlimit tmpfs.size=10%\n");
+    assert(jc.get("/j").limits[JLIMIT_TMPFS_SIZE].percent
+           && jc.get("/j").limits[JLIMIT_TMPFS_SIZE].value == 10);
+    // >100% is an error, and `%` is only for byte limits (not pids/count)
+    assert(throws_config_error([] { pajailconf("enablejail /j\nlimit memory.max=150%\n").get("/j"); }));
+    assert(throws_config_error([] { pajailconf("enablejail /j\nlimit pids.max=50%\n").get("/j"); }));
     // a `[cgroup]` pool rejects it, like any non-cgroup limit
-    assert(throws_config_error([] { pajailconf("[cgroup /p]\nlimit tmpfs.size=64m\n").pool_limits("/p"); }));
+    assert(throws_config_error([] { pool_of(pajailconf("[cgroup /p]\nlimit tmpfs.size=64m\n"), "/p"); }));
     // throttle + hard cap together
     jc = pajailconf("enablejail /j\nlimit memory.high=20g,memory.max=24g\n");
     assert(jc.get("/j").limits[JLIMIT_MEMORY_HIGH].value == 20ULL << 30);
@@ -965,43 +986,49 @@ void test_limit_override() {
 
     // parse_limit_override: same grammar as a conf `limit`, repeated flags overlay
     jaillimits over;
-    parse_limit_override("pids.max=10,memory.max=1g", over);
+    pajailconf::parse_limits(over, "pids.max=10,memory.max=1g");
     assert(over[JLIMIT_PIDS_MAX].value == 10 && over[JLIMIT_PIDS_MAX].set);
     assert(over[JLIMIT_MEMORY_MAX].value == 1ULL << 30);
-    parse_limit_override("pids.max=5", over);               // last write wins per name
+    pajailconf::parse_limits(over, "pids.max=5");               // last write wins per name
     assert(over[JLIMIT_PIDS_MAX].value == 5);
     assert(over[JLIMIT_MEMORY_MAX].value == 1ULL << 30);    // untouched
     // a malformed value or unknown name throws
-    assert(throws_config_error([] { jaillimits x; parse_limit_override("pids.max=bad", x); }));
-    assert(throws_config_error([] { jaillimits x; parse_limit_override("nope=1", x); }));
+    assert(throws_config_error([] { jaillimits x; pajailconf::parse_limits(x, "pids.max=bad"); }));
+    assert(throws_config_error([] { jaillimits x; pajailconf::parse_limits(x, "nope=1"); }));
 
     int id = JLIMIT_PIDS_MAX;
-    // tighter override wins; looser is ignored
-    { jaillimits b, o; b[id] = mk(64); o[id] = mk(10);
-      apply_limit_override(b, o); assert(b[id].value == 10); }
-    { jaillimits b, o; b[id] = mk(64); o[id] = mk(128);
-      apply_limit_override(b, o); assert(b[id].value == 64); }
+    // a HARD conf limit may only be *tightened* by the command line (min value)
+    { jaillimits b, o; b[id] = mk(64); o[id] = mk(10);          // tighter wins
+      b.apply_overrides(o); assert(b[id].value == 10); }
+    { jaillimits b, o; b[id] = mk(64); o[id] = mk(128);         // looser ignored
+      b.apply_overrides(o); assert(b[id].value == 64); }
+    { jaillimits b, o; b[id] = mk(10); o[id] = mk(5, false, true);   // tightens value, stays hard
+      b.apply_overrides(o); assert(b[id].value == 5 && !b[id].soft); }
     // cmdline-only introduces; conf-only is kept
     { jaillimits b, o; o[id] = mk(10);
-      apply_limit_override(b, o); assert(b[id].set && b[id].value == 10); }
+      b.apply_overrides(o); assert(b[id].set && b[id].value == 10); }
     { jaillimits b, o; b[id] = mk(64);
-      apply_limit_override(b, o); assert(b[id].value == 64); }
+      b.apply_overrides(o); assert(b[id].value == 64); }
     // a `!`-pinned conf value ignores the override entirely
     { jaillimits b, o; b[id] = mk(64, true); o[id] = mk(10);
-      apply_limit_override(b, o); assert(b[id].value == 64); }
-    // unlimited = +infinity: conf-unlimited is tightened by a finite cmdline,
-    // but a cmdline `unlimited` can never loosen a finite conf value
+      b.apply_overrides(o); assert(b[id].value == 64); }
+    // unlimited = +infinity: a hard conf-unlimited is tightened by a finite
+    // cmdline, but a cmdline `unlimited` can never loosen a finite hard value
     { jaillimits b, o; b[id] = mk(0, false, false, true); o[id] = mk(10);
-      apply_limit_override(b, o); assert(!b[id].unlimited && b[id].value == 10); }
+      b.apply_overrides(o); assert(!b[id].unlimited && b[id].value == 10); }
     { jaillimits b, o; b[id] = mk(10); o[id] = mk(0, false, false, true);
-      apply_limit_override(b, o); assert(!b[id].unlimited && b[id].value == 10); }
-    // hard beats soft (cmdline can tighten soft->hard, but not loosen hard->soft)
-    { jaillimits b, o; b[id] = mk(10, false, true); o[id] = mk(10);
-      apply_limit_override(b, o); assert(!b[id].soft); }
-    { jaillimits b, o; b[id] = mk(10); o[id] = mk(5, false, true);
-      apply_limit_override(b, o); assert(b[id].value == 5 && !b[id].soft); }
-    { jaillimits b, o; b[id] = mk(10, false, true); o[id] = mk(5, false, true);
-      apply_limit_override(b, o); assert(b[id].value == 5 && b[id].soft); }
+      b.apply_overrides(o); assert(!b[id].unlimited && b[id].value == 10); }
+    // a SOFT conf limit is a default, not a floor: the command line replaces it
+    // outright -- any value, looser OR tighter; soft only if the override is
+    { jaillimits b, o; b[id] = mk(10, false, true); o[id] = mk(20);          // looser override wins
+      b.apply_overrides(o); assert(b[id].set && b[id].value == 20 && !b[id].soft); }
+    { jaillimits b, o; b[id] = mk(10, false, true); o[id] = mk(5);           // tighter override wins
+      b.apply_overrides(o); assert(b[id].value == 5 && !b[id].soft); }
+    { jaillimits b, o; b[id] = mk(10, false, true); o[id] = mk(5, false, true);  // soft override stays soft
+      b.apply_overrides(o); assert(b[id].value == 5 && b[id].soft); }
+    // a soft conf limit the command line does not mention is left untouched
+    { jaillimits b, o; b[id] = mk(10, false, true);
+      b.apply_overrides(o); assert(b[id].set && b[id].value == 10 && b[id].soft); }
 }
 
 void test_path_absolute() {

@@ -1,20 +1,39 @@
 # pa-jail hardening design
 
 Status: living document — original audit + plan, with completed items marked.
-Parts of Phase 1 have landed (supplementary-group drop, `no_new_privs`, the
-`snprintf` fix). The config parser is extracted and unit-tested; it parses the
-resource-limit (`limit`/cgroup) directives, the `memory.*` names, and the pool
-config (`cgroupbase`, `[cgroup PATH]`, `pool_limits`) — §6.3, §6.5. At run time
-pa-jail builds the cgroup hierarchy from config: each jail's leaf lives under the
-pool named by its `cgroupbase` (default `/sys/fs/cgroup/pa-jail`, `$SELF`-relative
-forms resolved against `/proc/self/cgroup`), the pool carries the aggregate
-`pool_limits`, and `pids.max`/`cpu.max`/`memory.max`/`memory.high` are enforced on
-both leaf and pool. The per-process `rlimit.*` limits (`rlimit.cpu`/`as`/`fsize`/
-`nofile`/`core`/`nproc`) are applied via `setrlimit` in the child just before the
-final privilege drop. End-to-end runtime tests (`make check-jail-docker`) cover
-the per-jail cgroup cap, the shared-pool cap, and the rlimits. **Picking back
-up:** the one remaining "Next" item is the `--limit` command-line override — see
-the end of §6.5. Updated 2026-06.
+
+**Current setup (2026-06).** The config parser is extracted and unit-tested
+(`pa-jailconf`, `make check`); the privileged runtime has an end-to-end driver
+(`test-pa-jail`, `make check-jail-docker`, also runnable with `PA_HAVE_CGROUP=0`
+to exercise the no-cgroup-support path). What's landed:
+
+- **Resource limits — complete.** One `limit NAME=VALUE,…` grammar drives three
+  mechanisms, named by the real kernel name (§6.3): per-jail **cgroup v2**
+  (`pids.max`, `cpu.max`, `memory.max`, `memory.high`, `memory.swap.max`), applied
+  on both a per-run leaf and a shared **pool** (`cgroupbase` + `[cgroup PATH]`,
+  composing as `min(leaf, pool)`); per-process **rlimit** (`rlimit.cpu`/`as`/
+  `fsize`/`nofile`/`core`/`nproc`) via `setrlimit`; and the non-cgroup/non-rlimit
+  **`tmpfs.size`** (a `size=` cap on the jail's `/tmp`). A `!` suffix **pins**,
+  `?` makes a limit **soft** (best-effort: dropped with a warning rather than
+  dying when it can't be enforced); a byte limit may be **`NN%`** of RAM
+  (auto-scales to the VM/host or container budget). pa-jail **ships built-in
+  default limits** (soft, seeded under the config so any directive overrides and
+  `unset` drops them): per-jail `pids.max`/`tmpfs.size`/`rlimit.core`, plus a
+  pool-aggregate `memory.*=NN%` budget (§6.6). Via `-l/--limit` the caller may
+  **tighten** a hard conf limit (never loosen it) and **freely replace** a soft
+  default (§6.4).
+- **Namespaces / mounts.** `CLONE_NEWIPC|NEWNS|NEWPID` always; the jail's own
+  mounts are hard-coded `nosuid`/`nodev`/(`noexec` except `/tmp`,`/dev/pts`)
+  regardless of host config (§3.4). Opt-in **`--userns`** (§5.10) runs the student
+  in a user namespace, identity-mapped to its non-root uid (jail-root → host
+  `nobody`), with all capabilities dropped.
+- **Privilege model (unchanged core).** setuid-root → gid-before-uid drop →
+  `setgroups(0)` → `no_new_privs` → `pivot_root` → permanent drop before `execve`;
+  the supervisor drops to the caller (no lingering root for student I/O).
+
+**Next:** Phase 2 (`CLONE_NEWNET` loopback-only, then seccomp); smaller follow-ons
+in §5. The one design item still open in §6 is shipping the actual **default soft
+limit values** (§6.6).
 Author: (generated audit + plan)
 Scope: `jail/pa-jail.cc`, `jail/GNUmakefile`, `/etc/pa-jail.conf`, and the
 invocation path in `src/queueitem.php` + `src/psetconfig.php`.
@@ -100,8 +119,9 @@ What it does today for a run:
    device-node access) plus `nosuid` as defense-in-depth with `no_new_privs`.
    Still missing: read-only mounts where compatible. (The tmpfs `size=` cap is
    now done — the `tmpfs.size` limit, §6.3.)
-5. **No capability bounding-set / ambient drop**, and **no `mknod` allowlist**
-   (arbitrary device major/minor from the manifest).
+5. **No *unconditional* capability bounding-set / ambient drop** (the caps are
+   dropped under `--userns`, §5.10, but not yet on the default path). The `mknod`
+   allowlist is now in place (item 11 below).
 6. **No `CLONE_NEWUSER`** — setup runs as real host root; "root in the jail" is
    real root.
 7. ✅ **Done — tmpfs size cap.** The `tmpfs.size` limit (§6.3) sets `size=` on the
@@ -167,15 +187,37 @@ cgroup setup (which is set up by the parent before/around `clone`).
 8. **seccomp-bpf filter** installed after `no_new_privs`, before `execve`,
    fail-closed. Start from a denylist of dangerous/unnecessary syscalls, then
    tighten toward an allowlist once real workloads are profiled.
-9. **Capability bounding-set + ambient clear** (`PR_CAPBSET_DROP` loop, clear
-   ambient) as defense-in-depth around the uid drop.
+9. ◐ **Done in the `--userns` path** (`cap_drop_all`: `capset` to empty
+   effective/permitted/inheritable, `PR_CAP_AMBIENT_CLEAR_ALL`, `PR_CAPBSET_DROP`
+   loop). Still to do: apply it **unconditionally** (not just under `--userns`) as
+   defense-in-depth around every uid drop.
 
 ### Phase 3 — structural
 
-10. **`CLONE_NEWUSER`** so jail-root maps to an unprivileged host uid (large
-    refactor; interacts with the setuid model and mount setup — do last).
-11. **`mknod` device allowlist** (`null`, `zero`, `full`, `random`, `urandom`,
-    `tty`, `ptmx` only).
+10. ◐ **Opt-in `CLONE_NEWUSER` done** (`pa-jail run --userns`). Just before
+    `execve`, the student (already dropped to its non-root uid) `unshare`s a user
+    namespace and writes an **identity** uid/gid map (so it keeps its own non-root
+    uid); jail-root (uid 0) is left unmapped, resolving to the host overflow uid
+    (`nobody`), so an in-jail escalation to uid 0 gains nothing on the host. The
+    namespace creator gets a full capability set, so all capabilities are then
+    dropped (effective/permitted/inheritable via `capset`, ambient, and the
+    bounding set — this is item 9, in this path). `PR_SET_DUMPABLE(1)` is needed so
+    the uid-changed process can write its own `uid_map`. Opt-in and fail-closed: a
+    kernel without unprivileged userns makes `--userns` die rather than silently
+    run without it. The setup/mounts still run as real root (not student-influenced
+    — that's the larger "rootless setup" refactor, deferred). Verified in
+    `test-pa-jail`'s `userns` test (restricted map + empty `CapBnd`).
+11. ✅ **Done — `mknod` device allowlist.** `do_copy` (`pa-jail.cc`) now refuses to
+    create any device node from the manifest whose major:minor is not on a fixed
+    allowlist — `null` (1:3), `zero` (1:5), `full` (1:7), `random` (1:8), `urandom`
+    (1:9), `tty` (5:0), `ptmx` (5:2); no block device is ever allowed. The check is
+    by major:minor (the actual kernel-driver authority, not the manifest path) and
+    runs before the pre-existing-match fast path, so a disallowed node is rejected
+    even if it already sits in the jail. Rationale: `mknod` wields the setuid
+    binary's root authority and a device node is a live channel to its driver, so
+    installing an arbitrary manifest-named node (`/dev/mem`, a raw disk) would hand
+    jailed code a kernel-level capability. Verified in `test-pa-jail`'s `dev` test
+    (char 1:1 refused, command never runs; `/dev/null` permitted and usable).
 12. ✅ **Done — tightened `permdir` trust.** The `jaildirinfo` path walk now
     ownership-checks the final jail-root target (root-owned, not group/other-
     writable) for the creating/running actions even when it pre-exists at/below
@@ -184,10 +226,12 @@ cgroup setup (which is set up by the parent before/around `clone`).
     binary or swap the tree.
 13. `CLONE_NEWUTS`; consider `hidepid=2` on the proc mount.
 
-Phase 1 items 1–4, 6, and 7, and Phase 3 item 12, have landed, as has item 5
-(mount-flag hardening + the tmpfs `size=` cap; only optional read-only mounts
-remain). The next gap before trusting this with adversarial untrusted code on a
-shared host is Phase 2 (network namespace, seccomp).
+Phase 1 items 1–7, Phase 3 item 12, and (opt-in) Phase 3 item 10 have landed;
+item 9's capability drop is done within the `--userns` path. The next gap before
+trusting this with adversarial untrusted code on a shared host is Phase 2
+(network namespace, seccomp); smaller follow-ons are making item 9 unconditional,
+making `--userns` default-on once verified on the grading hosts, and the larger
+"rootless setup" refactor (item 10's design B).
 
 ## 6. Resource-limit configuration
 
@@ -344,11 +388,15 @@ default is overridden by a later matching section or two-arg directive.
 `k`/`m`/`g` (1024-based) for byte limits; `s`/`m`/`h` for cumulative-time limits;
 plain integer for counts; for a CPU *rate* (`cpu.max`), a decimal in cores
 (`1.5`) or a percentage of one core (`150%`), stored internally as millicores
-(1000 = one core). Two suffix flags follow the value, in either order and
-combinable (`pids.max=512!?`): `!` **pins** it (the command line cannot loosen or
-override it, see 6.4); `?` makes it **soft** (see 6.6). A malformed value, or an
-unknown limit name, is fatal (`die`) — a limit never silently degrades to
-"unlimited".
+(1000 = one core). A **byte** limit may instead be a **`NN%`** — a percentage
+(≤100) of total RAM, e.g. `memory.max=85%` — which the *parser* leaves unresolved
+(`jaillimit::percent`, since it has no host access) and the runtime multiplies out
+against `host_mem_bytes()` = `min(physical RAM, memory.max of pa-jail's cgroup)` —
+i.e. the VM/machine RAM, or the container's budget when cgroup-capped (§6.6). Two
+suffix flags follow the value, in either order and combinable (`pids.max=512!?`):
+`!` **pins** it (the command line cannot loosen or override it, see 6.4); `?`
+makes it **soft** (see 6.6). A malformed value, an over-100 `%`, or an unknown
+limit name is fatal (`die`) — a limit never silently degrades to "unlimited".
 
 **Soft (`?`) limits.** A soft limit is best-effort: if it cannot be *enforced* —
 no cgroup support in the build, an undelegated controller, a failed cgroup
@@ -442,8 +490,8 @@ caller can only tighten them, never loosen them.
 
 ### 6.4 Command-line override
 
-*(Status: **implemented.** `pa-jail run -l/--limit` (parsing + the tighten-only
-combination in `parse_limit_override`/`apply_limit_override`, `pa-jailconf`);
+*(Status: **implemented.** `pa-jail run -l/--limit` (parsing in
+`pajailconf::parse_limits` + `jaillimits::apply_overrides`, `pa-jailconf`);
 unit-tested in `test_limit_override` and end-to-end in `test-pa-jail`'s `limit`
 test.)*
 
@@ -452,16 +500,28 @@ test.)*
 ```
 
 Repeatable; later wins. The effective limit per name resolves as
-global-default -> matching-section -> `--limit`, **but the command line may only
-make a limit more restrictive, never looser**: when a conf value exists, the
-applied value is `min(conf, cmdline)` (treating `unlimited` as +inf), and the
-enforcement is the stricter of the two (a soft conf limit can be tightened to
-hard, but a hard one can't be loosened to soft). A `!`-pinned conf value ignores
-the command line entirely. If neither conf nor command line sets a name, that
-limit is left at its inherited value, so the feature is opt-in. A `--limit` name
-the conf didn't set is *introduced* (tightening from the inherited default); it
-takes effect only if the cgroup controller it needs is already delegated (the
-flag tightens at run time and does not re-run `init`).
+global-default -> matching-section -> `--limit`, and **what the command line may
+do depends on how the conf set the limit** — the key distinction is hard vs.
+**soft**:
+
+- A **hard** conf limit (no `?`) is a deliberate cap, so the command line may only
+  make it **more restrictive, never looser**: the applied value is `min(conf,
+  cmdline)` (treating `unlimited` as +inf). A looser `--limit` is ignored. The
+  conf's hard enforcement is kept (a `--limit …?` can lower the value but can't
+  relax a hard limit to soft).
+- A **soft** conf limit (`?`) is just a *default* (§6.6), not a floor, so the
+  command line **replaces it outright** — any value, looser or tighter, and soft
+  only if the override itself is. (To drop a soft default entirely, override it to
+  `unlimited`; a literal command-line `unset` is not yet wired up.)
+- A `!`-**pinned** conf value ignores the command line entirely, soft or hard.
+- A name the conf left **unset** is *introduced* from the command line (the feature
+  stays opt-in where neither sets it). An introduced/tightened cgroup limit takes
+  effect only if the controller it needs is already delegated (the flag tightens at
+  run time and does not re-run `init`).
+
+This keeps the security-relevant guarantee intact — a *hard* limit can never be
+loosened by the caller — while letting the caller freely retune the generous soft
+defaults for a particular run.
 
 ### 6.5 Implementation (now in `pa-jailconf`)
 
@@ -524,7 +584,7 @@ Implemented since (cgroup application — `pa-jail.cc`):
   reaches into the pivoted jail (the supervisor and `exec_go` are untouched).
   Each jail's leaf lives under the **pool named by its `cgroupbase`** (default
   `/sys/fs/cgroup/pa-jail`); the pool is created once, left in place, and carries
-  the aggregate `pool_limits` shared by its jails, with each run getting its own
+  the aggregate pool limits shared by its jails, with each run getting its own
   leaf `<pool>/<pid>`. `cgroup_setup` delegates the needed controllers down the
   chain — into the pool parent's `subtree_control` (a no-op on systemd hosts,
   which already delegate `cpu`/`pids` at the root) and then into the pool's — and
@@ -583,10 +643,11 @@ Implemented since (pools + `rlimit.*`; parser in `pa-jailconf`, runtime in
   jaildir query *skips* (a pool's limits never leak into a jail's `limits`);
   anything else is a `[JAILPAT]` as before. A multi-word header that is neither a
   valid `[cgroup]`/`[cgroup PATH]` nor a single `[JAILPAT]` is an error.
-- **`pajailconf::pool_limits(PATH)`** returns a pool's resolved limits — the union
-  of `limit` directives in bare `[cgroup]` sections (every pool) and `[cgroup P]`
-  sections whose `P` *literally* equals `PATH` (the same string `cgroupbase`
-  carries, `$SELF` included), overlaid in file order (last write wins per name).
+- **`pajailconf::parse_pool(PATH, limits&)`** overlays a pool's configured limits
+  onto `limits` in place — the `limit` directives in bare `[cgroup]` sections
+  (every pool) and `[cgroup P]` sections whose `P` *literally* equals `PATH` (the
+  same string `cgroupbase` carries, `$SELF` included), in file order (last write
+  wins per name). The caller pre-seeds `limits` with the built-in pool defaults.
   Pool `limit`s take only the no-JDIR form.
 - **`rlimit.*` limit names** (`rlimit.cpu`/`as`/`fsize`/`nofile`/`core`/`nproc`),
   per-process, applied with `setrlimit` in the child before the final privilege
@@ -668,8 +729,8 @@ Done — cgroup pools (`cgroup_setup`, `pa-jail.cc`):
   generalized unchanged.
 - **All four cgroup limits applied** on both leaf and pool via a table-driven
   `cgroup_write_limits` (`cgroup_limit_infos[]` maps id → controller + file), and
-  `memory` joins the delegated set when any `memory.*` limit is set. `pool_limits`
-  is written onto the pool, so per-jail and pool caps compose as
+  `memory` joins the delegated set when any `memory.*` limit is set. The pool
+  limits are written onto the pool, so per-jail and pool caps compose as
   `min(leaf, pool, …)`. Verified by `--dry-run --verbose` (exact command sequence
   for default / literal / `$SELF` bases + path validation) and a live
   `--privileged` container (pool `pids.max=200` + leaf `pids.max=15` both created
@@ -729,14 +790,67 @@ non-rlimit `tmpfs.size` for the `/tmp` tmpfs total (the RAM-fill guard).
 `rlimit.cpu`/`rlimit.nproc` stay available but are largely redundant here (the
 supervisor wall-clock timeout and `pids.max` respectively).
 
-**Soft defaults (planned use of `?`).** To ship sensible default limits without
-imposing the cgroup deployment requirement on every host, express them as **soft**
-(§6.3): a default `pids.max`/`memory.max` marked `?` enforces where cgroups are
-available and is silently dropped where they aren't, while `rlimit.core=0` is a
-cheap always-on default that needs no cgroups. An operator's explicit limit is
-hard and still fails closed. The soft mechanism is implemented; wiring up the
-actual default values (a shipped recommended `/etc/pa-jail.conf`, or built-in
-soft defaults) is the remaining step.
+**Built-in default limits.** pa-jail **ships** a set of default limits in the
+binary, so a host is safe out of the box with no config. They live as a mini
+pa-jail.conf string (`default_limits_conf` in `pa-jail.cc`) parsed by the **same**
+`parse()` / `parse_pool()` machinery as the real config — the top-level `limit` is
+the per-jail leaf default (`parse()` picks it up and skips the `[cgroup]`
+section); the bare `[cgroup]` section is the shared-pool default (`parse_pool()`
+picks it up):
+
+```
+limit pids.max=1024?,tmpfs.size=512m?,rlimit.core=0?
+[cgroup]
+limit memory.high=70%?,memory.max=85%?,memory.swap.max=0?
+```
+
+The defaults are parsed *first*, so the real config overlays them: a `limit
+NAME=VALUE` directive overrides one and `limit NAME=unset` drops it. All are
+**soft** (`?`), so they enforce where the mechanism exists and quietly don't where
+it doesn't. The design rule is *stop the catastrophe, never bound legit grading
+work* — so err generous.
+
+The **leaf vs pool split is deliberate**, and follows directly from what a `%`
+means (§6.3): a percentage is a slice of one fixed total (RAM), so the thing that
+must sum to ≤ that total is the *aggregate* across concurrent jails — exactly what
+a **pool** `memory.max` caps (cgroup v2 bounds the sum of a parent's children). A
+per-jail-leaf `memory.max=85%` would let `C` concurrent jails reach `C×85%` and
+OOM the host; pa-jail can't know `C`, but the pool form is correct for any
+concurrency. So the **memory `%` budget lives on the pool**, while the per-jail
+caps (fork-bomb `pids.max`, `/tmp` `tmpfs.size`, `rlimit.core`) live on the leaf.
+The leaf carries **no** memory default — a single jail may use up to the whole
+pool, and `min(leaf, pool)` still bounds the host. (Caveat: an operator running
+*multiple* pools must split the `%` — two `85%` pools = 170%.)
+
+- **`pids.max=1024`** (leaf) — the single most important (fork bombs); ~5–20× any
+  real build's peak. Drop to 256–512 for tighter.
+- **`memory.high=70%` + `memory.max=85%`** (pool) — `%`-of-RAM **auto-scales** to
+  the VM/host (or the container's cgroup budget) with no per-host editing; `high`
+  throttles (reclaim) before `max` kills, so a brief spike slows instead of being
+  OOM-killed (a *correct* submission OOM-killed is a false failure).
+  `memory.swap.max=0` makes `max` a true RAM cap (no swap-thrash).
+- **`tmpfs.size=512m`** (leaf) — bounds the `/tmp` tmpfs RAM-fill (only bites when
+  `/tmp` is a tmpfs). Can also be `NN%`.
+- **`rlimit.core=0`** (leaf) — pure upside; no giant core files, and works with no
+  cgroups.
+
+Deliberately *not* defaulted: `cpu.max` (slows builds; the supervisor timeout
+already kills runaway CPU — leave it an opt-in fairness knob), `rlimit.as` (caps
+virtual not resident memory; breaks JITs/sanitizers), `rlimit.cpu`/`rlimit.nproc`
+(redundant with the timeout and `pids.max`), `rlimit.nofile` (system default is
+usually fine; lowering breaks large links), `rlimit.fsize` (only a per-file cap —
+weak disk guard, real risk of clipping legit output).
+
+*(Status: **implemented** — `default_conf().parse(perm)` seeds the leaf defaults
+before the real `parse` (`jaildirinfo` ctor and the `init` path), and
+`default_conf().parse_pool(...)` seeds the pool defaults before the real
+`parse_pool` (`cgroup_setup`/`cgroup_init`); tested in `test-pa-jail`
+(`test_default_limits`: the `tmpfs.size=512m` default
+applies with no config and a `limit tmpfs.size=unset` drops it). Note: because
+the defaults add soft cgroup limits to every run, a host with cgroup v2 present
+but **not** delegated to pa-jail's pool will print per-limit "soft … not set"
+warnings until `pa-jail init` sets up delegation; gating those warnings behind
+`-q` is a possible follow-up.)*
 
 ## 7. `shell_quote` note
 

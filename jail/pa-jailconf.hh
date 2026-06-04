@@ -9,7 +9,7 @@
 #include <string_view>
 #include <stdexcept>
 
-// Thrown by `pajailconf` (its constructors, `parse`, and `pool_limits`) on any
+// Thrown by `pajailconf` (its constructors, `parse`, and `parse_pool`) on any
 // configuration error: a malformed directive or limit value, an unknown limit
 // name, or an unreadable/oversize/non-root-owned config file. `lineno` is the
 // 1-based config line the error is attributed to, or 0 for file-level errors
@@ -116,13 +116,17 @@ struct jaillimitinfo {
 // this limit cannot be *enforced* (no cgroup support, an undelegated controller,
 // an unavailable rlimit), the run proceeds without it instead of failing -- the
 // mechanism behind default limits (see HARDENING.md 6.6). The two are orthogonal
-// and combine (`64!?`). The unit of `value` is per-limit (see the `jaillimit_id`
-// comments).
+// and combine (`64!?`). `percent` (a `%` suffix, byte limits only) means `value`
+// is a percentage of total RAM, not bytes -- the *parser* leaves it unresolved
+// (it has no host access); the runtime multiplies it by introspected memory (see
+// `host_mem_bytes`, pa-jail.cc) before use. The unit of `value` is per-limit (see
+// the `jaillimit_id` comments).
 struct jaillimit {
     bool set = false;
     bool unlimited = false;
     bool pinned = false;
     bool soft = false;
+    bool percent = false;
     unsigned long long value = 0;
 };
 
@@ -130,11 +134,12 @@ struct jaillimits {
     jaillimit l[JLIMIT_COUNT];
     const jaillimit& operator[](int i) const { return l[i]; }
     jaillimit& operator[](int i) { return l[i]; }
+    void apply_overrides(const jaillimits& overrides);
 };
 
 // The pool cgroup a jail's per-run leaf is created under, named by `cgroupbase`
 // (default below) and joined *literally* against `[cgroup PATH]` sections (see
-// `pajailconf::pool_limits`); a `$SELF`-relative form is stored verbatim and
+// `pajailconf::parse_pool`); a `$SELF`-relative form is stored verbatim and
 // expanded only at apply time.
 inline constexpr char default_cgroupbase[] = "/sys/fs/cgroup/pa-jail";
 
@@ -185,12 +190,16 @@ struct pajailconf {
 
     void parse(jailperm&) const;
 
-    // Resolved limits of the pool cgroup `path` -- the union of the `limit`
-    // directives in `[cgroup]` sections (which apply to every pool) and
-    // `[cgroup PATH]` sections whose PATH literally equals `path` (the same
-    // string a jail's `cgroupbase` carries), overlaid in file order (last write
-    // wins per name). Cgroup-controller limits only.
-    jaillimits pool_limits(std::string_view path) const;
+    // Overlay the pool cgroup `path`'s configured limits onto `limits`, in place:
+    // the `limit` directives in `[cgroup]` sections (which apply to every pool) and
+    // `[cgroup PATH]` sections whose PATH literally equals `path` (the same string
+    // a jail's `cgroupbase` carries), in file order (last write wins per name; a
+    // config `unset` clears the entry). The caller pre-seeds `limits` with any
+    // built-in defaults, which the config thus overrides. Cgroup-controller limits
+    // only.
+    void parse_pool(jaillimits& limits, std::string_view path) const;
+
+    static void parse_limits(jaillimits& limits, std::string_view str);
 
     inline jailperm get(std::string dir, std::string skeletondir = std::string()) const {
         jailperm perm(std::move(dir), std::move(skeletondir));
@@ -202,17 +211,3 @@ private:
     char buf_[8192];
     size_t len_;
 };
-
-// Parse a `--limit` command-line value (`NAME=VALUE[,NAME=VALUE...]`, same grammar
-// as a conf `limit` directive) into `out`, overlaying like the conf does (so
-// repeated `--limit` flags accumulate, last write wins per name). Throws
-// `pajailconf_error` on a malformed item or unknown limit name.
-void parse_limit_override(std::string_view limits, jaillimits& out);
-
-// Fold a command-line override `over` into the conf-resolved limits `base`, in
-// place. The command line may only *tighten*: per name, a `!`-pinned conf value
-// ignores the override; otherwise the result is the more restrictive of the two
-// (smaller value, `unlimited` = +infinity, and hard if either side is hard --
-// soft only if both are). A name set only on the command line is introduced
-// (tightening from the inherited/unlimited default). See HARDENING.md 6.4.
-void apply_limit_override(jaillimits& base, const jaillimits& over);

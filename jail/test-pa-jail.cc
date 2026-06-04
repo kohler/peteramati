@@ -130,6 +130,7 @@ struct jail_run {
     std::string setup;                  // extra shell run before pa-jail (e.g. build a helper)
     std::string limit;                  // `--limit` argument (empty = none)
     bool cgroup_prep = false;           // delegate cgroup controllers first
+    bool userns = false;                // pass `--userns`
 };
 
 // The pa-jail binary's path (in the image, or locally).
@@ -145,6 +146,9 @@ static std::string pajail_command(const jail_run& jr) {
     }
     if (!jr.limit.empty()) {
         c += " --limit " + shq(jr.limit);
+    }
+    if (jr.userns) {
+        c += " --userns";
     }
     return c + " --fg " + shq(jr.jaildir) + " pajtest " + shq(jr.command);
 }
@@ -288,7 +292,90 @@ static void test_tmpfs_size() {
         fprintf(stderr, "test-pa-jail: tmpfs FAILED: size cap wrong (see above)\n");
         exit(1);
     }
-    printf("test-pa-jail: tmpfs ok (cap 8m, --limit tightens to 4m, can't loosen to 16m)\n");
+
+    // a `NN%`-of-RAM value resolves to a real chunk of memory (not the literal 10)
+    jr.conf = "enablejail /jails/**\n[/jails/**]\nlimit tmpfs.size=10%\n";
+    jr.limit = "";
+    auto [pout, pcode] = run_jail(jr);
+    size_t sp = pout.find("size=");
+    long ksz = sp == std::string::npos ? -1 : atol(pout.c_str() + sp + 5);
+    if (ksz < 1024 || verbose || pa_verbose) {
+        fprintf(stderr, "[tmpfs 10%%] exit=%d ksz=%ldk, /tmp=%s", pcode, ksz, pout.c_str());
+    }
+    if (ksz < 1024) {
+        fprintf(stderr, "test-pa-jail: tmpfs FAILED: tmpfs.size=10%% did not resolve to RAM%%\n");
+        exit(1);
+    }
+    printf("test-pa-jail: tmpfs ok (cap 8m; --limit tightens 4m, holds vs 16m; 10%%->%ldk)\n", ksz);
+}
+
+// pa-jail will only create a device node whose major:minor is on its allowlist.
+// A manifest entry naming a dangerous node (here char 1:1 = /dev/mem) is refused
+// before the jail runs; an allowed node (/dev/null, char 1:3) is installed and
+// usable. mknod runs with root authority, so this is what stops a manifest from
+// minting a kernel-level capability inside the jail.
+static void test_dev_allowlist() {
+    // disallowed: a char 1:1 (/dev/mem) node staged at /badnode, in the manifest
+    jail_run jr;
+    jr.conf = "enablejail /jails/**\n";
+    jr.user_shell = "/bin/sh";
+    jr.manifest = shell_manifest("/bin/sh");
+    jr.manifest.push_back("/badnode");
+    jr.jaildir = "/jails/dev";
+    jr.setup = "rm -f /badnode; mknod /badnode c 1 1\n";
+    jr.command = "echo should-not-run";
+    auto [out, code] = run_jail(jr);
+    bool refused = out.find("not permitted in jail") != std::string::npos
+        && out.find("should-not-run") == std::string::npos;
+    if (!refused || verbose || pa_verbose) {
+        fprintf(stderr, "[dev] disallowed node: exit=%d, output:\n%s\n", code, out.c_str());
+    }
+    if (!refused) {
+        fprintf(stderr, "test-pa-jail: dev FAILED: a disallowed device node was not refused\n");
+        exit(1);
+    }
+
+    // allowed: /dev/null (char 1:3) is installed and writable inside the jail
+    jail_run jr2;
+    jr2.conf = "enablejail /jails/**\n";
+    jr2.user_shell = "/bin/sh";
+    jr2.manifest = shell_manifest("/bin/sh");
+    jr2.manifest.push_back("/dev/null");
+    jr2.jaildir = "/jails/dev2";
+    jr2.command = "echo discard > /dev/null && echo null-ok";
+    expect_output("dev", jr2, "null-ok");
+    printf("test-pa-jail: dev ok (allowlist refuses /dev/mem, permits /dev/null)\n");
+}
+
+// Built-in defaults ship in the binary: a jail that sets no `limit` still gets
+// them. Observed via the leaf `tmpfs.size` default (512m), which a config `unset`
+// then drops -- proving the defaults are real and overridable. (The override case
+// is covered by test_tmpfs_size, whose conf 8m beats the 512m default.)
+static void test_default_limits() {
+    jail_run jr;
+    jr.user_shell = "/bin/sh";
+    jr.manifest = shell_manifest("/bin/sh");
+    jr.jaildir = "/jails/defaults";
+    jr.setup = "mount -t tmpfs -o rw tmpfs /tmp\n";
+    jr.command = "while read d m t o r; do case \"$m\" in /tmp) echo \"$o\";; esac; done < /proc/mounts";
+
+    jr.conf = "enablejail /jails/**\n";                 // no `limit` -> defaults apply
+    auto [out, code] = run_jail(jr);
+    bool applied = out.find("size=524288k") != std::string::npos;   // tmpfs.size=512m
+
+    jr.conf = "enablejail /jails/**\n[/jails/**]\nlimit tmpfs.size=unset\n";   // drop it
+    auto [uout, ucode] = run_jail(jr);
+    bool dropped = uout.find("size=") == std::string::npos;
+
+    if (!applied || !dropped || verbose || pa_verbose) {
+        fprintf(stderr, "[defaults] applied=%d dropped=%d\n  default: %s  unset: %s",
+                applied, dropped, out.c_str(), uout.c_str());
+    }
+    if (!applied || !dropped) {
+        fprintf(stderr, "test-pa-jail: defaults FAILED (built-in default limits)\n");
+        exit(1);
+    }
+    printf("test-pa-jail: defaults ok (built-in tmpfs.size=512m applies, `unset` drops it)\n");
 }
 
 // A pa-jail built without cgroup support must fail closed on a hard cgroup limit:
@@ -534,6 +621,36 @@ static void test_limit() {
            tight, loose);
 }
 
+// `--userns` runs the student in a user namespace: it keeps its own non-root uid
+// (identity-mapped), jail-root (uid 0) is unmapped (so `/proc/self/uid_map` is the
+// restricted single-line map, not the full `0 0 4294967295`), and all capabilities
+// are dropped (`CapBnd` is empty).
+static void test_userns() {
+    jail_run jr;
+    jr.conf = "enablejail /jails/**\n";
+    jr.user_shell = "/bin/sh";
+    jr.manifest = shell_manifest("/bin/sh");
+    jr.jaildir = "/jails/userns";
+    jr.userns = true;
+    jr.command =
+        "read m < /proc/self/uid_map; echo \"map:$m\"; "
+        "while read k v; do case \"$k\" in CapBnd:) echo \"bnd:$v\";; esac; done < /proc/self/status; "
+        "echo userns-ran";
+    auto [out, code] = run_jail(jr);
+    bool ran = out.find("userns-ran") != std::string::npos;
+    bool restricted = out.find("4294967295") == std::string::npos;   // not the full map
+    bool nocaps = out.find("bnd:0000000000000000") != std::string::npos;
+    if (!ran || !restricted || !nocaps || verbose || pa_verbose) {
+        fprintf(stderr, "[userns] exit=%d, output:\n%s\n", code, out.c_str());
+    }
+    if (!ran || !restricted || !nocaps) {
+        fprintf(stderr, "test-pa-jail: userns FAILED: ran=%d restricted-map=%d caps-dropped=%d\n",
+                ran, restricted, nocaps);
+        exit(1);
+    }
+    printf("test-pa-jail: userns ok (identity-mapped non-root, jail-root unmapped, caps dropped)\n");
+}
+
 // True if a running container is using `image` -- i.e. another test-pa-jail run.
 static bool image_in_use(const std::string& image) {
     auto [out, code] = capture("docker ps -q --filter ancestor=" + image);
@@ -626,6 +743,9 @@ int main(int argc, char** argv) {
     test_echo();
     test_mount_flags();
     test_tmpfs_size();
+    test_dev_allowlist();
+    test_default_limits();
+    test_userns();
     test_cgroup();
     test_rlimit();
     test_forkbomb();

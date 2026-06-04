@@ -27,7 +27,7 @@ struct pajailconf_parser {
     int lineno = 0;
     std::vector<std::string_view> args;
 
-    pajailconf_parser(std::string_view confstr_)
+    pajailconf_parser(std::string_view confstr_ = std::string_view{})
         : confstr(confstr_) {
     }
     explicit constexpr operator bool() const {
@@ -45,7 +45,7 @@ struct pajailconf_parser {
     // Limit parsing, with errors attributed to the current line. When
     // `cgroup_only`, a non-cgroup (`rlimit.*`) name is an error -- pools are
     // cgroup-only.
-    void parse_limits(std::string_view limits, jaillimits& out,
+    void parse_limits(jaillimits& out, std::string_view limits,
                       bool cgroup_only = false) const;
     unsigned long long parse_limit_value(int unit, std::string_view s, bool& unlimited) const;
     unsigned long long parse_uint(std::string_view s) const;
@@ -281,7 +281,7 @@ unsigned long long pajailconf_parser::parse_limit_value(int unit, std::string_vi
 // Parse a `NAME=VALUE[,NAME=VALUE...]` list, overlaying each named limit onto
 // `out` (last write wins). Trailing `!` (pin) and `?` (soft) value flags are
 // honored, in any order. Throws on a malformed item or an unknown limit name.
-void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out,
+void pajailconf_parser::parse_limits(jaillimits& out, std::string_view limits,
                                      bool cgroup_only) const {
     while (!limits.empty()) {
         size_t comma = limits.find(',');
@@ -308,7 +308,7 @@ void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out,
             if (!unset && val != "unlimited") {
                 throw error("limit: `cgroup` only accepts `unlimited` or `unset`");
             }
-            jaillimit lim{!unset, !unset, pinned, soft, 0};   // unset clears, else unlimited
+            jaillimit lim{!unset, !unset, pinned, soft, false, 0};   // unset clears, else unlimited
             for (int i = JLIMIT_CGROUP_FIRST; i != JLIMIT_CGROUP_LAST; ++i) {
                 out[i] = lim;
             }
@@ -323,12 +323,22 @@ void pajailconf_parser::parse_limits(std::string_view limits, jaillimits& out,
         }
         if (val == "unset") {
             // clear this limit (e.g. drop an inherited default)
-            out[id] = jaillimit{false, false, pinned, soft, 0};
+            out[id] = jaillimit{false, false, pinned, soft, false, 0};
             continue;
         }
-        bool unlimited = false;
-        unsigned long long v = parse_limit_value(jaillimitinfo::get(id).unit, val, unlimited);
-        out[id] = jaillimit{true, unlimited, pinned, soft, v};
+        bool unlimited = false, percent = false;
+        unsigned long long v;
+        if (jaillimitinfo::get(id).unit == UNIT_BYTES && !val.empty() && val.back() == '%') {
+            // a byte limit as a percentage of total RAM, resolved by the runtime
+            percent = true;
+            v = parse_uint(val.substr(0, val.size() - 1));
+            if (v > 100) {
+                throw error("limit: percentage `{}` exceeds 100%", val);
+            }
+        } else {
+            v = parse_limit_value(jaillimitinfo::get(id).unit, val, unlimited);
+        }
+        out[id] = jaillimit{true, unlimited, pinned, soft, percent, v};
     }
 }
 
@@ -433,7 +443,7 @@ void pajailconf::parse(jailperm& perm) const {
             }
             if (parser.args.size() == 2
                 || pathmatch(resolve_dir_pattern(parser.args[1]), perm.dir)) {
-                parser.parse_limits(parser.args.back(), perm.limits);
+                parser.parse_limits(perm.limits, parser.args.back());
             }
             continue;
         }
@@ -505,8 +515,7 @@ void pajailconf::parse(jailperm& perm) const {
         && perm.skeletondir.ends_with('/');
 }
 
-jaillimits pajailconf::pool_limits(std::string_view path) const {
-    jaillimits limits;
+void pajailconf::parse_pool(jaillimits& limits, std::string_view path) const {
     bool in_pool = false;       // inside a `[cgroup]`/`[cgroup PATH]` for `path`
     pajailconf_parser parser({buf_, len_});
     std::vector<std::string_view> words;
@@ -539,37 +548,39 @@ jaillimits pajailconf::pool_limits(std::string_view path) const {
             if (parser.args.size() != 2) {
                 throw parser.error("Expected `limit NAME=VALUE,...` in cgroup section");
             }
-            parser.parse_limits(parser.args[1], limits, true);
+            parser.parse_limits(limits, parser.args[1], true);
         }
     }
-    return limits;
 }
 
-void parse_limit_override(std::string_view limits, jaillimits& out) {
-    pajailconf_parser parser(limits);
-    parser.parse_limits(limits, out);
+void pajailconf::parse_limits(jaillimits& limits, std::string_view str) {
+    pajailconf_parser parser;
+    parser.parse_limits(limits, str);
 }
 
-void apply_limit_override(jaillimits& base, const jaillimits& over) {
+// Fold a command-line override `over` into `*this`. The command line's reach over
+// a given limit depends on how the conf set it: a `!`-pinned conf value is
+// untouchable; a *soft* (`?`) conf limit is just a default, so the override
+// replaces it outright (any value, looser or tighter, soft only if the override
+// is); a *hard* conf limit may only be *tightened* (the smaller value, `unlimited`
+// = +infinity). A name the conf left unset is introduced from the command line.
+// See HARDENING.md 6.4.
+void jaillimits::apply_overrides(const jaillimits& over) {
     for (int id = 0; id != JLIMIT_COUNT; ++id) {
         const jaillimit& o = over[id];
-        jaillimit& b = base[id];
-        if (!o.set || b.pinned) {
-            continue;               // nothing to override, or conf pinned it
+        jaillimit& b = l[id];
+        if (!o.set
+            || b.pinned) {
+            continue;               // override silent here, or conf pinned it
         }
-        if (!b.set) {
-            b = o;                  // introduce (tighten from inherited default)
-            b.pinned = false;
-            continue;
+        if (!b.set || b.soft) {
+            // an unset limit, or a *soft* default: the override wins outright
+            b = o;                  // (a soft default is not a floor)
+        } else if (b.unlimited
+                   || (!o.unlimited && o.value < b.value)) {
+            b.unlimited = o.unlimited;       // a *hard* conf limit: tighten only
+            b.value = o.value;               // (keep the more restrictive value)
         }
-        // both set, not pinned: keep the more restrictive value (unlimited = +inf)
-        bool over_tighter = b.unlimited ? !o.unlimited
-            : (!o.unlimited && o.value < b.value);
-        if (over_tighter) {
-            b.unlimited = o.unlimited;
-            b.value = o.value;
-        }
-        b.soft = b.soft && o.soft;  // hard wins (stricter enforcement)
         b.pinned = false;
     }
 }
