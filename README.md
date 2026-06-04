@@ -8,14 +8,14 @@ Students can run test code themselves.
 
 Peteramati is named after Peter Amati, one of my most important teachers. Mr.
 Amati taught AP biology at Holliston High School, Holliston, Massachusetts. In
-the classroom, he was exacting, passionate, warm, inspirational, and fun as
-hell. -Eddie Kohler
+the classroom, he was exacting, passionate, warm, inspirational, a delight.
+-Eddie Kohler
 
 Configuration
 -------------
 
 Peteramati is configured primarily through the `psets.json` file. See
-[doc/psetsjson.md](doc/psetsjson.md) for more information.
+[devel/psetsjson.md](devel/psetsjson.md) for more information.
 
 Installation
 ------------
@@ -130,7 +130,7 @@ Installation
       create file `/etc/pa-jail.conf`, and in it, add a line saying
       `enablejail /jails/*`.
 
-    * See [doc/runners.md](https://github.com/kohler/peteramati/blob/master/doc/runners.md) for
+    * See [devel/runners.md](https://github.com/kohler/peteramati/blob/master/devel/runners.md) for
       more information about the jail layout.
 
 9. Now configure the jail contents, which are defined by a manifest that
@@ -145,7 +145,7 @@ Installation
     (it never needs to log in).
 
 11. Now create your pset configuration file, `psets.json`. For content, see
-    [the examples](https://github.com/kohler/peteramati/blob/main/doc/psetsjson.md)
+    [the examples](https://github.com/kohler/peteramati/blob/main/devel/psetsjson.md)
     and the
     [schema](https://github.com/kohler/peteramati/blob/main/etc/pa-psets.schema.json).
 
