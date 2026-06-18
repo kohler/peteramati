@@ -2736,7 +2736,7 @@ class PsetView {
         }
 
         echo '<div id="', $tabid, '" class="pa-dg pa-filediff';
-        if ($hide_left) {
+        if ($hide_left || $dinfo->file_inserted()) {
             echo " pa-hide-left";
         }
         if ($dinfo->tabwidth !== 4) {
