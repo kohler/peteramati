@@ -8,6 +8,8 @@
 @layer theme {
 :root {
 	--pa-mono-ff: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	--pa-markdown-ff: Georgia, serif;
+	--pa-markdown-fs: 112.5%;
 	--pa-diff-border: #e0e0f0;
 	--pa-diff-header-bg: #e8e8f8;
 }
