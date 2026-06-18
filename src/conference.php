@@ -2047,7 +2047,7 @@ class Conf {
         if ($this->opt("katexUrl") === "local") {
             echo $this->make_css_link("stylesheets/katex.min.css"), "\n";
         } else {
-            echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css", null, "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+");
+            echo $this->make_css_link("https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css", null, "sha384-vlBdW0r3AcZO/HboRPznQNowvexd3fY8qHOWkBi5q7KGgqJ+F48+DceybYmrVbmB");
         }
         foreach ($this->opt["stylesheets"] as $css) {
             echo $this->make_css_link($css), "\n";
@@ -2120,7 +2120,7 @@ class Conf {
         if ($this->opt("katexUrl") === "local") {
             Ht::stash_html($this->make_script_file("scripts/katex.min.js", true) . "\n");
         } else {
-            Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg" crossorigin="anonymous"></script>');
+            Ht::stash_html('<script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js" integrity="sha384-AtrdNsnxl/75rvBneBVH7DtOvCxSVahR2zWqle1coBKd8DEmLoviqNeJSx64gNAs" crossorigin="anonymous"></script>');
         }
         foreach ($this->opt["javascripts"] as $scriptfile) {
             Ht::stash_html($this->make_script_file($scriptfile, true) . "\n");
