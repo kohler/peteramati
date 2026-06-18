@@ -575,7 +575,7 @@ class Repository {
         }
         $list->merges_checked = true;
 
-        $s = $this->gitrun(["git", "log", "--cc", "--name-only", "--format=%x00%H", $this->repobranchname($branch), "--"]);
+        $s = $this->gitrun(["git", "log", "--cc", "--no-renames", "--name-only", "--format=%x00%H", $this->repobranchname($branch), "--"]);
         $p = 0;
         $l = strlen($s);
         $cr = $newcr = null;
@@ -643,11 +643,10 @@ class Repository {
         }
 
         // read log
-        $cmd = ["git", "log", "-m"];
+        $cmd = ["git", "log", "-m", "--no-renames"];
         if (($wantflags & CommitRecord::CRF_HAS_FILE_LIST) !== 0) {
             $cmd[] = "--numstat";
             $cmd[] = "-w";
-            $cmd[] = "--no-renames";
         } else {
             $cmd[] = "--name-only";
         }
@@ -1094,7 +1093,7 @@ class Repository {
      * @param int $last
      * @param list<string> $diffoptions */
     private function parse_diff($xdiffs, $first, $last, DiffContext $dctx) {
-        $command = ["git", "diff"];
+        $command = ["git", "diff", "--no-renames"];
         if ($dctx->wdiff) {
             $command[] = "-w";
         }
@@ -1196,7 +1195,7 @@ class Repository {
         }
 
         // fetch names of changed files
-        $command = ["git", "diff", "--name-only", $dctx->repo_hasha(), $dctx->repo_hashb()];
+        $command = ["git", "diff", "--no-renames", "--name-status", $dctx->repo_hasha(), $dctx->repo_hashb()];
         if ($dir) {
             array_push($command, "--", $dir);
         }
@@ -1204,10 +1203,12 @@ class Repository {
 
         $xdiffs = [];
         foreach (explode("\n", $result) as $line) {
-            if ($line == "") {
+            // `--name-status` output is `STATUS\tpath` (no renames, so one path)
+            if (($tab = strpos($line, "\t")) === false) {
                 continue;
             }
-            $file = $dctx->repo_to_pset_file($line);
+            $status = $line[0];
+            $file = $dctx->repo_to_pset_file(substr($line, $tab + 1));
             $diffconfig = $pset->find_diffconfig($file);
             // skip files presented in their entirety
             if ($diffconfig
@@ -1223,6 +1224,7 @@ class Repository {
             }
             // create diff record
             $di = new DiffInfo($file, $diffconfig, $dctx);
+            $di->mark_file_status($status);
             // decide whether file is collapsed
             if ($dctx->no_user_collapse
                 && $diffconfig

@@ -158,6 +158,17 @@ final class DiffInfo implements Iterator {
         $this->_dflags[$di] |= DiffConfig::LINE_NONL;
     }
 
+    /** @param string $status
+     * Record `git diff --name-status` status so insertion/deletion is known
+     * even for unloaded diffs, whose flags `finish()` cannot derive from content. */
+    function mark_file_status($status) {
+        if ($status === "A") {
+            $this->_flags |= DiffConfig::F_FILE_INSERTED;
+        } else if ($status === "D") {
+            $this->_flags |= DiffConfig::F_FILE_DELETED;
+        }
+    }
+
     function finish() {
         $n = $this->_diffsz;
         if ($n === 4 && str_starts_with($this->_diff[3], "B")) {
