@@ -2903,7 +2903,7 @@ class PsetView {
                     '<div class="pa-db',
                     ($bc === 3 ? "" : " pa-dw" . $bc),
                     '"', $bk, '></div>',
-                    '<div class="', $x[1], " pa-dw", $wc;
+                    '<div class="', $x[1], " pa-dw", $ac ? $wc : "0{$wc}";
             }
             $nonl = ($l[4] ?? 0) & DiffConfig::LINE_NONL;
             echo ($nonl ? ' pa-dnonl">' : '">'),
