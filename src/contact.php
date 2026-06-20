@@ -1735,4 +1735,8 @@ class Contact {
         }
         return null;
     }
+
+    function activate_database_account() {
+        error_log("Contact::activate_database_account() is unimplemented!");
+    }
 }
