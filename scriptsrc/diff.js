@@ -4,6 +4,7 @@
 
 import { ImmediatePromise } from "./utils.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui, $e } from "./ui.js";
+import { event_key } from "./ui-key.js";
 import { dropmenu } from "./dropmenu.js";
 import { hoturl } from "./hoturl.js";
 import { html_id_encode, html_id_decode } from "./encoders.js";
@@ -555,14 +556,10 @@ handle_ui.on("pa-diff-toggle-hide-comments", function (evt) {
     restore();
 });
 
-handle_ui.on("pa-filenav", function () {
-    goto_hash(this.hash);
-});
-
-handle_ui.on("pa-filenav-all", function () {
-    for (const e of this.closest("nav").querySelectorAll(".pa-filenav")) {
-        const fd = Filediff.by_href(e.href);
-        fd && fd.load().then(() => { fd.toggle(true); });
+handle_ui.on("pa-filenav", function (evt) {
+    if (event_key.is_default_a(evt)) {
+        goto_hash(this.hash);
+        evt.preventDefault();
     }
 });
 

@@ -3075,7 +3075,7 @@ class PsetView {
     /** @param string $label
      * @param DiffInfo $di */
     private function print_filenav_file($label, $di) {
-        echo '<a class="ui pa-filenav ulh" href="#';
+        echo '<a class="uic pa-filenav ulh" href="#';
         if ($this->conf->multiuser_page) {
             echo "U", html_id_encode($this->user_linkpart()), "/";
         }

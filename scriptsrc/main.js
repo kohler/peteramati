@@ -40,8 +40,8 @@ import "./cluster-diff.js";
 import { resolve_pinnable } from "./pinnable.js";
 import { pa_pset_table } from "./ptable.js";
 import { SearchParser, SearchExpr } from "./search.js";
-import LinkifyIt from "linkify-it";
-window.markdownit.linkify = LinkifyIt();
+import { LinkifyIt } from "linkify-it";
+window.markdownit.linkify = new LinkifyIt();
 window.markdownit.linkify.set({fuzzyEmail: false, "---": true});
 
 function $$(id) {
