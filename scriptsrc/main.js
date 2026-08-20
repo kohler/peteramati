@@ -1,5 +1,5 @@
 // main.js -- Peteramati JavaScript library
-// Peteramati is Copyright (c) 2006-2024 Eddie Kohler
+// Peteramati is Copyright (c) 2006-2026 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
 import { sprintf, strftime, text_eq, string_utf8_index } from "./utils.js";
@@ -40,9 +40,6 @@ import "./cluster-diff.js";
 import { resolve_pinnable } from "./pinnable.js";
 import { pa_pset_table } from "./ptable.js";
 import { SearchParser, SearchExpr } from "./search.js";
-import { LinkifyIt } from "linkify-it";
-window.markdownit.linkify = new LinkifyIt();
-window.markdownit.linkify.set({fuzzyEmail: false, "---": true});
 
 function $$(id) {
     return document.getElementById(id);

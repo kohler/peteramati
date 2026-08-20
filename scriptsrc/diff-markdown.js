@@ -3,6 +3,7 @@
 // See LICENSE for open-source distribution terms
 
 import { Filediff } from "./diff.js";
+import { html_id_encode } from "./encoders.js";
 import { active_scroll_anchor } from "./note-edit.js";
 import { hasClass, addClass, removeClass, toggleClass, handle_ui } from "./ui.js";
 import { hoturl } from "./hoturl.js";
@@ -74,56 +75,94 @@ function modify_landmark(base, level) {
     };
 }
 
-function modify_landmark_image(base) {
-    function fix(user, pi, file) {
-        let t = siteinfo.site_relative;
-        if (user) {
-            t += "~" + encodeURIComponent(user) + "/";
+// Resolve `url` against the directory of the Markdown file being rendered.
+// Returns a path relative to the repository root, or null if `url` does not
+// name a file in this repository.
+function repo_path(pi, url) {
+    let m, m2;
+    if (/\/\//.test(url)) {
+        if ((m = url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:blob|raw)\/([^/]+)\/(.*)$/))
+            && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
+            && m2[1] === m[1]
+            && pi.getAttribute("data-pa-branch") === m[2]) {
+            return m[3];
         }
-        t += "raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-commit") + "/" + file;
-        if (siteinfo.defaults) {
-            t += "?" + (new URLSearchParams(siteinfo.defaults)).toString();
-        }
-        return t;
+        return null;
     }
+    const fd = Filediff.closest(mdcontext),
+        slash = fd ? fd.file.lastIndexOf("/") : -1;
+    let dir = slash < 0 ? "" : fd.file.substring(0, slash);
+    while (true) {
+        if (url.startsWith("./")) {
+            url = url.substring(2).replace(/^\/+/, "");
+        } else if (url.startsWith("../") && dir !== "") {
+            url = url.substring(3).replace(/^\/+/, "");
+            dir = dir.replace(/(?:^|\/)[^/]+\/*$/, "");
+        } else if (url.startsWith("../") || url.startsWith("/")) {
+            return null;
+        } else if ((m = url.match(/(^|\/+)[^/]+\/\.\.(?:\/+|$)(.*)$/))) {
+            url = m[1] + m[2];
+        } else {
+            break;
+        }
+    }
+    if (url === "") {
+        return null;
+    }
+    return dir ? dir + "/" + url : url;
+}
+
+/** @param {string} file
+ * @return {string} */
+function repo_raw_url(pi, file) {
+    const user = pi.getAttribute("data-pa-user") || siteinfo.uservalue;
+    let t = siteinfo.site_relative;
+    if (user) {
+        t += "~" + encodeURIComponent(user) + "/";
+    }
+    t += "raw/" + pi.getAttribute("data-pa-pset") + "/" + pi.getAttribute("data-pa-commit") + "/" + file;
+    if (siteinfo.defaults) {
+        t += "?" + (new URLSearchParams(siteinfo.defaults)).toString();
+    }
+    return t;
+}
+
+function modify_landmark_image(base) {
     return function (tokens, idx, options, env, self) {
-        let token = tokens[idx],
-            srci = token.attrIndex("src"),
-            src = token.attrs[srci][1],
-            pi, m, m2;
+        const token = tokens[idx],
+            srci = token.attrIndex("src");
+        let pi;
         if (mdcontext && (pi = mdcontext.closest(".pa-psetinfo"))) {
-            const user = pi.getAttribute("data-pa-user") || siteinfo.uservalue;
-            if (!/\/\//.test(src)) {
-                let fd = Filediff.closest(mdcontext),
-                    dir = fd ? fd.file.replace(/^(.*)\/[^/]*$/, '$1') : "";
-                while (true) {
-                    if (src.startsWith("./")) {
-                        src = src.substring(2).replace(/^\/+/, "");
-                    } else if (src.startsWith("../") && dir !== "") {
-                        src = src.substring(3).replace(/^\/+/, "");
-                        dir = dir.replace(/(?:^|\/)[^/]+\/*$/, "");
-                    } else if (src.startsWith("../") || src.startsWith("/")) {
-                        src = null;
-                        break;
-                    } else if ((m = src.match(/(^|\/+)[^/]+\/\.\.(?:\/+|$)(.*)$/))) {
-                        src = m[1] + m[2];
-                    } else {
-                        break;
-                    }
-                }
-                if (src) {
-                    token.attrs[srci][1] = fix(user, pi, dir ? dir + "/" + src : src);
-                } else {
-                    token.attrs[srci][1] = "data:image/jpg,";
-                }
-            } if ((m = src.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:blob|raw)\/([^/]+)\/(.*)$/))
-                  && (m2 = (pi.getAttribute("data-pa-repourl") || "").match(/^(?:https:\/\/github\.com\/|git@github\.com:)(.*?)\/?$/))
-                  && m2[1] == m[1]
-                  && pi.getAttribute("data-pa-branch") == m[2]) {
-                token.attrs[srci][1] = fix(user, pi, m[3]);
+            const src = token.attrs[srci][1],
+                path = repo_path(pi, src);
+            if (path !== null) {
+                token.attrs[srci][1] = repo_raw_url(pi, path);
+            } else if (!/\/\//.test(src)) {
+                token.attrs[srci][1] = "data:image/jpg,";
             }
         }
         return fix_landmark_html(base(tokens, idx, options, env, self), token);
+    };
+}
+
+// Point a link at a repository file at that file's diff, if it is displayed,
+// and at its raw contents otherwise.
+function modify_repo_link(base) {
+    return function (tokens, idx, options, env, self) {
+        const token = tokens[idx],
+            hrefi = token.attrIndex("href");
+        let pi;
+        if (hrefi >= 0 && mdcontext && (pi = mdcontext.closest(".pa-psetinfo"))) {
+            const m = token.attrs[hrefi][1].match(/^([^#?]*)(?:[#?].*)?$/),
+                path = m[1] === "" ? null : repo_path(pi, m[1]);
+            if (path !== null) {
+                token.attrs[hrefi][1] = Filediff.by_file(path)
+                    ? "#F" + html_id_encode(path)
+                    : repo_raw_url(pi, path);
+            }
+        }
+        return base ? base(tokens, idx, options, env, self)
+            : self.renderToken(tokens, idx, options, env);
     };
 }
 
@@ -198,7 +237,7 @@ function make_markdownit() {
             .use(markdownit_deflist);
         for (let x of ["paragraph_open", "heading_open", "ordered_list_open",
                        "bullet_list_open", "dl_open", "table_open",
-                       "blockquote_open", "hr"]) {
+                       "blockquote_open", "math_block", "hr"]) {
             md.renderer.rules[x] = modify_landmark(md.renderer.rules[x], 0);
         }
         for (let x of ["list_item_open", "dt_open", "dd_open"]) {
@@ -206,6 +245,7 @@ function make_markdownit() {
         }
         md.renderer.rules.fence = md.renderer.rules.code_block = render_landmark_fence(md);
         md.renderer.rules.image = modify_landmark_image(md.renderer.rules.image);
+        md.renderer.rules.link_open = modify_repo_link(md.renderer.rules.link_open);
     }
     return md;
 }
