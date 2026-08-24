@@ -2587,6 +2587,18 @@ class PsetView {
         return $this->_complete_diff($diff, $dctx);
     }
 
+    /** The browser can display some file types, such as PDF, that have no
+     * useful diff. Link those files straight to their inline contents.
+     * @return ?string */
+    private function raw_inline_url(DiffInfo $dinfo) {
+        if ($dinfo->fileless()
+            || $dinfo->file_deleted()
+            || !preg_match('/\.pdf\z/i', $dinfo->filename)) {
+            return null;
+        }
+        return $this->hoturl("raw", ["file" => $dinfo->repo_filename()]);
+    }
+
     /** @return list<string> */
     private function _diff_buttons(DiffInfo $dinfo, $hide_left) {
         if ($dinfo->file_deleted()) {
@@ -2718,14 +2730,19 @@ class PsetView {
 
         if (!$no_heading) {
             // NB Javascript depend on `h3` followed by `span`s and then `a`
-            echo '<h3 class="pa-fileref">';
-            $a = "<a class=\"q ui pa-diff-unfold\" href=\"#{$tabid}\" aria-expanded=\""
+            $unfold = "<a class=\"q ui pa-diff-unfold\" href=\"#{$tabid}\" aria-expanded=\""
                 . ($expand ? "true" : "false")
                 . "\" aria-controls=\"{$tabid}\">";
-            echo $a, foldarrow(null);
-            if ($args["diffcontext"] ?? false) {
-                echo '</a><span class="pa-fileref-context">',
-                    $args["diffcontext"], '</span>', $a;
+            $context = $args["diffcontext"] ?? false;
+            $rawurl = $this->raw_inline_url($dinfo);
+            echo '<h3 class="pa-fileref">', $unfold, foldarrow(null);
+            if ($context || $rawurl !== null) {
+                echo '</a>';
+                if ($context) {
+                    echo '<span class="pa-fileref-context">', $context, '</span>';
+                }
+                echo $rawurl === null ? $unfold
+                    : "<a class=\"q pa-extlink\" href=\"{$rawurl}\" target=\"_blank\">";
             }
             echo htmlspecialchars($dinfo->title ? : $file), "</a>";
             $bts = $this->_diff_buttons($dinfo, $hide_left);
@@ -3075,6 +3092,11 @@ class PsetView {
     /** @param string $label
      * @param DiffInfo $di */
     private function print_filenav_file($label, $di) {
+        if (($url = $this->raw_inline_url($di)) !== null) {
+            echo '<a class="pa-filenav ulh pa-extlink" href="', $url, '" target="_blank">',
+                htmlspecialchars($label), '</a>';
+            return;
+        }
         echo '<a class="uic pa-filenav ulh" href="#';
         if ($this->conf->multiuser_page) {
             echo "U", html_id_encode($this->user_linkpart()), "/";
