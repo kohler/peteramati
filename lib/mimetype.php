@@ -19,6 +19,7 @@ class Mimetype {
     const KEYNOTE_TYPE = "application/vnd.apple.keynote";
     const HTML_TYPE = "text/html";
     const CSV_TYPE = "text/csv";
+    const FORM_DATA_TYPE = "multipart/form-data";
 
     const TXT_UTF8_TYPE = "text/plain; charset=utf-8";
     const JSON_UTF8_TYPE = "application/json; charset=utf-8";
@@ -60,7 +61,7 @@ class Mimetype {
         self::JPG_TYPE =>     [".jpg", "JPEG", self::FLAG_INLINE, ".jpeg"],
         self::PNG_TYPE =>     [".png", "PNG", self::FLAG_INLINE | self::FLAG_REQUIRE_SNIFF],
         self::GIF_TYPE =>     [".gif", "GIF", self::FLAG_INLINE | self::FLAG_REQUIRE_SNIFF],
-        self::HTML_TYPE =>    [".html", "HTML", self::FLAG_INLINE | self::FLAG_COMPRESSIBLE | self::FLAG_TEXTUAL]
+        self::HTML_TYPE =>    [".html", "HTML", self::FLAG_COMPRESSIBLE | self::FLAG_TEXTUAL]
     ];
 
     /** @var bool */
