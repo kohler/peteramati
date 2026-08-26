@@ -121,6 +121,34 @@ Installation
    `SITE/authorize`, or by configuring a personal access token and setting
    `$Opt["githubOAuthToken"]` explicitly in `conf/options.php`.
 
+    Peteramati can also authenticate as a GitHub App installed on your
+    organization. An app is required to create student repositories, and is
+    preferred for `git fetch`; the OAuth token above is used when no app is
+    configured. Register the app on your organization’s Settings page with
+    organization permission “Administration: read and write” (to create
+    repositories) and repository permissions “Administration: read and write”
+    (to add collaborators) and “Contents: read” (for `git fetch`). Install it
+    on **all** repositories in the organization, generate a private key, and
+    set:
+
+    ```php
+    $Opt["githubAppId"] = "123456";
+    $Opt["githubAppInstallationId"] = "78901234";
+    $Opt["githubAppKeyFile"] = "conf/github-app.pem";   // keep mode 600
+    ```
+
+    Then create student repositories with:
+
+    ```sh
+    $ php batch/githubadmin.php -p PSET create-repo
+    ```
+
+    Repositories are named `{pset}-{username}` by default; set
+    `$Opt["githubRepoPattern"]`, or a pset’s `github_repo_pattern`, to change
+    that. A pset’s `github_template_repo` (`"owner/name"`) names a GitHub
+    template repository to generate student repositories from; without it,
+    new repositories are empty.
+
 8. Configure the jail. The instructions below describe a simple setup, in
    which each student jail contains an actual copy of the files included in
    the jail. This can use substantial amounts of disk space for a large class;

@@ -101,6 +101,10 @@ class Pset {
     /** @var ?bool */
     public $handout_warn_merge;
     public $repo_guess_patterns = [];
+    /** @var ?string */
+    public $github_repo_pattern;
+    /** @var ?string */
+    public $github_template_repo;
     /** @var string */
     public $directory;
     /** @var string */
@@ -350,6 +354,12 @@ class Pset {
         $this->handout_warn_hash = self::cstr($p, "handout_warn_hash");
         $this->handout_warn_merge = self::cbool($p, "handout_warn_merge");
         $this->repo_guess_patterns = self::cstr_list($p, "repo_guess_patterns");
+        $this->github_repo_pattern = self::cstr($p, "github_repo_pattern");
+        $this->github_template_repo = self::cstr($p, "github_template_repo");
+        if ($this->github_template_repo !== null
+            && !preg_match('/\A[^\/]+\/[^\/]+\z/', $this->github_template_repo)) {
+            throw new PsetConfigException("`github_template_repo` should look like \"owner/name\"", "github_template_repo");
+        }
         $this->directory = $this->directory_slash = "";
         if (isset($p->directory) && is_string($p->directory)) {
             $this->directory = $p->directory;

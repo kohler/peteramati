@@ -31,6 +31,10 @@ class GitHubAdmin_Batch {
     /** @var bool */
     public $verbose;
 
+    /** Pause between repository creations; GitHub applies a secondary rate
+     * limit to bursts of content-creating requests. */
+    const CREATE_DELAY_US = 1000000;
+
     function __construct(Conf $conf, $arg) {
         $this->conf = $conf;
 
@@ -41,7 +45,7 @@ class GitHubAdmin_Batch {
             if ($this->team === "") {
                 throw new CommandLineException("team argument missing");
             }
-        } else {
+        } else if ($this->subcommand !== "create-repo") {
             throw new CommandLineException("unknown subcommand");
         }
 
@@ -214,7 +218,63 @@ class GitHubAdmin_Batch {
         return 0;
     }
 
+    /** Create missing repositories for the users in `-p PSET`.
+     * @return int */
+    private function run_create() {
+        if (!$this->pset) {
+            throw new CommandLineException("`-p PSET` required for `create-repo`");
+        } else if ($this->pset->gitless) {
+            throw new CommandLineException("`{$this->pset->key}` does not use git");
+        }
+
+        // `-u` may name someone who has dropped; a bulk run should not
+        $flags = empty($this->usermatch) ? StudentSet::ALL_ENROLLED : StudentSet::ALL;
+        $sset = new StudentSet($this->conf->site_contact(), $flags, [$this, "test_user"]);
+        $sset->set_pset($this->pset);
+
+        $ncreate = $nerror = 0;
+        foreach ($sset as $info) {
+            $user = $info->user;
+            if ($info->repo) {
+                if ($this->verbose) {
+                    fwrite(STDOUT, "{$user->email}: has {$info->repo->friendly_url()}\n");
+                }
+                continue;
+            } else if (!$user->github_username) {
+                fwrite(STDERR, "{$user->email}: no GitHub username\n");
+                ++$nerror;
+                continue;
+            } else if ($this->count !== null && $ncreate >= $this->count) {
+                break;
+            }
+            if (!($creator = GitHub_RepoCreator::make($this->conf, $this->pset, $user))) {
+                throw new CommandLineException("GitHub App or organization not configured");
+            }
+            if ($ncreate !== 0) {
+                // GitHub throttles bursts of repository creation
+                usleep(self::CREATE_DELAY_US);
+            }
+            ++$ncreate;
+
+            $ms = new MessageSet;
+            if (($repo = $creator->run($ms))) {
+                $note = $creator->created ? "created" : "adopted";
+                if ($creator->invitation_id !== null) {
+                    $note .= ", invitation {$creator->invitation_id} unaccepted";
+                }
+                fwrite(STDOUT, "{$user->email}: {$repo->friendly_url()} ({$note})\n");
+            } else {
+                fwrite(STDERR, "{$user->email}: " . $ms->full_feedback_text());
+                ++$nerror;
+            }
+        }
+        return $nerror ? 1 : 0;
+    }
+
     function run() {
+        if ($this->subcommand === "create-repo") {
+            return $this->run_create();
+        }
         return $this->run_collaborator();
     }
 
@@ -232,6 +292,7 @@ class GitHubAdmin_Batch {
          ->subcommand(
             "add-team Add team collaborator",
             "remove-team Remove team collaborator",
+            "create-repo Create missing student repositories",
         )->description("Administer GitHub remotes.
 Usage: php batch/githubadmin.php [-r REPOID | -u USER | -p PSET] [SUBCOMMAND]")
          ->maxarg(1);

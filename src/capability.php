@@ -49,6 +49,10 @@ class CapabilityManager {
             return false;
     }
 
+    function delete_expired($capabilityType) {
+        Dbl::ql($this->dblink, "delete from Capability where capabilityType=? and timeExpires>0 and timeExpires<?", $capabilityType, time());
+    }
+
     function delete($capdata) {
         assert(!$capdata || is_string($capdata->salt));
         if ($capdata)

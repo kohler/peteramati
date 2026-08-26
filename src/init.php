@@ -7,6 +7,7 @@ const TAG_REGEX_NOTWIDDLE = '[a-zA-Z@*_:.][-+a-zA-Z0-9?!@*_:.\/]*';
 const TAG_MAXLEN = 40;
 
 const CAPTYPE_RESETPASSWORD = 1;
+const CAPTYPE_GITHUB_OAUTH = 2;
 
 // see also forward_pset_links
 const LINK_PARTNER = 1;

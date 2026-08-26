@@ -164,6 +164,8 @@ class Conf {
     private $_fmt;
     /** @var ?list<string> */
     private $_fmt_override_names;
+    /** @var false|null|GitHubApp */
+    private $_github_app = false;
     /** @var array<string,Repository> */
     private $_handout_repos = [];
     /** @var array<int,CommitList> */
@@ -2479,6 +2481,14 @@ class Conf {
     //
     // Miscellaneous
     //
+
+    /** @return ?GitHubApp */
+    function github_app() {
+        if ($this->_github_app === false) {
+            $this->_github_app = GitHubApp::make($this);
+        }
+        return $this->_github_app;
+    }
 
     function capability_manager($for = null) {
         if ($for && substr($for, 0, 1) === "U") {

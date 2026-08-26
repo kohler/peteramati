@@ -26,8 +26,32 @@ class GitHubResponse implements JsonSerializable {
     function jsonSerialize() {
         return $this->response ?? ["status" => $this->status, "content" => $this->content];
     }
-    function run_post(Conf $conf, $content_type, $content, $header = "") {
-        if (is_array($content) || is_object($content)) {
+    /** Perform a REST request against api.github.com authorized by $token.
+     * @param ?string $token
+     * @param string $url
+     * @param string $method
+     * @param null|string|array|object $data
+     * @return GitHubResponse */
+    static function make_restapi(Conf $conf, $token, $url, $method, $data = null) {
+        $response = new GitHubResponse("https://api.github.com/{$url}");
+        if ($token && !$conf->opt("disableRemote")) {
+            $response->run_request($conf, $method, "application/json", $data,
+                "Authorization: Bearer {$token}\r\n"
+                . "Accept: application/vnd.github+json\r\n"
+                . "X-GitHub-Api-Version: 2022-11-28\r\n");
+        }
+        return $response;
+    }
+
+    /** @param string $method
+     * @param ?string $content_type
+     * @param null|string|array|object $content
+     * @param string $header
+     * @return $this */
+    function run_request(Conf $conf, $method, $content_type, $content, $header = "") {
+        if ($content === null) {
+            $content = "";
+        } else if (is_array($content) || is_object($content)) {
             if ($content_type === "application/x-www-form-urlencoded") {
                 $content = (array) $content;
                 $content = join("&", array_map(function ($k, $v) {
@@ -39,12 +63,17 @@ class GitHubResponse implements JsonSerializable {
                 throw new Error();
             }
         }
-        $header .= "User-Agent: kohler/peteramati\r\n"
-            . "Content-Type: {$content_type}\r\n"
-            . "Content-Length: " . strlen($content) . "\r\n";
+        $header .= "User-Agent: kohler/peteramati\r\n";
+        if ($content !== "") {
+            $header .= "Content-Type: {$content_type}\r\n";
+        }
+        if ($content !== "" || $method !== "GET") {
+            // GitHub wants an explicit length on bodyless PUT/POST/PATCH
+            $header .= "Content-Length: " . strlen($content) . "\r\n";
+        }
         $htopt = [
             "timeout" => (float) $conf->validate_timeout,
-            "ignore_errors" => true, "method" => "POST",
+            "ignore_errors" => true, "method" => $method,
             "header" => $header, "content" => $content
         ];
         $context = stream_context_create(array("http" => $htopt));
@@ -63,7 +92,9 @@ class GitHubResponse implements JsonSerializable {
             }
             $this->content = stream_get_contents($stream);
             if ($this->content !== false
-                && (empty($this->headers) || str_starts_with($this->headers["content-type"], "application/json"))
+                && $this->content !== ""
+                && (empty($this->headers)
+                    || str_starts_with($this->headers["content-type"] ?? "", "application/json"))
                 && ($j = json_decode($this->content))
                 && is_object($j)) {
                 $this->response = $j;
@@ -74,6 +105,7 @@ class GitHubResponse implements JsonSerializable {
             }
             fclose($stream);
         }
+        return $this;
     }
 }
 
@@ -128,23 +160,17 @@ class GitHub_RepositorySite extends RepositorySite {
             if (!is_string($post_data)) {
                 $post_data = json_encode($post_data);
             }
-            $response->run_post($conf, "application/json", $post_data, "Authorization: Bearer {$token}\r\n");
+            $response->run_request($conf, "POST", "application/json", $post_data, "Authorization: Bearer {$token}\r\n");
         }
         return $response;
     }
 
-    /** @return GitHubResponse */
-    static function restapi(Conf $conf, $url, $method, $data = "") {
-        $response = new GitHubResponse("https://api.github.com/{$url}");
-        $token = $conf->opt("githubOAuthToken");
-        if ($token && !$conf->opt("disableRemote")) {
-            $h = "Authorization: Bearer {$token}\r\nAccept: application/vnd.github+json\r\nX-GitHub-Api-Version: 2022-11-28\r\n";
-            if (!is_string($data)) {
-                $data = json_encode($data);
-            }
-            $response->run_post($conf, "application/json", $data, $h);
-        }
-        return $response;
+    /** @param string $url
+     * @param string $method
+     * @param null|string|array|object $data
+     * @return GitHubResponse */
+    static function restapi(Conf $conf, $url, $method, $data = null) {
+        return GitHubResponse::make_restapi($conf, $conf->opt("githubOAuthToken"), $url, $method, $data);
     }
 
     static function echo_username_form(Contact $user, $first) {
@@ -276,17 +302,39 @@ class GitHub_RepositorySite extends RepositorySite {
         }
         return "https://github.com/{$this->base}/tree/" . rawurlencode($branch) . "/{$subdir}";
     }
-    /** @return list<string> */
-    function credentialed_git_command() {
+    /** Site-wide OAuth token, used when no GitHub App is configured.
+     * @return ?array{string,string} */
+    private function oauth_credentials() {
         if (($id = $this->conf->opt("githubOAuthClientId"))
             && ($token = $this->conf->opt("githubOAuthToken"))
             && $token !== Conf::INVALID_TOKEN) {
-            return [
-                "git", "-c", "credential.helper=",
-                "-c", "credential.helper=!f () { echo username={$id}; echo password={$token}; }; f"
-            ];
+            return [$id, $token];
         }
-        return ["false"];
+        return null;
+    }
+
+    /** @return bool */
+    function has_credentials() {
+        return $this->conf->github_app() !== null
+            || $this->oauth_credentials() !== null;
+    }
+
+    /** @return list<string> */
+    function credentialed_git_command() {
+        // installation tokens authenticate git as the literal user
+        // `x-access-token`; they expire hourly, so fetch one per command
+        if (($app = $this->conf->github_app())
+            && ($token = $app->installation_token())) {
+            $username = "x-access-token";
+        } else if (($cred = $this->oauth_credentials())) {
+            list($username, $token) = $cred;
+        } else {
+            return ["false"];
+        }
+        return [
+            "git", "-c", "credential.helper=",
+            "-c", "credential.helper=!f () { echo username={$username}; echo password={$token}; }; f"
+        ];
     }
     function owner_name() {
         if (preg_match('{\A([^/"\\\\]+)/([^/"\\\\]+)\z}', $this->base, $m)) {
@@ -310,9 +358,8 @@ class GitHub_RepositorySite extends RepositorySite {
     }
 
     function gitfetch($repo, $cacheid, $foreground) {
-        if (!$this->conf->opt("githubOAuthClientId")
-            || !($token = $this->conf->opt("githubOAuthToken"))
-            || $token === Conf::INVALID_TOKEN) {
+        // don't mint a token here; `repofetch.php` does that if it runs
+        if (!$this->has_credentials()) {
             return false;
         }
         $arg = $foreground ? [] : ["--bg"];
