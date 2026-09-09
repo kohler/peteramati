@@ -1097,6 +1097,11 @@ class UpdateSchema {
             $conf->update_schema_version(179);
         }
 
+        if ($conf->sversion === 179
+            && $conf->ql_ok("alter table ContactInfo add `github_userid` bigint(20) DEFAULT NULL")) {
+            $conf->update_schema_version(180);
+        }
+
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }
 }

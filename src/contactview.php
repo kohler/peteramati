@@ -600,7 +600,7 @@ For example, try these commands: <pre>git commit --allow-empty --author=\"" . ht
                 if (!$repo->snapat) {
                     $value = "(checking)";
                 } else if ($info->directory !== ""
-                           && $repo->latest_commit(null, $info->branch, $info->directory)) {
+                           && $repo->latest_commit(null, $info->branch, ".")) {
                     $value = "(no commits yet for this pset)";
                 } else {
                     $value = "(no such branch)";

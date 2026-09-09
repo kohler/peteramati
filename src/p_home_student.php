@@ -102,6 +102,22 @@ class Home_Student_Page {
     }
 
     /** @return ?PsetView */
+    /** Offer to create the student's course repository. Shown only to the
+     * student themselves: the flow authorizes GitHub as the signed-in user,
+     * so course staff looking at someone else's page cannot use it. */
+    private function render_repo_setup() {
+        if ($this->viewer->contactId !== $this->user->contactId
+            || !GitHub_StudentSetup::available($this->conf, $this->user)) {
+            return;
+        }
+        echo "<hr>\n",
+            $this->conf->hotform("=authorize", ["setup_repo" => 1]);
+        ContactView::echo_group("repository",
+            Ht::submit("Set up my repository", ["class" => "btn-primary"]),
+            [[false, "You will be sent to GitHub to sign in, then we’ll create an empty repository for you."]]);
+        echo "</form>\n";
+    }
+
     private function psetview(Pset $pset) {
         if (!$pset->disabled
             && $this->viewer->can_view_pset($pset)
@@ -151,6 +167,8 @@ class Home_Student_Page {
                 ContactView::echo_group(htmlspecialchars($fc->title), $v);
             }
         }
+
+        $this->render_repo_setup();
 
         foreach ($ss->infos($this->user->contactId) as $info) {
             $this->render_home_pset($info, $flagsbypset[$info->pset->id] ?? []);

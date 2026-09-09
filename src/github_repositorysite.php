@@ -149,8 +149,14 @@ class GitHub_RepositorySite extends RepositorySite {
         return Ht::link($html, self::MAINURL);
     }
 
-    /** @return GitHubResponse */
+    /** Course-wide GitHub API access. Prefers the GitHub App, as
+     * `credentialed_git_command` does; the OAuth token is the fallback for
+     * installations that have no app.
+     * @return GitHubResponse */
     static function graphql(Conf $conf, $post_data, $preencoded = false) {
+        if (($app = $conf->github_app())) {
+            return $app->graphql($post_data, $preencoded);
+        }
         $response = new GitHubResponse("https://api.github.com/graphql");
         $token = $conf->opt("githubOAuthToken");
         if ($token && !$conf->opt("disableRemote")) {
@@ -170,6 +176,9 @@ class GitHub_RepositorySite extends RepositorySite {
      * @param null|string|array|object $data
      * @return GitHubResponse */
     static function restapi(Conf $conf, $url, $method, $data = null) {
+        if (($app = $conf->github_app())) {
+            return $app->restapi($url, $method, $data);
+        }
         return GitHubResponse::make_restapi($conf, $conf->opt("githubOAuthToken"), $url, $method, $data);
     }
 
@@ -177,6 +186,18 @@ class GitHub_RepositorySite extends RepositorySite {
         global $Me;
         if (!$first && !$user->github_username)
             return;
+        // Where the course creates repositories itself, the username is
+        // whatever account the student proved they own by signing in to
+        // GitHub; typing one would defeat that. Show it, don't offer it.
+        // Staff keep the form, since they are the ones who must fix a
+        // student who authorized the wrong account.
+        if (GitHub_StudentSetup::configured($user->conf) && !$Me->privChair) {
+            if ($user->github_username) {
+                ContactView::echo_group(self::home_link("GitHub") . " username",
+                                        htmlspecialchars($user->github_username));
+            }
+            return;
+        }
         echo $user->conf->hotform("=index", ["set_username" => 1, "u" => $Me->user_linkpart($user), "reposite" => "github"]),
             '<div class="f-contain">';
         $notes = array();
@@ -192,6 +213,11 @@ class GitHub_RepositorySite extends RepositorySite {
      * @return bool */
     static function save_username(Contact $user, $username) {
         global $Me;
+        // enforce the read-only rule above against a hand-built POST
+        if (GitHub_StudentSetup::configured($user->conf) && !$Me->privChair) {
+            $user->conf->error_msg("<0>Use “Set up my repository” to connect your GitHub account.");
+            return false;
+        }
         $username = trim((string) $username);
 
         // empty?
@@ -218,18 +244,19 @@ class GitHub_RepositorySite extends RepositorySite {
         }
 
         // is it valid? XXX GitHub API
+        // Ask the organization about the user, not the user about the
+        // organization: `user { organization }` resolves to null under a
+        // GitHub App installation token, which would silently skip the staff
+        // checks below. Both forms work under an OAuth token.
         $org = $user->conf->opt("githubOrganization");
         $staff_team = $user->conf->opt("githubStaffTeam");
-        $gq = "{ user(login:" . json_encode($username) . ") { id";
-        if ($org) {
-            $gq .= ", organization(login:" . json_encode($org) . ") { id";
-            if ($staff_team) {
-                $gq .= ", team(slug:" . json_encode($staff_team) . ") {"
-                    . " members(query:" . json_encode($username) . ") { nodes { login } } }";
-            }
-            $gq .= " }";
+        $gq = "{ user(login:" . json_encode($username) . ") { id }";
+        if ($org && $staff_team) {
+            $gq .= " organization(login:" . json_encode($org) . ") {"
+                . " team(slug:" . json_encode($staff_team) . ") {"
+                . " members(query:" . json_encode($username) . ") { nodes { login } } } }";
         }
-        $gq .= " } }";
+        $gq .= " }";
         $gql = self::graphql($user->conf, $gq);
         if (!$gql->rdata) {
             error_log(json_encode($gql). "!!!!");
@@ -238,19 +265,22 @@ class GitHub_RepositorySite extends RepositorySite {
         } else if (!isset($gql->rdata->user)) {
             $user->conf->error_msg("<0>That user doesn’t exist. Check your spelling and try again.");
             return false;
-        } else if (!isset($gql->rdata->user->organization)) {
-            if ($user->conf->opt("githubRequireOrganizationMembership")) {
+        }
+        if ($org && $user->conf->opt("githubRequireOrganizationMembership")) {
+            // 204 member, 404 not a member; REST answers this for an app token
+            $ghr = self::restapi($user->conf, "orgs/" . urlencode($org)
+                . "/members/" . urlencode($username), "GET");
+            if ($ghr->status !== 204) {
                 $user->conf->error_msg("<5>That user isn’t a member of the " . Ht::link(htmlspecialchars($org) . " organization", self::MAINURL . urlencode($org)) . ", which manages the class. Follow the link to register with the class, or contact course staff.");
                 return false;
             }
-        } else if ($staff_team
-                   && $user->is_student()
-                   && isset($gql->rdata->user->organization->team)
-                   && isset($gql->rdata->user->organization->team->members)
-                   && array_filter($gql->rdata->user->organization->team->members->nodes,
-                                function ($node) use ($username) {
-                                    return strcasecmp($username, $node->login) === 0;
-                                })) {
+        }
+        if ($staff_team
+            && $user->is_student()
+            && ($nodes = $gql->rdata->organization->team->members->nodes ?? null)
+            && array_filter($nodes, function ($node) use ($username) {
+                    return strcasecmp($username, $node->login) === 0;
+                })) {
             $user->conf->error_msg("<0>That user is a member of the course staff.");
             return false;
         }
@@ -404,6 +434,11 @@ class GitHub_RepositorySite extends RepositorySite {
             return -1;
         }
         if (!preg_match('/\A[0-9a-f]{40,}\s+/', $subp->stdout)) {
+            // A repository the course just created has no commits, so
+            // `ls-remote` prints nothing; it's still ok
+            if ($subp->status === 0 && trim($subp->stdout) === "") {
+                return 1;
+            }
             if ($ms) {
                 $ms->error_at("repo", $this->expand_message("repo_unreadable", $user));
                 $ms->error_at("working");

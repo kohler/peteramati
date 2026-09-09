@@ -79,6 +79,8 @@ class Contact {
     public $username;
     /** @var ?string */
     public $github_username;
+    /** @var ?int */
+    public $github_userid;
     /** @var string */
     public $anon_username;
     /** @var ?int */
@@ -223,6 +225,9 @@ class Contact {
         if (isset($user->github_username)) {
             $this->github_username = $user->github_username;
         }
+        if (isset($user->github_userid)) {
+            $this->github_userid = (int) $user->github_userid;
+        }
         if (isset($user->anon_username)) {
             $this->anon_username = $user->anon_username;
         }
@@ -272,6 +277,9 @@ class Contact {
         }
         if (isset($this->contactImageId)) {
             $this->contactImageId = (int) $this->contactImageId;
+        }
+        if (isset($this->github_userid)) {
+            $this->github_userid = (int) $this->github_userid;
         }
         if (isset($this->roles)) {
             $this->assign_roles((int) $this->roles);
@@ -1549,6 +1557,28 @@ class Contact {
             $this->conf->log("Set $k to $username", $this);
         }
         return true;
+    }
+
+    /** Record a GitHub identity proved by OAuth. Unlike `change_username`,
+     * which records whatever the user typed, this also stores GitHub's
+     * numeric account id, which -- unlike the login -- a user cannot change.
+     * @param string $username
+     * @param int $userid
+     * @return bool */
+    function set_github_identity($username, $userid) {
+        $this->github_username = $username;
+        $this->github_userid = $userid;
+        if ($this->conf->qe("update ContactInfo set github_username=?, github_userid=? where contactId=?", $username, $userid, $this->contactId)) {
+            $this->conf->log("Set github_username to {$username} (verified, GitHub id {$userid})", $this);
+        }
+        return true;
+    }
+
+    /** @param string $username
+     * @return ?int contactId of a different user already holding $username */
+    function github_username_conflict($username) {
+        return $this->conf->fetch_ivalue("select contactId from ContactInfo where github_username=? and contactId!=? limit 1",
+            $username, $this->contactId);
     }
 
 

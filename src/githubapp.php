@@ -15,6 +15,10 @@ class GitHubApp {
     private $installid;
     /** @var ?string */
     private $keysrc;
+    /** @var ?string */
+    private $clientid;
+    /** @var ?string */
+    private $clientsecret;
     /** @var bool */
     private $keyfile;
     /** @var ?string */
@@ -34,6 +38,27 @@ class GitHubApp {
         $this->installid = $installid;
         $this->keysrc = $keysrc;
         $this->keyfile = $keyfile;
+        $this->clientid = $conf->opt("githubAppClientId");
+        $this->clientsecret = $conf->opt("githubAppClientSecret");
+    }
+
+    /** True if the app can also authorize individual users. A GitHub App runs
+     * the same OAuth web flow as an OAuth app, from the same endpoints, but
+     * its user tokens carry no scopes: what they may do follows from the
+     * app's own permissions.
+     * @return bool */
+    function has_user_auth() {
+        return !!$this->clientid && !!$this->clientsecret;
+    }
+
+    /** @return ?string */
+    function client_id() {
+        return $this->clientid;
+    }
+
+    /** @return ?string */
+    function client_secret() {
+        return $this->clientsecret;
     }
 
     /** @return ?GitHubApp */

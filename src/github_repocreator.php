@@ -32,6 +32,9 @@ class GitHub_RepoCreator {
     public $invitation_id;
     /** @var ?Repository */
     public $repo;
+    /** GraphQL node id of the GitHub repository, needed to grant team access.
+     * @var ?string */
+    public $repo_nodeid;
 
     const DEFAULT_PATTERN = "{pset}-{username}";
     /** @var string */
@@ -94,6 +97,8 @@ class GitHub_RepoCreator {
             $body["owner"] = $this->organization;
             $ghr = $this->app->restapi("repos/{$template}/generate", "POST", $body);
         } else {
+            // bare repository: no README, no initial commit, no branches
+            $body["auto_init"] = false;
             $ghr = $this->app->restapi("orgs/" . urlencode($this->organization) . "/repos",
                 "POST", $body);
         }
@@ -101,7 +106,40 @@ class GitHub_RepoCreator {
             $this->api_error($ms, $ghr, "creating");
             return false;
         }
+        $this->repo_nodeid = $ghr->response->node_id ?? null;
         $this->created = true;
+        return true;
+    }
+
+    /** Give the course staff team admin access, as `batch/githubadmin.php`
+     * does in bulk. Failure here is reported but not fatal: the student's
+     * repository exists and they can use it, and `githubadmin.php add-team`
+     * can grant staff access later.
+     * @return bool */
+    function grant_staff_team(MessageSet $ms) {
+        $team = $this->conf->opt("githubStaffTeam");
+        if (!$team) {
+            return true;
+        } else if ($this->repo_nodeid === null) {
+            $ms->warning_at("repo", "<0>Could not grant course staff access to the repository (no repository id)");
+            return false;
+        }
+        $ghr = $this->app->graphql("query { organization(login: "
+            . json_encode($this->organization) . ") { team(slug: "
+            . json_encode($team) . ") { id } } }");
+        if (($teamid = $ghr->rdata->organization->team->id ?? null) === null) {
+            error_log("GitHub error looking up team {$this->organization}/{$team}: " . json_encode($ghr));
+            $ms->warning_at("repo", "<0>Could not look up the course staff team on GitHub");
+            return false;
+        }
+        $ghr = $this->app->graphql("mutation { updateTeamsRepository(input: {repositoryId: "
+            . json_encode($this->repo_nodeid) . ", permission: ADMIN, teamIds: ["
+            . json_encode($teamid) . "]}) { clientMutationId } }");
+        if ($ghr->rdata === null) {
+            error_log("GitHub error granting {$team} access to {$this->organization}/{$this->name}: " . json_encode($ghr));
+            $ms->warning_at("repo", "<0>Could not grant course staff access to the repository");
+            return false;
+        }
         return true;
     }
 
@@ -143,6 +181,8 @@ class GitHub_RepoCreator {
             }
         } else if ($ghr->status !== 200) {
             return $this->api_error($ms, $ghr, "looking up");
+        } else {
+            $this->repo_nodeid = $ghr->response->node_id ?? null;
         }
 
         if (!$this->add_collaborator($ms)) {
@@ -156,6 +196,12 @@ class GitHub_RepoCreator {
             return null;
         }
         $this->user->set_repo($this->pset, $repo);
+        // The course made this repository for this student and granted them
+        // access, so their ownership of it is established. Record that, or
+        // `Repository::check_ownership` would make them prove it the way a
+        // student who supplied their own repository must -- by pushing a
+        // commit authored from their course email address.
+        $this->user->add_link(LINK_REPOVIEW, 0, $repo->repoid);
         return ($this->repo = $repo);
     }
 }

@@ -124,18 +124,47 @@ Installation
     Peteramati can also authenticate as a GitHub App installed on your
     organization. An app is required to create student repositories, and is
     preferred for `git fetch`; the OAuth token above is used when no app is
-    configured. Register the app on your organization’s Settings page with
-    organization permission “Administration: read and write” (to create
-    repositories) and repository permissions “Administration: read and write”
-    (to add collaborators) and “Contents: read” (for `git fetch`). Install it
-    on **all** repositories in the organization, generate a private key, and
-    set:
+    configured. Register the app on your organization’s Settings page. Grant
+    it these permissions, which GitHub lists in two separate sections:
+
+    * Repository permission “Administration: read and write”, to add
+      students to their repositories as collaborators.
+
+    * Repository permission “Contents: read”, for `git fetch`. Use “read and
+      write” if you generate repositories from a template, as below.
+
+    * Organization permission “Administration: read and write”, to create
+      repositories.
+
+    * Organization permission “Members: read and write”, to give the course
+      staff team access to student repositories. Read alone suffices to look
+      up the team named by `$Opt["githubStaffTeam"]`; write is what grants it
+      access to a repository.
+
+    Install the app on **all** repositories in the organization, generate a
+    private key, and set:
 
     ```php
     $Opt["githubAppId"] = "123456";
     $Opt["githubAppInstallationId"] = "78901234";
     $Opt["githubAppKeyFile"] = "conf/github-app.pem";   // keep mode 600
     ```
+
+    The app ID and private key come from the app’s own settings page, but the
+    installation ID does not: it names the *installation* of the app on your
+    organization. Find it on your organization’s Settings → GitHub Apps page
+    by clicking “Configure” next to the app; the installation ID ends the
+    resulting URL, as in
+    `https://github.com/organizations/ORG/settings/installations/78901234`.
+
+    Install the app on the organization named by `$Opt["githubOrganization"]`.
+    Once these options are set, Peteramati prefers the app’s token to the
+    OAuth token for `git fetch`, so an app installed on some *other*
+    organization will break fetches site-wide.
+
+    Changing the permissions of an app that is already installed does not take
+    effect right away: GitHub asks an organization owner to accept the new
+    permissions, and the installation keeps its old access until they do.
 
     Then create student repositories with:
 
@@ -148,6 +177,40 @@ Installation
     that. A pset’s `github_template_repo` (`"owner/name"`) names a GitHub
     template repository to generate student repositories from; without it,
     new repositories are empty.
+
+    Students can also set up their own repositories, without waiting for a
+    batch run. When an app is configured, a student with no repository sees a
+    “Set up my repository” button on the home page; it sends them to GitHub,
+    and on their return Peteramati records the account they signed in as,
+    creates the repository, invites them to it, and accepts the invitation on
+    their behalf.
+
+    This runs entirely on the GitHub App — the OAuth app of step 5 is not
+    involved. An app runs the same user authorization flow as an OAuth app,
+    from the same endpoints, so all that is needed is the app’s own client ID
+    and a client secret generated on its settings page:
+
+    ```php
+    $Opt["githubAppClientId"] = "Iv23li…";
+    $Opt["githubAppClientSecret"] = "…";
+    ```
+
+    Set the app’s callback URL to `SITE/authorize`. The student is not asked
+    for any scope: a user access token issued to an app carries none, and may
+    do only what the app’s permissions already allow. Accepting the
+    invitation is the one step the course cannot take on the student’s
+    behalf, which is why the student authorizes at all.
+
+    Peteramati links repositories per problem set, but a `githubRepoPattern`
+    with no `{pset}` in it gives each student one repository for the term. The
+    button links that one repository to every problem set the student can see,
+    and problem sets added later pick it up through the usual link forwarding.
+
+    Because the button records the GitHub account the student actually signed
+    in as, it is more reliable than the username form, where a typo silently
+    creates a repository for a stranger. The verified numeric account id is
+    kept alongside the login, which — unlike the login — the student cannot
+    change.
 
 8. Configure the jail. The instructions below describe a simple setup, in
    which each student jail contains an actual copy of the files included in
