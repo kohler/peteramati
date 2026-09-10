@@ -147,8 +147,12 @@ Installation
     ```php
     $Opt["githubAppId"] = "123456";
     $Opt["githubAppInstallationId"] = "78901234";
-    $Opt["githubAppKeyFile"] = "conf/github-app.pem";   // keep mode 600
+    $Opt["githubAppKeyFile"] = "conf/github-app.pem";
     ```
+
+    Keep the private key unreadable by other users, but make sure the web
+    server can read it. `chmod 640` with the key’s group set to the web
+    server’s group is usually right.
 
     The app ID and private key come from the app’s own settings page, but the
     installation ID does not: it names the *installation* of the app on your

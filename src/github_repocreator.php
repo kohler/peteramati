@@ -66,6 +66,12 @@ class GitHub_RepoCreator {
      * @return null */
     private function api_error(MessageSet $ms, GitHubResponse $ghr, $what) {
         error_log("GitHub error {$what} {$this->organization}/{$this->name}: " . json_encode($ghr));
+        if ($ghr->response === null && $ghr->status >= 500) {
+            // no HTTP response at all -- the request failed or was never
+            // sent. Don't blame GitHub for what is usually a local problem.
+            $ms->error_at("repo", "<0>Could not reach GitHub. Try again in a moment; if this persists, ask the course staff to check the server error log.");
+            return null;
+        }
         $detail = $ghr->response->message ?? null;
         $ms->error_at("repo", "<0>GitHub reported an error {$what} the repository"
             . ($detail ? ": {$detail}" : "."));
@@ -171,6 +177,12 @@ class GitHub_RepoCreator {
             $ms->error_at("repo", "<0>This user has no GitHub username");
             return null;
         } else if (($this->name = $this->repo_name($ms)) === null) {
+            return null;
+        } else if (!$this->app->installation_token()) {
+            // e.g. the web server cannot read `githubAppKeyFile`. Every API
+            // call below would come back with no response at all, which reads
+            // like a GitHub outage; say what is actually wrong instead.
+            $ms->error_at("repo", "<0>This course’s GitHub App credentials are not working. Ask the course staff to check the server error log.");
             return null;
         }
 
