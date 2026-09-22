@@ -80,6 +80,8 @@ class QueueItem {
     private $_evaluate_at;
     /** @var mixed */
     private $_evaluate;
+    /** @var bool */
+    private $_leaderboard_recorded = false;
 
     // running a command (`start` and helpers)
     /** @var string */
@@ -754,6 +756,16 @@ class QueueItem {
             && $this->status >= self::STATUS_DONE) {
             // always evaluate at least once
             $this->evaluate();
+            // `evaluate()` may recurse into `swap_status`; record only once
+            if (!$this->_leaderboard_recorded
+                && ($runner = $this->runner())
+                && ($lbcs = $runner->pset->leaderboards_for_runner($runner))
+                && ($info = $this->info())) {
+                $this->_leaderboard_recorded = true;
+                foreach ($lbcs as $lbc) {
+                    Leaderboard::record($info, $lbc, $this->runat);
+                }
+            }
         }
         if ($changed && $this->status >= self::STATUS_CANCELLED) {
             if ($this->eventsource && ($esdir = $this->eventsource_dir())) {
@@ -790,6 +802,41 @@ class QueueItem {
 
     function cancel() {
         $this->swap_status(self::STATUS_CANCELLED);
+    }
+
+    /** If this job was working but its process has exited, mark it done,
+     * which evaluates it and records its leaderboard metrics. Jobs run in the
+     * background, so nothing else notices completion unless someone polls.
+     * @return bool true if the job is done or cancelled */
+    function check_completion() {
+        // XXX this does not use run timeouts
+        if ($this->working_complete()) {
+            $this->swap_status(self::STATUS_EVALUATED);
+        }
+        return $this->status >= self::STATUS_CANCELLED;
+    }
+
+    /** Mark done the working jobs matching `$qwhere` whose processes have
+     * exited.
+     * @param string $qwhere SQL condition on ExecutionQueue
+     * @param list $qv values for `$qwhere`
+     * @return list<QueueItem> the jobs marked done */
+    static function complete_exited(Conf $conf, $qwhere, $qv) {
+        $result = $conf->qe("select * from ExecutionQueue where status=? and ({$qwhere})",
+            self::STATUS_WORKING, ...$qv);
+        $qis = [];
+        while (($qi = self::fetch($conf, $result))) {
+            $qis[] = $qi;
+        }
+        Dbl::free($result);
+        $done = [];
+        foreach ($qis as $qi) {
+            if ($qi->working_complete()) {
+                $qi->check_completion();
+                $done[] = $qi;
+            }
+        }
+        return $done;
     }
 
     /** @param QueueState $qs
@@ -845,12 +892,7 @@ class QueueItem {
         }
 
         // if working, check for completion
-        if ($this->status === self::STATUS_WORKING
-            && $this->lockfile
-            && RunLogger::active_job_at($this->lockfile) !== $this->runat) {
-            // XXX this does not use run timeouts
-            $this->swap_status(self::STATUS_EVALUATED);
-        }
+        $this->check_completion();
 
         if ($this->status === self::STATUS_SCHEDULED
             || $this->status === self::STATUS_WORKING) {
@@ -940,7 +982,9 @@ class QueueItem {
         if (($hostname = gethostname()) !== false) {
             $rr->host = gethostbyname($hostname);
         }
-        fwrite($this->_logstream, "++ " . json_encode($rr) . "\n");
+        // record whom the run was for; not sent to clients
+        $j = $rr->jsonSerialize() + ["uid" => $this->cid];
+        fwrite($this->_logstream, "++ " . json_encode($j) . "\n");
     }
 
 

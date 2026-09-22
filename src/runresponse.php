@@ -22,6 +22,10 @@ class RunResponse implements JsonSerializable {
     public $url;
     /** @var ?string */
     public $hash;
+    /** @var ?string */
+    public $branch;
+    /** @var ?int */
+    public $uid;
     /** @var ?array */
     public $settings;
     /** @var ?list<string> */
@@ -71,6 +75,7 @@ class RunResponse implements JsonSerializable {
         $rr->repogid = $info->repo->repogid;
         $rr->url = $info->repo->url;
         $rr->hash = $info->hash();
+        $rr->branch = $info->branch();
         return $rr;
     }
 
@@ -92,6 +97,12 @@ class RunResponse implements JsonSerializable {
         }
         if (is_string($x->hash ?? null)) {
             $rr->hash = $x->hash;
+        }
+        if (is_string($x->branch ?? null)) {
+            $rr->branch = $x->branch;
+        }
+        if (is_int($x->uid ?? null)) {
+            $rr->uid = $x->uid;
         }
         if (is_object($x->settings ?? null)) {
             $rr->settings = (array) $x->settings;
@@ -132,10 +143,11 @@ class RunResponse implements JsonSerializable {
         return $this->log_file ?? "@{$this->timestamp}";
     }
 
+    /** JSON for clients. Omits `uid`, which only log headers record. */
     function jsonSerialize(): array {
         $a = [];
         foreach (get_object_vars($this) as $k => $v) {
-            if ($v !== null)
+            if ($v !== null && $k !== "uid")
                 $a[$k] = $v;
         }
         return $a;

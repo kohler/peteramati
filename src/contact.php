@@ -1133,6 +1133,8 @@ class Contact {
         if ($old_roles != $new_roles) {
             $this->conf->qe("update ContactInfo set roles=$new_roles where contactId=$this->contactId");
             $this->assign_roles($new_roles);
+            // leaderboards list only students
+            Leaderboard::note_change_all($this->conf);
         }
         return $old_roles != $new_roles;
     }
@@ -1685,7 +1687,9 @@ class Contact {
 
     private function show_setting_on($setting, Pset $pset) {
         return $setting === true
-            || (is_int($setting) && $setting >= Conf::$now)
+            || ((is_int($setting) || is_float($setting))
+                && $setting > 0
+                && $setting <= Conf::$now)
             || ($setting === "grades" && $this->xxx_can_view_grades($pset));
     }
 
@@ -1741,6 +1745,30 @@ class Contact {
         }
         return ($runner->visible && $this->show_setting_on($runner->visible, $pset))
             || ($runner->display_visible && $this->show_setting_on($runner->display_visible, $pset));
+    }
+
+    /** Whether this user may see `$m` on `$pset`'s leaderboard. Leaderboards
+     * are staff-only unless a metric sets `visible`.
+     * @return bool */
+    function can_view_leaderboard_metric(Pset $pset, LeaderboardMetric $m) {
+        if ($m->disabled) {
+            return false;
+        } else if ($this->isPC) {
+            return true;
+        }
+        return $this->can_view_pset($pset)
+            && $m->visible
+            && $this->show_setting_on($m->visible, $pset);
+    }
+
+    /** @return bool */
+    function can_view_leaderboard(Pset $pset) {
+        foreach ($pset->leaderboard as $m) {
+            if ($this->can_view_leaderboard_metric($pset, $m)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function can_view_transferred_warnings(Pset $pset, RunnerConfig $runner, $user = null) {

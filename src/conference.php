@@ -2522,7 +2522,10 @@ class Conf {
 
     function clean_queue() {
         if (($this->settings["__qcleanat"] ?? 0) < Conf::$now - 600) {
+            // saving first also stops the work below from recursing here
             $this->__save_setting("__qcleanat", Conf::$now);
+            // finish jobs whose processes exited while nobody watched
+            QueueItem::complete_exited($this, "true", []);
             $this->qe("delete from ExecutionQueue where status>=? and updateat<? and runat<?", QueueItem::STATUS_CANCELLED, Conf::$now - 1800, Conf::$now - 1800);
         }
     }
@@ -2961,6 +2964,7 @@ class Conf {
             "gradestatistics" => "3 GradeStatistics_API::run",
             "jserror" => "1 JSError_API::jserror",
             "latestcommit" => "1 Repo_API::latestcommit",
+            "leaderboard" => "3 Leaderboard_API::run",
             "linenote" => "3 LineNote_API::linenote",
             "linenotesuggest" => "3 LineNoteSuggest_API::linenotesuggest",
             "linenotemark" => "3 LineNoteSuggest_API::linenotemark",

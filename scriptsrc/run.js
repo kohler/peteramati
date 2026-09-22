@@ -145,7 +145,8 @@ export function run(button, opts) {
         queueid = opts.queueid || null, was_onqueue = false,
         eventsource = null,
         sendtimeout = null,
-        completed = false;
+        completed = false,
+        saw_live = false, runner_name = null;
 
     therunout && (therunout.hidden = false);
     removeClass(therun, "need-run");
@@ -269,6 +270,14 @@ export function run(button, opts) {
             }
             opts.done_function && opts.done_function();
             completed = true;
+            // announce runs that finished while we watched (not replays),
+            // so, e.g., leaderboards can refresh
+            if (saw_live) {
+                therun.dispatchEvent(new CustomEvent("pa-runcomplete", {
+                    bubbles: true,
+                    detail: {runner: runner_name || category, timestamp: checkt}
+                }));
+            }
         }
         send_after(-1);
     }
@@ -643,7 +652,7 @@ export function run(button, opts) {
             }
             append(t + "\x1b[m");
             scroll_therun();
-            was_onqueue = true;
+            was_onqueue = saw_live = true;
             send_after(8000);
             return;
         }
@@ -670,6 +679,13 @@ export function run(button, opts) {
             return complete();
         } else if (data.done) {
             complete(false);
+        }
+
+        if (data.status === "working") {
+            saw_live = true;
+        }
+        if (data.runner) {
+            runner_name = data.runner;
         }
 
         if (data.eventsource

@@ -21,6 +21,8 @@ class PsetRequest {
     public $info;
     /** @var Qrequest */
     public $qreq;
+    /** @var bool */
+    private $_leaderboard_echoed = false;
 
     function __construct(Contact $viewer, Qrequest $qreq) {
         $this->conf = $viewer->conf;
@@ -428,6 +430,23 @@ class PsetRequest {
         }
         echo '<div class="statistics"></div></div>';
         Ht::stash_script("\$(\"#pa-grade-statistics\").each(\$pa.grgraph)");
+    }
+
+    /** Print the leaderboard section, at most once. Its `<hr>` is inside the
+     * section so it disappears if the leaderboard ends up hidden. */
+    private function echo_leaderboard() {
+        if ($this->_leaderboard_echoed
+            || !$this->pset->has_leaderboard()
+            || !$this->viewer->can_view_leaderboard($this->pset)) {
+            return;
+        }
+        $this->_leaderboard_echoed = true;
+        echo '<div class="pa-leaderboard" data-pa-pset="',
+            htmlspecialchars($this->pset->urlkey),
+            '" data-pa-self="', htmlspecialchars($this->user->leaderboard_name ?? ""), '"><hr>',
+            '<h3 class="pa-leaderboard-title">leaderboard</h3>',
+            '<div class="pa-leaderboard-body"></div></div>';
+        Ht::stash_script("\$(\".pa-leaderboard\").each(\$pa.leaderboard)");
     }
 
     private function echo_grader() {
@@ -902,6 +921,13 @@ class PsetRequest {
             $this->info->repo->refresh(30);
         }
 
+        // finish runs whose processes have exited; otherwise they are marked
+        // done (evaluated, leaderboard metrics recorded) only while watched
+        if ($this->info->repo) {
+            QueueItem::complete_exited($this->conf, "repoid=? and psetid=?",
+                [$this->info->repo->repoid, $this->pset->id]);
+        }
+
         // header
         if ($this->pset->has_xterm_js) {
             $this->conf->add_stylesheet("stylesheets/xterm.css");
@@ -980,6 +1006,7 @@ class PsetRequest {
 
             // print runners
             $this->echo_runner_output();
+            $this->echo_leaderboard();
 
             // line notes
             if (!empty($diff)) {
@@ -1012,6 +1039,8 @@ class PsetRequest {
             }
         }
 
+        // pages without runner output get the leaderboard at the end
+        $this->echo_leaderboard();
         echo "</div>\n";
 
 
