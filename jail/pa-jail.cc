@@ -3433,13 +3433,27 @@ void jailownerinfo::wait_background(pid_t child, int ptymaster) {
     }
 }
 
+static std::string format_duration(double t) {
+    if (t > 90) {
+        double m = std::floor(t / 60), s = t - 60 * m;
+        return s == 0 ? std::format("{}m", m) : std::format("{}m{}s", m, s);
+    }
+    return std::format("{}s", t);
+}
+
 void jailownerinfo::exec_done(pid_t child, int exit_status) {
     if (timingfd != -1) {
         write_timing();
     }
     std::string xmsg;
     if (exit_status == 124 && !quiet) {
-        xmsg = "...timed out";
+        struct timeval now;
+        gettimeofday(&now, nullptr);
+        if (timerisset(&expiry_) && timercmp(&now, &expiry_, >)) {
+            xmsg = "...timed out after " + format_duration(timeout_);
+        } else {
+            xmsg = "...timed out after " + format_duration(idle_timeout_) + " idle";
+        }
     } else if (exit_status == 128 + SIGTERM && !quiet) {
         xmsg = "...terminated";
     } else if (verbose) {
