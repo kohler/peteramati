@@ -11,6 +11,8 @@ class SiteLoader {
         "FmtArg" => "lib/fmt.php",
         "Function_GradeFormula" => "src/gradeformula.php",
         "GitHubResponse" => "src/github_repositorysite.php",
+        "LeaderboardConfig" => "src/psetconfig.php",
+        "LeaderboardMetric" => "src/psetconfig.php",
         "LoginHelper" => "lib/login.php",
         "MessageItem" => "lib/messageset.php",
         "Pset" => "src/psetconfig.php",

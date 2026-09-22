@@ -753,6 +753,14 @@ class PsetView {
         return $un ? $un->$key ?? null : null;
     }
 
+    /** The user's recorded leaderboard metrics, a map from metric key to
+     * record. Read through `upi`, not `vupi`: metrics track the latest run and
+     * have no version history.
+     * @return ?object */
+    function leaderboard_jxnote() {
+        return $this->upi()->jxnote("leaderboard");
+    }
+
     /** @return ?object */
     function commit_jnotes() {
         assert(!$this->pset->gitless);
@@ -1223,18 +1231,69 @@ class PsetView {
         }
     }
 
-    /** @param array $updates */
+    /** Merge `$updates` into the user's `xnotes`, unless their notes
+     * version has changed (`xnotes` caches values computed from the notes).
+     * Retries if another writer, such as a leaderboard update, changed
+     * `xnotes` first.
+     * @param array $updates */
     function update_user_xnotes($updates) {
         $upi = $this->upi();
         $upi->materialize($this->conf);
-        $new_xnotes = json_update($upi->jxnotes(), $updates);
-        $xnotes = json_encode_db($new_xnotes);
-        $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
-        $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
-        $result = $this->conf->qe("update ContactGrade set xnotes=?, xnotesOverflow=? where cid=? and pset=? and notesversion=?",
-            $xnotesa, $xnotesb, $upi->cid, $upi->pset, $upi->notesversion);
-        Dbl::free($result);
-        $upi->assign_xnotes($xnotes, $new_xnotes);
+        $nv = $upi->notesversion;
+        for ($ntries = 0; $ntries !== 25; ++$ntries) {
+            if ($upi->save_xnotes(json_update($upi->jxnotes(), $updates), $this->conf, $nv)
+                || $upi->notesversion !== $nv) {
+                return;
+            }
+        }
+        error_log("{$this->pset->key}: ~{$this->user->username}: xnotes update failed");
+    }
+
+
+    /** Merge leaderboard metric records into the user's `xnotes`. Each entry in
+     * `$changes` is a metric record, or null to clear that metric. A record is
+     * stored only if `$when` is at least as recent as the stored record's `at`,
+     * so runs that complete out of order don't move the leaderboard backwards.
+     * @param array<string,?object> $changes
+     * @param int $when
+     * @return bool true if anything changed */
+    function update_leaderboard_xnotes($changes, $when) {
+        $upi = $this->upi();
+        for ($ntries = 0; $ntries !== 25; ++$ntries) {
+            $lb = ($x = $upi->jxnote("leaderboard")) ? clone $x : (object) [];
+            $n = 0;
+            foreach ($changes as $key => $rec) {
+                $old = $lb->{$key} ?? null;
+                if ($old !== null && ($old->at ?? 0) > $when) {
+                    continue;
+                } else if ($rec !== null && $old == $rec) {
+                    // unchanged (loose comparison: JSON may decode 32.0 as 32)
+                    continue;
+                } else if ($rec === null) {
+                    if ($old === null) {
+                        continue;
+                    }
+                    unset($lb->{$key});
+                } else {
+                    $lb->{$key} = $rec;
+                }
+                ++$n;
+            }
+            if ($n === 0) {
+                return false;
+            }
+            $jx = ($x = $upi->jxnotes()) ? clone $x : (object) [];
+            if (empty(get_object_vars($lb))) {
+                unset($jx->leaderboard);
+            } else {
+                $jx->leaderboard = $lb;
+            }
+            if ($upi->save_xnotes($jx, $this->conf)) {
+                return true;
+            }
+        }
+        error_log("{$this->pset->key}: ~{$this->user->username}: leaderboard update failed");
+        return false;
     }
 
 
@@ -1831,7 +1890,15 @@ class PsetView {
         assert(!!$this->pset->gitless);
         $snv = $this->answer_version();
         $nv = $this->notesversion();
-        $this->conf->qe("update ContactGrade set pinsnv=?, xnotes=null, xnotesOverflow=null where cid=? and pset=?", $snv !== null && $snv < $nv ? $snv : null, $this->user->contactId, $this->pset->id);
+        // `xnotes` caches values computed from the notes; keep only
+        // leaderboard metrics, which don't depend on them
+        $lb = $this->leaderboard_jxnote();
+        $xnotes = $lb ? json_encode_db(["leaderboard" => $lb]) : null;
+        $big = $xnotes !== null && strlen($xnotes) > 1000;
+        $this->conf->qe("update ContactGrade set pinsnv=?, xnotes=?, xnotesOverflow=? where cid=? and pset=?",
+            $snv !== null && $snv < $nv ? $snv : null,
+            $big ? null : $xnotes, $big ? $xnotes : null,
+            $this->user->contactId, $this->pset->id);
     }
 
 
@@ -1937,6 +2004,15 @@ class PsetView {
     function runner_evaluate(RunnerConfig $runner, $jobid) {
         SiteLoader::require_includes(null, $runner->require);
         return call_user_func($runner->evaluate_function, $this, $runner, $jobid);
+    }
+
+    /** The metrics `$lbc` computes from job `$jobid` of its runner, as a map
+     * from metric key to number.
+     * @param int $jobid
+     * @return mixed */
+    function leaderboard_values(LeaderboardConfig $lbc, $jobid) {
+        SiteLoader::require_includes(null, $lbc->require);
+        return call_user_func($lbc->function, $this, $lbc, $jobid);
     }
 
 

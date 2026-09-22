@@ -191,6 +191,11 @@ class Pset {
     public $all_runners = [];
     /** @var array<string,RunnerConfig> */
     public $runners;
+    /** @var array<int|string,LeaderboardConfig> */
+    public $leaderboards = [];
+    /** Keyed by metric key; all-digit keys become ints.
+     * @var array<int|string,LeaderboardMetric> */
+    public $leaderboard = [];
     /** @var ?string */
     public $run_username;
     /** @var ?string */
@@ -513,6 +518,26 @@ class Pset {
         } else if ($runners) {
             throw new PsetConfigException("`runners` format error", "runners");
         }
+
+        // leaderboards
+        $lbs = $p->leaderboards ?? null;
+        if (is_array($lbs) || is_object($lbs)) {
+            // `(array)` turns numeric object keys like `"21"` into ints, so
+            // number entries only if `leaderboards` is a list
+            foreach ((array) $lbs as $k => $v) {
+                $lbc = new LeaderboardConfig(is_array($lbs) ? $k + 1 : $k, $v, $this);
+                $this->leaderboards[$lbc->name] = $lbc;
+                foreach ($lbc->metrics as $m) {
+                    if (isset($this->leaderboard[$m->key])) {
+                        throw new PsetConfigException("leaderboard metric `{$m->key}` reused", "leaderboards", $k, "metrics");
+                    }
+                    $this->leaderboard[$m->key] = $m;
+                }
+            }
+        } else if ($lbs) {
+            throw new PsetConfigException("`leaderboards` format error", "leaderboards");
+        }
+        $this->leaderboard = self::order_sort("leaderboard", $this->leaderboard);
         if ($p->runner_order ?? false) {
             $this->runners = self::reorder_config("runner_order", $this->all_runners, $p->runner_order);
         } else {
@@ -1124,6 +1149,23 @@ class Pset {
     }
 
 
+    /** @return bool */
+    function has_leaderboard() {
+        return !empty($this->leaderboard);
+    }
+
+    /** Enabled leaderboards computed from `$runner`'s output.
+     * @return list<LeaderboardConfig> */
+    function leaderboards_for_runner(RunnerConfig $runner) {
+        $lbcs = [];
+        foreach ($this->leaderboards as $lbc) {
+            if ($lbc->runner === $runner && !$lbc->disabled) {
+                $lbcs[] = $lbc;
+            }
+        }
+        return $lbcs;
+    }
+
     /** @param string $key
      * @return ?RunnerConfig */
     function runner_by_key($key) {
@@ -1270,7 +1312,7 @@ class Pset {
         return $b;
     }
 
-    private static function order_sort($what, $x) {
+    static function order_sort($what, $x) {
         $i = 0;
         $xp = [];
         foreach ($x as $k => $v) {
@@ -2018,5 +2060,197 @@ function check_interval($x) {
         return [true, floatval($m[1]) * $mult[$m[2]]];
     } else {
         return false;
+    }
+}
+
+class LeaderboardConfig {
+    /** @var Pset
+     * @readonly */
+    public $pset;
+    /** @var string
+     * @readonly */
+    public $name;
+    /** @var RunnerConfig
+     * @readonly */
+    public $runner;
+    /** @var ?string
+     * @readonly */
+    public $require;
+    /** @var string
+     * @readonly */
+    public $function;
+    /** @var null|bool|int|float|'grades'
+     * @readonly */
+    public $visible;
+    /** @var bool
+     * @readonly */
+    public $disabled;
+    /** @var array<int|string,LeaderboardMetric>
+     * @readonly */
+    public $metrics = [];
+
+    /** @param int|string $name
+     * @param mixed $lb */
+    function __construct($name, $lb, Pset $pset) {
+        $loc = ["leaderboards", $name];
+        if (!is_object($lb)) {
+            throw new PsetConfigException("leaderboard format error", $loc);
+        }
+        $this->pset = $pset;
+        $this->name = (string) $name;
+        $rname = Pset::cstr($loc, $lb, "runner") ?? $this->name;
+        if (!($runner = $pset->all_runners[$rname] ?? null)) {
+            throw new PsetConfigException("leaderboard runner `{$rname}` not found", $loc, "runner");
+        }
+        $this->runner = $runner;
+        $this->require = Pset::cstr($loc, $lb, "require", "load");
+        if (!($this->function = Pset::cstr($loc, $lb, "function"))) {
+            throw new PsetConfigException("leaderboard `function` required", $loc, "function");
+        }
+        $this->visible = Pset::cbool_or_grades_or_date($loc, $lb, "visible");
+        $this->disabled = Pset::cbool($loc, $lb, "disabled") ?? false;
+        $ms = $lb->metrics ?? null;
+        if (!is_array($ms) && !is_object($ms)) {
+            throw new PsetConfigException("leaderboard `metrics` format error", $loc, "metrics");
+        }
+        foreach ((array) $ms as $k => $v) {
+            $m = new LeaderboardMetric(is_array($ms) ? $k + 1 : $k, $v, $this);
+            if (isset($this->metrics[$m->key])) {
+                throw new PsetConfigException("leaderboard metric `{$m->key}` reused", $loc, "metrics");
+            }
+            $this->metrics[$m->key] = $m;
+        }
+    }
+}
+
+class LeaderboardMetric {
+    /** @var Pset
+     * @readonly */
+    public $pset;
+    /** @var LeaderboardConfig
+     * @readonly */
+    public $leaderboard;
+    /** @var RunnerConfig
+     * @readonly */
+    public $runner;
+    /** @var string
+     * @readonly */
+    public $key;
+    /** @var string
+     * @readonly */
+    public $title;
+    /** Short title for column headers.
+     * @var ?string
+     * @readonly */
+    public $abbr;
+    /** @var bool
+     * @readonly */
+    public $best_is_min;
+    /** @var ?int */
+    public $precision;
+    /** @var ?string */
+    public $unit;
+    /** @var null|bool|int|float|'grades' */
+    public $visible;
+    /** @var bool */
+    public $disabled;
+    /** @var ?float */
+    public $order;
+    /** Values mapped to the worst and best colors, as `[bad, good]`; null
+     * means use the range of measured values.
+     * @var ?array{float,float}
+     * @readonly */
+    public $range;
+
+    /** @param int|string $key
+     * @param mixed $m */
+    function __construct($key, $m, LeaderboardConfig $lbc) {
+        $loc = ["leaderboards", $lbc->name, "metrics", $key];
+        if ($m === true) {
+            $m = (object) [];
+        } else if (!is_object($m)) {
+            throw new PsetConfigException("leaderboard metric format error", $loc);
+        }
+
+        $this->pset = $lbc->pset;
+        $this->leaderboard = $lbc;
+        $this->runner = $lbc->runner;
+        $this->key = Pset::cstr($loc, $m, "key") ?? (string) $key;
+        if (!preg_match('/\A[0-9A-Za-z](?:[0-9A-Za-z_]|-(?![-_]))*+\z/', $this->key)) {
+            throw new PsetConfigException("leaderboard metric key format error", $loc);
+        }
+        $this->title = Pset::cstr($loc, $m, "title") ?? $this->key;
+        $this->abbr = Pset::cstr($loc, $m, "abbr");
+        $r = $m->range ?? null;
+        if ($r !== null) {
+            if (!is_array($r)
+                || count($r) !== 2
+                || !is_number($r[0])
+                || !is_number($r[1])
+                || $r[0] == $r[1]) {
+                throw new PsetConfigException("leaderboard metric `range` must be `[bad, good]`, two different numbers", $loc, "range");
+            }
+            $this->range = [(float) $r[0], (float) $r[1]];
+        }
+        $best = Pset::cstr($loc, $m, "best");
+        if ($best === null) {
+            $best = $this->range && $this->range[0] > $this->range[1] ? "min" : "max";
+        } else if ($best !== "min" && $best !== "max") {
+            throw new PsetConfigException("leaderboard metric `best` must be `min` or `max`", $loc, "best");
+        } else if ($this->range
+                   && ($best === "min") !== ($this->range[0] > $this->range[1])) {
+            throw new PsetConfigException("leaderboard metric `range` must be `[bad, good]`, but its order contradicts `best`", $loc, "range");
+        }
+        $this->best_is_min = $best === "min";
+        $this->precision = Pset::cint($loc, $m, "precision");
+        if ($this->precision !== null && ($this->precision < 0 || $this->precision > 10)) {
+            throw new PsetConfigException("leaderboard metric `precision` out of range", $loc, "precision");
+        }
+        $this->unit = Pset::cstr($loc, $m, "unit");
+        if ($this->unit !== null && ($this->unit = trim($this->unit)) === "") {
+            $this->unit = null;
+        }
+        $this->visible = Pset::cbool_or_grades_or_date($loc, $m, "visible") ?? $lbc->visible;
+        $this->disabled = $lbc->disabled || (Pset::cbool($loc, $m, "disabled") ?? false);
+        $this->order = Pset::cnum($loc, $m, "order", "position");
+    }
+
+    /** Format `$v` for display, without `unit`.
+     * @param int|float $v
+     * @return string */
+    function unparse_value($v) {
+        if ($this->precision !== null) {
+            $s = number_format((float) $v, $this->precision, ".", "");
+        } else if (is_int($v)
+                   || (floor($v) == $v && abs($v) < 1e15)) {
+            $s = sprintf("%.0f", $v);
+        } else {
+            $s = (string) round($v, 4);
+        }
+        return $s;
+    }
+
+    /** @return array<string,mixed> */
+    function json() {
+        $j = [
+            "key" => $this->key,
+            "title" => $this->title,
+            "leaderboard" => $this->leaderboard->name,
+            "runner" => $this->runner->name,
+            "best" => $this->best_is_min ? "min" : "max"
+        ];
+        if ($this->abbr !== null) {
+            $j["abbr"] = $this->abbr;
+        }
+        if ($this->precision !== null) {
+            $j["precision"] = $this->precision;
+        }
+        if ($this->unit !== null) {
+            $j["unit"] = $this->unit;
+        }
+        if ($this->range !== null) {
+            $j["range"] = $this->range;
+        }
+        return $j;
     }
 }

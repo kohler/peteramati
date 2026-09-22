@@ -374,6 +374,7 @@ class Grade_API {
             $info->user->dropped = $ug->dropped ? Conf::$now : 0;
             $info->conf->qe("update ContactInfo set dropped=? where contactId=?",
                 $info->user->dropped, $info->user->contactId);
+            Leaderboard::note_change_all($info->conf);
         }
     }
 

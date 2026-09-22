@@ -1104,6 +1104,11 @@ class UpdateSchema {
             && $conf->ql_ok("alter table SessionData change `data` `data` varbinary(32767) DEFAULT NULL")) {
             $conf->update_schema_version(181);
         }
+        if ($conf->sversion === 181
+            && $conf->ql_ok("alter table ContactInfo add `leaderboard_name` varbinary(64) DEFAULT NULL")
+            && $conf->ql_ok("alter table ContactInfo add unique key `leaderboard_name` (`leaderboard_name`)")) {
+            $conf->update_schema_version(182);
+        }
 
         $conf->ql_ok("delete from Settings where name='__schema_lock'");
     }

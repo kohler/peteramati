@@ -19,7 +19,7 @@
         "markdown-it": "latest",
         "markdown-it-attrs": "latest",
         "uglify-js": "^3.17",
-        "webpack": "^5.94.0"
+        "webpack": "^5.111.1"
     },
     "devDependencies": {
         "@eslint/js": "^9.11.0",

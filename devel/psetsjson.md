@@ -742,6 +742,136 @@ A runner may post-process its output with PHP callbacks.
 
     PHP callback that customizes how the run’s output is displayed.
 
+## Leaderboards
+
+A problem set can rank students by numeric metrics—throughput, running time,
+memory used—computed from the output of one of its runners, and display the
+rankings on the problem set page. Each entry in the problem set’s
+`leaderboards` object names a runner, a PHP callback that computes metrics from
+that runner’s output, and the metrics it computes:
+
+```json
+"runners": {
+    "torture": {"command": "…", "visible": true}
+},
+"leaderboards": {
+    "torture": {
+        "runner": "torture",
+        "require": "class/m61leaderboard.php",
+        "function": "M61Leaderboard::torture",
+        "metrics": {
+            "passed": {"title": "tests passed"},
+            "time": {"best": "min", "precision": 2, "unit": "s"}
+        }
+    }
+}
+```
+
+Whenever a run of `runner` completes, peteramati calls the callback as
+`FUNCTION(PsetView $info, LeaderboardConfig $lb, int $jobid)`. It should
+return a map from metric key to number; a `null` value clears the student’s
+recorded metric, and returning `null` records nothing. The run’s output is in
+`$info->run_logger()->output_file($jobid)`. Only declared metrics are stored.
+
+Each completed run records metrics for the student it ran for, on whatever
+commit it ran; a run never overwrites metrics from a run that started later.
+Metrics are kept in the student’s `ContactGrade` extra notes under the
+`leaderboard` key. To recompute metrics from existing runs—for instance,
+after the callback changes or when a leaderboard is added after students have
+run the runner—use `php batch/leaderboard.php refresh`, which uses each
+student’s most recent completed run on their branch. (Run logs record the
+branch and the user the run was for; older logs without a branch match if
+their commit is on the branch.) Leaderboards are read directly from recorded
+metrics, so changes appear immediately.
+
+Students appear on leaderboards under a `leaderboard_name`, a pseudonym such as
+`giraffe-enjoyer` that peteramati assigns automatically and shows to the
+student on the problem set page. Course staff also see real names and can click
+through to a student’s page.
+
+### Leaderboard entries
+
+* `runner`: string
+
+    The runner whose output is ranked. Defaults to the leaderboard’s key.
+
+* `function`: string (required)
+
+    PHP callback that computes metrics.
+
+* `require`: string (alias `load`)
+
+    PHP file to load before calling `function`.
+
+* `metrics`: object (required)
+
+    The metrics `function` computes (see below).
+
+* `visible`: boolean, date, or `"grades"`
+
+    Default `visible` for the leaderboard’s metrics.
+
+* `disabled`: boolean
+
+    If true, the leaderboard is hidden and no metrics are recorded.
+
+### Leaderboard metrics
+
+Each entry in a `metrics` object may set:
+
+* `key`: string (defaults to the key in `metrics`)
+
+    The metric’s identifier, as returned by `function`: letters, digits,
+    underscores, and single hyphens, starting with a letter or digit (`time`,
+    `21-churn`, and `21` are all valid). Metric keys must be unique within a
+    problem set.
+
+* `title`: string
+
+    Display title. Defaults to `key`.
+
+* `abbr`: string
+
+    Short title for the leaderboard’s column header, which shows the full
+    `title` in a tooltip. Defaults to `title`.
+
+* `best`: `"min"` or `"max"`
+
+    Whether smaller or larger values rank higher. Defaults to `"max"`, or to
+    the direction of `range` if that is set.
+
+* `range`: `[bad, good]`
+
+    The values colored worst and best in the leaderboard table; values in
+    between are colored by their position in the range, and values outside it
+    get the end colors. For example, `[0, 33]` for a count of passed tests, or
+    `[300, 0]` for a time where lower is better. Defaults to the range of
+    measured values, oriented by `best`.
+
+* `precision`: integer between 0 and 10
+
+    Digits after the decimal point. Defaults to displaying the value as-is.
+
+* `unit`: string
+
+    Unit shown in the metric’s column header, like `"s"` or `"B/block"`.
+    Leading and trailing spaces are ignored.
+
+* `visible`: boolean, date, or `"grades"`
+
+    When students can see this metric’s leaderboard. Leaderboards are visible
+    only to course staff unless this (or the leaderboard’s `visible`) is set.
+
+* `disabled`: boolean
+
+    If true, the metric is hidden from everyone.
+
+* `order`: number (alias `position`)
+
+    Display order among a problem set’s metrics.
+
+An entry may also be `true`, which means the metric uses all defaults.
+
 ## Renamed settings
 
 Several settings have been renamed. The old names are now errors (unless the

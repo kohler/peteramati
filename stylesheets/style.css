@@ -4403,3 +4403,132 @@ a.help {
 	opacity: 0;
 	transition: opacity .6s 3s;
 }
+
+.pa-leaderboard {
+	margin: 0 0 1.5rem;
+}
+.pa-leaderboard-title {
+	margin: 0 0 0.5rem;
+}
+.pa-leaderboard-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+}
+.pa-leaderboard-table {
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: 90%;
+}
+.pa-leaderboard-table th,
+.pa-leaderboard-table td {
+	padding: 0.125rem 0.5rem;
+	border-bottom: 1px solid #f0f0f0;
+}
+.pa-leaderboard-table th {
+	vertical-align: bottom;
+	text-align: right;
+	font-weight: normal;
+	color: #555555;
+	border-bottom-color: #cccccc;
+}
+.pa-leaderboard-table th.pa-leaderboard-who {
+	text-align: left;
+}
+.pa-leaderboard-htitle {
+	max-width: 6em;
+	margin-left: auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.pa-leaderboard-who .pa-leaderboard-htitle {
+	max-width: none;
+}
+.pa-leaderboard-hunit {
+	font-size: 85%;
+	color: #888888;
+	white-space: nowrap;
+}
+.pa-leaderboard-hunit:empty::before {
+	content: "\00a0";
+}
+.pa-leaderboard-sort {
+	cursor: pointer;
+}
+.pa-leaderboard-sort:hover .pa-leaderboard-htitle {
+	text-decoration: underline;
+}
+.pa-leaderboard-sort.active .pa-leaderboard-hunit::after {
+	content: "\25bc";
+	margin-left: 0.25em;
+	opacity: 0.5;
+}
+.pa-leaderboard-sort.active.reverse .pa-leaderboard-hunit::after {
+	content: "\25b2";
+}
+.pa-leaderboard-rank {
+	text-align: right;
+	color: #777777;
+}
+.pa-leaderboard-who {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: white;
+	white-space: nowrap;
+	text-align: left;
+}
+.pa-leaderboard-value {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	min-width: 3.5em;
+}
+.pa-leaderboard-name {
+	font-family: var(--pa-mono-ff);
+}
+.pa-leaderboard-realname,
+.pa-leaderboard-you {
+	color: #777777;
+	font-size: 90%;
+}
+.pa-leaderboard-you {
+	font-weight: normal;
+}
+.pa-leaderboard-self > td {
+	font-weight: bold;
+	border-top: 2px solid #333333;
+	border-bottom: 2px solid #333333;
+}
+.pa-leaderboard-self > .pa-leaderboard-who {
+	background: #fffbe0;
+}
+.pa-leaderboard-self .pa-leaderboard-rank,
+.pa-leaderboard-self .pa-leaderboard-realname {
+	color: inherit;
+}
+.pa-leaderboard-changed {
+	animation: pa-leaderboard-flash 3s ease-out;
+}
+@keyframes pa-leaderboard-flash {
+	0%, 30% {
+		box-shadow: inset 0 0 0 2px #276419;
+		background-color: #b8e186;
+	}
+	100% {
+		box-shadow: inset 0 0 0 2px transparent;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.pa-leaderboard-changed {
+		animation: none;
+		box-shadow: inset 0 0 0 2px #7fbc41;
+	}
+}
+.pa-leaderboard-gap td {
+	text-align: center;
+	color: #777777;
+}
+.pa-leaderboard-more {
+	margin-top: 0.5rem;
+}

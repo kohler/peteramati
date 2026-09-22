@@ -25,6 +25,7 @@ import { run } from "./run.js";
 import { run_settings_load } from "./run-settings.js";
 import { grgraph } from "./grgraph-ui.js";
 import "./grgraph-highlight.js";
+import { leaderboard } from "./leaderboard.js";
 import { GradeEntry, GradeSheet } from "./gradeentry.js";
 import "./gc-checkbox.js";
 import "./gc-letter.js";
@@ -1361,6 +1362,7 @@ window.$pa = {
     gradesheet_store: GradeSheet.store,
     grgraph: grgraph,
     hoturl: hoturl,
+    leaderboard: leaderboard,
     loadgrades: pa_loadgrades,
     load_runsettings: run_settings_load,
     note_near: Note.near,
