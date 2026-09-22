@@ -1165,6 +1165,18 @@ class QueueItem {
         $this->_lockstream = null;
         $s = proc_close($sproc);
 
+        // clean up if pa-jail exited without launching the job
+        if (($f = @fopen($pidfile, "r"))) {
+            if (flock($f, LOCK_EX | LOCK_NB)
+                && in_array(fread($f, 1), ["", "*", false], true)) {
+                if ($inputfifo) {
+                    @unlink($inputfifo);
+                }
+                @unlink($pidfile);
+            }
+            fclose($f);
+        }
+
         // save information about execution
         if ($foreground) {
             $this->foreground_command_status = $s;

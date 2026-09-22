@@ -79,11 +79,19 @@ class RunLogger {
             $w = substr($s, 0, $sp);
         }
         $runat = ctype_digit($w) ? intval($w) : 0;
+        // An empty unlocked pidfile is normal while pa-jail starts up,
+        // but is stale if pa-jail exited early.
         if (flock($f, LOCK_SH | LOCK_NB)
-            && $s !== "") {
-            if ($runat > 0
-                && strpos($s, "-i") !== false
-                && str_ends_with($fn, ".pid")) {
+            && ($s !== ""
+                || (($st = fstat($f))
+                    && $st["mtime"] < Conf::$now - 60))) {
+            if ($s === "" && str_ends_with($fn, ".pid")) {
+                foreach (glob(substr($fn, 0, -4) . ".*.in") ? : [] as $in) {
+                    @unlink($in);
+                }
+            } else if ($runat > 0
+                       && strpos($s, "-i") !== false
+                       && str_ends_with($fn, ".pid")) {
                 @unlink(substr($fn, 0, -4) . ".{$runat}.in");
             }
             unlink($fn);
