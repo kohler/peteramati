@@ -914,8 +914,6 @@ static int do_copy(const std::string& dst, const std::string& src,
         if (x_rm_f(dst)) {
             return 1;
         }
-        // /dev/ptmx is mknod'd here like any other node; exec_go() later replaces
-        // it with the `pts/ptmx` symlink the newinstance devpts needs.
         mode_t mode = ss.st_mode & (S_IFREG | S_IFCHR | S_IFBLK | S_IFIFO | S_IFSOCK | S_ISUID | S_ISGID | S_IRWXU | S_IRWXG | S_IRWXO);
         if (x_mknod(dst.c_str(), mode, ss.st_rdev)) {
             return 1;
@@ -2828,12 +2826,14 @@ int jailownerinfo::exec_go() {
     }
     handle_mount("/proc", jdir + "proc", true);
     handle_mount("/dev/pts", jdir + "dev/pts", true);
-    // /dev/pts is mounted `newinstance`, so its pty multiplexor is
-    // /dev/pts/ptmx. posix_openpt() requires a /dev/ptmx → /dev/pts/ptmx
-    // symlink to this new multiplexor; we install it unconditionally.
+    // /dev/pts is a `newinstance` devpts. On Linux 4.7+, /dev/ptmx opens that
+    // instance whether it is a device node or a `pts/ptmx` symlink, so a
+    // manifest-supplied /dev/ptmx is left alone; otherwise create the symlink.
     std::string ptmx = jdir + "dev/ptmx";
-    x_rm_f(ptmx);
-    x_symlink("pts/ptmx", ptmx.c_str());
+    struct stat ptmxst;
+    if (lstat(ptmx.c_str(), &ptmxst) != 0 && errno == ENOENT) {
+        x_symlink("pts/ptmx", ptmx.c_str());
+    }
     // a configured `tmpfs.size` limit becomes a `size=` cap on the jail's /tmp
     // tmpfs (only meaningful when /tmp is a tmpfs -- a disk-backed /tmp is not a
     // RAM-fill vector; the jail mounts a fresh empty tmpfs, so it's bounded)

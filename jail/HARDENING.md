@@ -47,8 +47,11 @@ regardless of host config (`jail_mount_hardening`): `/proc` → `nosuid,nodev,-
 noexec`; `/tmp`, `/run` → `nosuid,nodev`; `/dev/pts` → `nosuid,noexec` (no
 `nodev` — pty slaves are devices). `noexec` is deliberately *not* on `/tmp`
 (student build output is legitimately executed; since the student runs their own
-code anyway it adds no boundary). pa-jail links `/dev/ptmx` → `pts/ptmx` on every
-run, so the always-allocated pty needs no manifest entry.
+code anyway it adds no boundary). If the manifest provides no `/dev/ptmx`, pa-jail
+links `/dev/ptmx` → `pts/ptmx` at run time, so the always-allocated pty needs no
+manifest entry. A manifest-provided `/dev/ptmx` (device node or symlink, as on
+the host) is kept; on Linux 4.7+ either form opens the jail's own devpts
+instance.
 
 **Trust anchors.** The setuid path-walk is component-by-component
 `openat(O_PATH|O_NOFOLLOW)`, each ancestor required root-owned and not
@@ -458,8 +461,8 @@ enforcement, a `docker run --privileged gcc:14` container with cgroup v2 (free t
 cgroup root of processes, enable the controllers in `cgroup.subtree_control`),
 register a tiny **static** fork-counter as the jail user's shell (`/etc/shells` +
 `-F /path/to/forksh`), and run with `pids.max=15`: it prints `FORKCAP at 13
-children` (15 − supervisor − shell). Since pa-jail links `/dev/ptmx` on every run,
-the manifest needs no `/dev/*` entries for the pty.
+children` (15 − supervisor − shell). Since pa-jail links a missing `/dev/ptmx` at run
+time, the manifest needs no `/dev/*` entries for the pty.
 
 ## 6. `shell_quote`
 
