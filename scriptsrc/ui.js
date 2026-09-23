@@ -279,7 +279,7 @@ export function check_form_differs(form, elt) {
     }
 }
 
-export function $e(tag, attr) {
+export function $e(tag, attr, ...args) {
     const e = document.createElement(tag);
     if (!attr) {
         // nothing
@@ -296,10 +296,39 @@ export function $e(tag, attr) {
             }
         }
     }
-    for (let i = 2; i < arguments.length; ++i) {
-        if (arguments[i] != null) {
-            e.append(arguments[i]);
+    for (const a of args) {
+        a == null || e.append(a);
+    }
+    return e;
+}
+
+export function $frag(...args) {
+    const f = document.createDocumentFragment();
+    for (const a of args) {
+        a == null || f.append(a);
+    }
+    return f;
+}
+
+export function $svg(tag, attr, ...args) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    if (!attr) {
+        // nothing
+    } else if (typeof attr === "string") {
+        e.setAttribute("class", attr);
+    } else {
+        for (const i in attr) {
+            if (attr[i] == null) {
+                // skip
+            } else if (typeof attr[i] === "boolean") {
+                attr[i] ? e.setAttribute(i, "") : e.removeAttribute(i);
+            } else {
+                e.setAttribute(i, attr[i]);
+            }
         }
+    }
+    for (const a of args) {
+        a == null || e.append(a);
     }
     return e;
 }
@@ -327,3 +356,14 @@ $.fn.awaken = function () {
 };
 
 $(function () { $(document.body).awaken(); });
+
+
+// elements named by a space-separated ID list, like `aria-describedby`
+export function $$list(ids) {
+    const es = [];
+    for (const id of ids.split(/\s+/)) {
+        const e = id !== "" ? document.getElementById(id) : null;
+        e && es.push(e);
+    }
+    return es;
+}
