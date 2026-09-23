@@ -381,6 +381,9 @@ form {
 .d-inline {
 	display: inline !important;
 }
+.d-block {
+	display: block !important;
+}
 .d-inline-block {
 	display: inline-block !important;
 }
@@ -2490,16 +2493,14 @@ div.pst span.hint {
 }
 .bubtail {
 	position: absolute;
-	border-style: solid;
-	border-width: 0;
 	width: 12px;
 	height: 6px;
 }
-.bubtail.tooltip {
+.bubble.tooltip > .bubtail {
 	width: 8px;
 	height: 4px;
 }
-.bubtail.suggest {
+.bubble.suggest > .bubtail {
 	width: 0;
 	height: 0;
 }

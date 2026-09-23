@@ -6,37 +6,37 @@ const ee_re = /[&<>"']/g,
     ee_rep = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"};
 
 export function escape_entities(s) {
-    if (s !== null && typeof s !== "number")
+    if (s !== null && typeof s !== "number") {
         return s.replace(ee_re, function (match) { return ee_rep[match]; });
-    else
-        return s;
+    }
+    return s;
 }
 
 const ue_re = /&.*?;/g,
     ue_rep = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'", "&#039;": "'", "&#39;": "'"};
 
 export function unescape_entities(s) {
-    if (s !== null && typeof s !== "number")
+    if (s !== null && typeof s !== "number") {
         return s.replace(ue_re, function (match) { return ue_rep[match]; });
-    else
-        return s;
+    }
+    return s;
 }
 
 const urle_re = /%20|[!~*'()]/g,
     urle_rep = {"%20": "+", "!": "%21", "~": "%7E", "*": "%2A", "'": "%27", "(": "%28", ")": "%29"};
 
 export function urlencode(s) {
-    if (s !== null && typeof s !== "number")
+    if (s !== null && typeof s !== "number") {
         return encodeURIComponent(s).replace(urle_re, function (match) { return urle_rep[match]; });
-    else
-        return s;
+    }
+    return s;
 }
 
 export function urldecode(s) {
-    if (s !== null && typeof s !== "number")
+    if (s !== null && typeof s !== "number") {
         return decodeURIComponent(s.replace(/\+/g, "%20"));
-    else
-        return s;
+    }
+    return s;
 }
 
 export function text_to_html(text) {
@@ -60,9 +60,8 @@ export function html_id_encode(s) {
             return "@" + s.charCodeAt(0).toString(16);
         } else if (s === "%2F") {
             return "/";
-        } else {
-            return "@" + s.substring(1);
         }
+        return "@" + s.substring(1);
     });
 }
 

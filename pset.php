@@ -366,18 +366,18 @@ class PsetRequest {
         $b = [];
         if ($newer || $older) {
             if ($older !== null) {
-                $b[] = $this->info->hotlink("←", "pset", ["snv" => $older], ["class" => "btn need-tooltip", "aria-label" => "Older answers"]);
+                $b[] = $this->info->hotlink("←", "pset", ["snv" => $older], ["class" => "btn need-tooltip", "aria-label" => "Older answers", "data-tooltip-anchor" => "b"]);
             } else {
                 $b[] = Ht::button("←", ["type" => "button", "disabled" => true]);
             }
         }
         if ($this->info->pc_view) {
             $cl = $match === $this->info->pinsnv() ? " btn-primary" : "";
-            $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl_raw("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading"]);
+            $b[] = Ht::button("Ⓖ", ["type" => "submit", "formmethod" => "post", "formaction" => $this->info->hoturl_raw("=pset", ["pinsnv" => 1]), "class" => "btn need-tooltip{$cl}", "aria-label" => "Mark these answers for grading", "data-tooltip-anchor" => "b"]);
         }
         if ($newer || $older) {
             if ($newer !== null) {
-                $b[] = $this->info->hotlink("→", "pset", ["snv" => $newer === $newest ? "latest" : $newer], ["class" => "btn need-tooltip", "aria-label" => "Newer answers"]);
+                $b[] = $this->info->hotlink("→", "pset", ["snv" => $newer === $newest ? "latest" : $newer], ["class" => "btn need-tooltip", "aria-label" => "Newer answers", "data-tooltip-anchor" => "b"]);
             } else {
                 $b[] = Ht::button("→", ["type" => "button", "disabled" => true]);
             }
