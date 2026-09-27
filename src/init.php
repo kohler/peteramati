@@ -188,16 +188,22 @@ function load_psets_json($exclude_overrides) {
     return $json;
 }
 
-function initialize_psets() {
-    global $Opt, $PsetOverrides;
-
-    // create initial conference
+function initialize_conf() {
+    global $Opt;
     if (!Conf::$main) {
         Conf::set_main_instance(new Conf($Opt, true));
     }
     if (!Conf::$main->dblink) {
         Multiconference::fail_bad_database();
     }
+    return Conf::$main;
+}
+
+function initialize_psets() {
+    global $Opt, $PsetOverrides;
+
+    // create initial conference
+    initialize_conf();
 
     // read psets
     try {
