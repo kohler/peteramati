@@ -6,6 +6,8 @@
 class Grade_API {
     /** @var array<string,true|string> */
     public $errf = [];
+    /** @var list<string> */
+    public $conflicts = [];
     /** @var bool */
     public $diff = false;
 
@@ -64,6 +66,7 @@ class Grade_API {
                     && (!array_key_exists($k, $g)
                         || $ge->value_differs($oldgv, $g[$k]))) {
                     $this->errf[$k] = "Edit conflict";
+                    $this->conflicts[] = $k;
                 }
             }
             $has_agv = false;
@@ -164,7 +167,11 @@ class Grade_API {
             // assign grades
             $v = $gapi->apply_grades($info, $g, $ag, $og);
             if (!empty($gapi->errf)) {
-                return $gapi->error_json((array) $info->grade_json(0, $known_entries));
+                $j = (array) $info->grade_json(0, $known_entries);
+                if (!empty($gapi->conflicts)) {
+                    $j["conflicts"] = $gapi->conflicts;
+                }
+                return $gapi->error_json($j);
             } else if (!empty($v)) {
                 $info->update_grade_notes($v);
             }

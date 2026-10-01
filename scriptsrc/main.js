@@ -456,6 +456,10 @@ function gv_save_some() {
             data: {grades: g, oldgrades: og},
             method: "POST", cache: false, dataType: "json",
             success: function (data) {
+                if (!data.ok && gv_resolve_conflict(pi, fs, og, data)) {
+                    api_conditioner.done();
+                    return;
+                }
                 for (const f of fs) {
                     gv_resolve_change(f, data);
                 }
@@ -467,6 +471,45 @@ function gv_save_some() {
     }
 
     gv_mark_changed();
+}
+
+// A student's answers conflict when they edit from more than one tab. Resolve
+// silently: rebase the fields we sent onto the server's current values and
+// save them again, and give clean fields the server's text. Returns false,
+// leaving the error to be reported, if any error isn't an answer conflict or
+// rebasing would not change what we send.
+function gv_resolve_conflict(pi, fs, og, data) {
+    const gi = GradeSheet.closest(pi);
+    if (!data.conflicts || !data.grades || !data.errf) {
+        return false;
+    }
+    for (const k in data.errf) {
+        const ge = gi.xentry(k);
+        if (!data.conflicts.includes(k) || !ge || !ge.answer) {
+            return false;
+        }
+    }
+
+    // `GradeSheet.store` rebases every field, but changes only the text of
+    // fields that aren't `.pa-dirty`
+    for (const f of fs) {
+        addClass(f, "pa-dirty");
+    }
+    GradeSheet.store(pi, data);
+    for (const k of data.conflicts) {
+        if (gi.xentry(k).value_in(gi) == og[k]) {
+            for (const f of fs) {
+                removeClass(f, "pa-dirty");
+            }
+            return false;
+        }
+    }
+
+    removeClass(pi, "pa-outstanding");
+    for (const f of fs) {
+        gv_save_after(f, 0);
+    }
+    return true;
 }
 
 function gv_resolve_change(f, data) {
