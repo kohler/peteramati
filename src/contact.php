@@ -1509,12 +1509,13 @@ class Contact {
         if (!$this->activity_at || $this->activity_at <= Conf::$now - 7776000
             || (($cdbu = $this->contactdb_user())
                 && (!$cdbu->activity_at || $cdbu->activity_at <= Conf::$now - 7776000))) {
-            $this->mark_activity();
+            $this->mark_activity(0);
         }
     }
 
-    function mark_activity() {
-        if (!$this->activity_at || $this->activity_at < Conf::$now) {
+    /** @param int $allowance */
+    function mark_activity($allowance = 0) {
+        if (!$this->activity_at || $this->activity_at < Conf::$now - $allowance) {
             $this->activity_at = Conf::$now;
             if ($this->contactId && !$this->is_anonymous_user()) {
                 $this->conf->ql("update ContactInfo set lastLogin=" . Conf::$now . " where contactId=$this->contactId");
@@ -1535,7 +1536,7 @@ class Contact {
     function log_activity_for($user, $text, $paperId = null) {
         $this->mark_activity();
         if (!$this->is_anonymous_user()) {
-            $this->conf->log($text . " by $this->email", $user, $paperId);
+            $this->conf->log("{$text} by {$this->email}", $user, $paperId);
         }
     }
 
