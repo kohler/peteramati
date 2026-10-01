@@ -264,7 +264,7 @@ span.lgsep {
 .nw, .nb {
 	white-space: nowrap;
 }
-.pw {
+.pw, .pw-code code, code.pw-code {
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
 }
