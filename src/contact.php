@@ -83,6 +83,8 @@ class Contact {
     public $github_userid;
     /** @var string */
     public $anon_username;
+    /** @var ?string */
+    public $leaderboard_name;
     /** @var ?int */
     public $contactImageId;
     public $last_runorder;
@@ -230,6 +232,9 @@ class Contact {
         }
         if (isset($user->anon_username)) {
             $this->anon_username = $user->anon_username;
+        }
+        if (isset($user->leaderboard_name)) {
+            $this->leaderboard_name = $user->leaderboard_name;
         }
         if (isset($user->contactImageId)) {
             $this->contactImageId = (int) $user->contactImageId;
