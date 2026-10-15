@@ -1753,12 +1753,12 @@ class Conf {
         }
         if (($flags & self::HOTURL_ABSOLUTE) || $this !== Conf::$main) {
             return $this->opt("paperSite") . "/" . $t;
-        } else {
-            $siteurl = $nav->site_path_relative;
-            if ($need_site_path && $siteurl === "")
-                $siteurl = $nav->site_path;
-            return $siteurl . $t;
         }
+        $siteurl = $nav->site_path_relative;
+        if ($need_site_path && $siteurl === "") {
+            $siteurl = $nav->site_path;
+        }
+        return $siteurl . $t;
     }
 
     /** @param string $t

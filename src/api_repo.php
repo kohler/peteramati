@@ -252,6 +252,8 @@ class Repo_API {
         if (!$qreq->file) {
             return ["ok" => false, "error" => "Invalid request"];
         }
+        $nav = $qreq->navigation();
+        $nav->set_site_path_relative($qreq->base ?? null);
         $info = PsetView::make($api->pset, $api->user, $user);
         if (($qreq->base_commit ?? $qreq->base_hash ?? "") === "") {
             $base_commit = $info->base_handout_commit();
