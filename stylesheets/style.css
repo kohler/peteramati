@@ -2470,6 +2470,16 @@ div.pst span.hint {
 .bubble.tooltip {
 	margin: 0 8px;
 }
+.bubble.tooltip.gray {
+	background-color: rgba(246, 246, 246, 0.88);
+	color: inherit;
+	border: 1px solid #b8b8b8;
+	font-size: inherit;
+	line-height: inherit;
+}
+.bubble.tooltip.gray.small {
+	font-size: smaller;
+}
 .bubble.tooltip .tagcolorspan, .bubble.graphtip .tagcolorspan {
 	color: #2c2c33;
 }

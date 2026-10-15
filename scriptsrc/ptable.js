@@ -84,7 +84,7 @@ function strong(t) {
 function user_hover(evt) {
     if (evt.target.tagName === "A" && evt.target.classList.contains("pa-user")) {
         if (evt.type === "mouseenter") {
-            tooltip.enter(evt.target, "pa-ptable-user");
+            tooltip.enter(evt.target, {builder: "pa-ptable-user"});
         } else {
             tooltip.leave(evt.target);
         }
@@ -1736,7 +1736,7 @@ tooltip.add_builder("pa-ptable-user", function () {
                 $e("img", {class: "pa-tinyface", src: hoturl("face", {u: su.user, imageid: su.imageid})}),
                 ub));
         }
-    }), delay: 400, className: "gray small ml-2", dir: "w",
+    }), delay: 400, className: "gray small ml-2", anchor: "w",
         noDelayClass: "pa-ptable-user"};
 });
 

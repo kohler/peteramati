@@ -2,7 +2,7 @@
 // Peteramati is Copyright (c) 2006-2026 Eddie Kohler
 // See LICENSE for open-source distribution terms
 
-import { $e, $$list, $svg, hasClass, removeClass } from "./ui.js";
+import { $e, $$list, $svg, $frag, hasClass, removeClass } from "./ui.js";
 import { escape_entities } from "./encoders.js";
 
 
@@ -516,6 +516,11 @@ function prepare_info(elt, info) {
     } else if (elt.hasAttribute("title")) {
         info.content = escape_entities(elt.getAttribute("title"));
     }
+    if (elt.hasAttribute("data-tooltip-delay")) {
+        info.delay = parseInt(elt.getAttribute("data-tooltip-delay"));
+    } else if (info.delay == null && (info.type == null || info.type === "hover")) {
+        info.delay = 150;
+    }
     return info;
 }
 
@@ -527,30 +532,36 @@ function show_tooltip(info) {
     const self = this;
     info = prepare_info(self, $.extend({}, info || {}));
 
-    let bub = null, to = null, refcount = 0;
+    let bub = null, to = null, delayto = null, refcount = 1, closed = false,
+        contentElement = info.contentElement, content = info.content;
 
     function close() {
+        closed = true;
         to = clearTimeout(to);
+        delayto = clearTimeout(delayto);
         if (bub) {
             bub.element().removeEventListener("pointerenter", tt.enter);
             bub.element().removeEventListener("pointerleave", tt.leave);
             bub.remove();
+            bub = null;
         }
-        bub && bub.remove();
-        tooltip_map.delete(self);
+        if (tooltip_map.get(self) === tt) {
+            tooltip_map.delete(self);
+        }
         if (global_tooltip === tt) {
             global_tooltip = null;
         }
     }
 
-    let tt = {
+    const tt = {
         enter: function () {
             to = clearTimeout(to);
             ++refcount;
             return tt;
         },
         leave: function () {
-            const delay = info.type === "focus" ? 0 : 200;
+            // close immediately if the bubble hasn't appeared yet
+            const delay = bub && info.type !== "focus" ? 200 : 0;
             to = clearTimeout(to);
             if (--refcount === 0 && info.type !== "sticky") {
                 to = setTimeout(close, delay);
@@ -566,28 +577,51 @@ function show_tooltip(info) {
         },
         bubbleElement: function () {
             return bub ? bub.element() : null;
+        },
+        reposition: function () {
+            bub && bub.near(info.near || self);
+            return tt;
+        },
+        noDelayClass: function () {
+            return info.noDelayClass;
+        },
+        text: function (text) {
+            if (text === undefined) {
+                return bub ? bub.text() : null;
+            }
+            if (bub) {
+                bub.text(text);
+            } else {
+                contentElement = null;
+                content = new Text(text);
+            }
+            return tt;
+        },
+        replace_content: function (...es) {
+            const fr = $frag(...es);
+            if (bub) {
+                bub.replace_content(fr);
+            } else {
+                contentElement = null;
+                content = fr;
+            }
+            return tt;
         }
     };
 
-    function complete(content) {
+    function show() {
+        if (closed || delayto) {
+            return;
+        }
         if (content instanceof Promise) {
-            content.then(complete);
+            const p = content;
+            p.then((c) => {
+                if (content === p) {
+                    content = c;
+                }
+                show();
+            });
             return;
-        }
-
-        let tx = global_tooltip;
-        if (tx
-            && tx.owner() === info.element
-            && (info.contentElement
-                ? info.contentElement === tx.bubbleElement()
-                : content === tx.html())
-            && !info.done) {
-            tt = tx;
-            return;
-        }
-        if (tx) {
-            tx.close();
-            tx = null;
         }
 
         const className = info.className ? `tooltip ${info.className}` : "tooltip",
@@ -595,28 +629,41 @@ function show_tooltip(info) {
         if (info.type === "focus") {
             bubinfo.class += " position-absolute";
         }
-        if (info.contentElement) {
-            bubinfo.element = info.contentElement;
+        if (contentElement) {
+            bubinfo.element = contentElement;
         } else if (content) {
             bubinfo.content = content;
         } else {
             return;
         }
 
-        tooltip_map.set(self, tt);
         bub = Bubble(bubinfo).near(info.near || self);
         bub.element().addEventListener("pointerenter", tt.enter);
         bub.element().addEventListener("pointerleave", tt.leave);
-        global_tooltip = tt;
     }
-    complete(info.content);
-    info.done = true;
+
+    // skip the delay if a tooltip with the same noDelayClass is showing
+    const tx = global_tooltip;
+    if (info.delay > 0
+        && !(info.noDelayClass
+             && tx
+             && tx.bubbleElement()
+             && tx.noDelayClass() === info.noDelayClass)) {
+        delayto = setTimeout(() => {
+            delayto = null;
+            show();
+        }, info.delay);
+    }
+    tx && tx.close();
+    tooltip_map.set(self, tt);
+    global_tooltip = tt;
+    show();
     return tt;
 }
 
 function ttenter() {
-    const tt = tooltip_map.get(this) || show_tooltip.call(this);
-    tt && tt.enter();
+    const tt = tooltip_map.get(this);
+    tt ? tt.enter() : show_tooltip.call(this);
 }
 
 function ttleave() {
@@ -644,8 +691,8 @@ export function tooltip_within(elt) {
     function enter(evt) {
         const wte = evt.target.closest(".need-tooltip-within");
         if (wte) {
-            const tt = tooltip_map.get(wte) || show_tooltip.call(wte, info);
-            tt && tt.enter();
+            const tt = tooltip_map.get(wte);
+            tt ? tt.enter() : show_tooltip.call(wte, info);
         }
     }
     function leave(evt) {

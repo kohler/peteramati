@@ -12,7 +12,7 @@ import { feedback } from "./render.js";
 
 handle_ui.on("js-repo-copy", function () {
     var node = document.createTextNode(this.getAttribute("data-pa-repo"));
-    var bub = Bubble(node, {color: "tooltip", dir: "t"});
+    var bub = Bubble({content: node, class: "tooltip", anchor: "t"});
     bub.near(this);
     var range = document.createRange();
     range.selectNode(node);
@@ -24,7 +24,7 @@ handle_ui.on("js-repo-copy", function () {
     }
     window.getSelection().removeAllRanges();
     bub.remove();
-    if (global_tooltip && global_tooltip.elt == this) {
+    if (global_tooltip && global_tooltip.owner() === this) {
         global_tooltip.text(this.getAttribute("data-pa-repo"));
     }
 });
