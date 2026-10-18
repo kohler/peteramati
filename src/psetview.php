@@ -2599,12 +2599,31 @@ class PsetView {
         return $this->hoturl("raw", ["file" => $dinfo->repo_filename()]);
     }
 
+    /** @return bool */
+    private static function inline_image(DiffInfo $dinfo) {
+        return !$dinfo->fileless()
+            && !$dinfo->file_deleted()
+            && preg_match('/\.(?:png|jpg|jpeg|gif|svg)\z/i', $dinfo->filename);
+    }
+
+    /** @return bool */
+    private static function inline_svg(DiffInfo $dinfo) {
+        return self::inline_image($dinfo)
+            && preg_match('/\.svg\z/i', $dinfo->filename);
+    }
+
     /** @return list<string> */
-    private function _diff_buttons(DiffInfo $dinfo, $hide_left) {
+    private function _diff_buttons(DiffInfo $dinfo, $hide_left, $hide_source) {
         if ($dinfo->file_deleted()) {
             return [];
         }
         $bts = $icons = [];
+        if (self::inline_svg($dinfo)) {
+            $icons[] = "source";
+            $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-source'
+                . ($hide_source ? "" : " btn-primary")
+                . ' need-tooltip" aria-label="Source">' . Icons::source() . '</button>';
+        }
         if (!$dinfo->file_inserted()) {
             $icons[] = "plusminus";
             $bts[] = '<button type="button" class="btn ui pa-diff-toggle-hide-left'
@@ -2652,12 +2671,13 @@ class PsetView {
         $hide_left = ($args["hide_left"] ?? false)
             && !$only_content
             && $dinfo->has_insertion();
+        $linenotes = $lnorder->file($file);
+        $hide_source = self::inline_svg($dinfo) && empty($linenotes);
 
         $tabid = "F" . html_id_encode($file);
         if ($this->conf->multiuser_page) {
             $tabid = "U" . html_id_encode($this->user_linkpart()) . "/{$tabid}";
         }
-        $linenotes = $lnorder->file($file);
         if ($this->can_view_note_authors()) {
             $this->conf->stash_hotcrp_pc($this->viewer);
         }
@@ -2718,7 +2738,7 @@ class PsetView {
                 }
             }
         }
-        $bts = $no_heading ? [] : $this->_diff_buttons($dinfo, $hide_left);
+        $bts = $no_heading ? [] : $this->_diff_buttons($dinfo, $hide_left, $hide_source);
 
         if (!$only_content) {
             echo '<div class="pa-dg pa-filediff-ctr',
@@ -2745,7 +2765,7 @@ class PsetView {
                     : "<a class=\"q pa-extlink\" href=\"{$rawurl}\" target=\"_blank\">";
             }
             echo htmlspecialchars($dinfo->title ? : $file), "</a>";
-            $bts = $this->_diff_buttons($dinfo, $hide_left);
+            $bts = $this->_diff_buttons($dinfo, $hide_left, $hide_source);
             if (!empty($bts)) {
                 echo '<div class="hdr-actions btnbox no-print">', join("", $bts), '</div>';
             }
@@ -2755,6 +2775,9 @@ class PsetView {
         echo '<div id="', $tabid, '" class="pa-dg pa-filediff';
         if ($hide_left || $dinfo->file_inserted()) {
             echo " pa-hide-left";
+        }
+        if ($hide_source) {
+            echo " pa-hide-source";
         }
         if ($dinfo->tabwidth !== 4) {
             echo " pa-tabwidth-", $dinfo->tabwidth;
@@ -2810,8 +2833,9 @@ class PsetView {
         if ($has_grade_range) {
             echo '</div></div>'; // end div.pa-dg div.pa-dg.pa-with-sidebar
         }
-        if (preg_match('/\.(?:png|jpg|jpeg|gif)\z/i', $file)) {
-            echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $dinfo->repo_filename()])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="pa-dr ui-error js-hide-error">';
+        if (self::inline_image($dinfo)) {
+            $imgclass = self::inline_svg($dinfo) ? "pa-dr pa-source-image" : "pa-dr";
+            echo '<img src="', Ht::escape_attr($this->hoturl_raw("raw", ["file" => $dinfo->repo_filename()])), '" alt="', htmlspecialchars("[{$file}]"), '" loading="lazy" class="', $imgclass, ' ui-error js-hide-error">';
         }
         echo "</div>"; // end div.pa-filediff#F_...
         if (!$only_content) {

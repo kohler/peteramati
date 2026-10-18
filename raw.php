@@ -65,11 +65,18 @@ if ($ext === "txt" || strcasecmp($filename, "README") === 0) {
     $mimetype = Mimetype::TXT_TYPE;
 } else if ($ext === "html") {
     $mimetype = Mimetype::HTML_TYPE;
+} else if ($ext === "svg") {
+    $mimetype = "image/svg+xml";
 } else {
     $mimetype = Mimetype::content_type($result);
 }
 
 header("Content-Type: " . Mimetype::type_with_charset($mimetype));
+header("X-Content-Type-Options: nosniff");
+if (!Mimetype::disposition_inline($mimetype)) {
+    // Neutralize active content (HTML, SVG) if rendered as a document
+    header("Content-Security-Policy: sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'");
+}
 if (zlib_get_coding_type() === false) {
     header("Content-Length: " . strlen($result));
 }

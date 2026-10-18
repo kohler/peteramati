@@ -3371,6 +3371,12 @@ code, .pa-da, .pa-db, .pa-dd, .pa-dcx,
 .pa-hide-left .pa-gi {
 	background-color: #f0fff0;
 }
+.pa-hide-source .pa-dl {
+	display: none;
+}
+.pa-filediff:not(.pa-hide-source) > .pa-source-image {
+	display: none;
+}
 .pa-hide-comments .pa-gi.pa-gblank,
 .pa-hide-comments .pa-gi.pa-gcomment,
 .pa-hide-comments .pa-gi .hljs-comment {

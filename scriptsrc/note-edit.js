@@ -520,7 +520,9 @@ function adjacent_visible_source(ln, backward) {
 // original screen position. If the toggle hides it (e.g. its file was
 // collapsed), liveness moves to the nearest following visible line and the
 // topmost still-visible reference line is held fixed instead — keeping visible
-// content put rather than pulling distant content up to the anchor.
+// content put rather than pulling distant content up to the anchor. If no
+// source line in the anchor's file remains visible (e.g. SVG source replaced by
+// its image), the file's header is held fixed, with content starting below it.
 export function active_scroll_anchor() {
     const vh = window.innerHeight || document.documentElement.clientHeight;
 
@@ -544,10 +546,23 @@ export function active_scroll_anchor() {
     }
 
     const anchor_top = anchorel.getBoundingClientRect().top;
+
+    // file content top, clamped below its (possibly sticky) header
+    const fdel = anchorel.closest(".pa-filediff");
+    let fd_top = 0;
+    if (fdel) {
+        const h3 = fdel.previousSibling;
+        fd_top = fdel.getBoundingClientRect().top;
+        if (h3 && hasClass(h3, "pa-fileref")) {
+            fd_top = Math.max(fd_top, h3.getBoundingClientRect().bottom);
+        }
+    }
+
     return function () {
         if (!anchorel.parentElement) {
             anchorel = anchorel2;
         }
+        let target_top = anchor_top;
         if (!anchorel.offsetParent) {
             if (hasClass(anchorel, "pa-dl")
                 && anchorel.parentElement.offsetParent) {
@@ -558,9 +573,14 @@ export function active_scroll_anchor() {
                     anchorel = anchorel.parentElement;
                 }
             }
+            if ((!anchorel || anchorel === fdel)
+                && fdel && fdel.offsetParent) {
+                anchorel = fdel;
+                target_top = fd_top;
+            }
         }
         if (anchorel) {
-            const delta = Math.round(anchorel.getBoundingClientRect().top - anchor_top);
+            const delta = Math.round(anchorel.getBoundingClientRect().top - target_top);
             if (delta) {
                 capture_scroll_at = performance.now();
                 window.scrollBy(0, delta);

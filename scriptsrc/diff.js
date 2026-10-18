@@ -126,6 +126,13 @@ export class Filediff {
         toggleClass(this.element, "pa-hide-comments", !show);
         $(this.element.previousSibling).find(".pa-diff-toggle-hide-comments").toggleClass("btn-primary", !show);
     }
+    toggle_show_source(show) {
+        if (show == null) {
+            show = hasClass(this.element, "pa-hide-source");
+        }
+        toggleClass(this.element, "pa-hide-source", !show);
+        $(this.element.previousSibling).find(".pa-diff-toggle-hide-source").toggleClass("btn-primary", show);
+    }
     get file() {
         const id = this.element.id;
         if (id.charCodeAt(0) === 85 /* U */) {
@@ -553,6 +560,14 @@ handle_ui.on("pa-diff-toggle-hide-comments", function (evt) {
         show = hasClass(Filediff.referenced(this).element, "pa-hide-comments"),
         restore = active_scroll_anchor();
     $es.each(function () { Filediff.referenced(this).toggle_show_comments(show); });
+    restore();
+});
+
+handle_ui.on("pa-diff-toggle-hide-source", function (evt) {
+    const $es = evt.metaKey ? $(".pa-diff-toggle-hide-source") : $(this),
+        show = hasClass(Filediff.referenced(this).element, "pa-hide-source"),
+        restore = active_scroll_anchor();
+    $es.each(function () { Filediff.referenced(this).toggle_show_source(show); });
     restore();
 });
 
