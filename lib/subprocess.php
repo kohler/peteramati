@@ -88,7 +88,7 @@ class Subprocess {
 
     /** @param list<string> $command
      * @param string $cwd
-     * @param array{firstline?:int,linecount?:int,stdin?:string,env?:array<string,string>} $args
+     * @param array{firstline?:int,linecount?:int,stdin?:string,stdout?:false,stderr?:false,env?:array<string,string>} $args
      * @return Subprocess */
     static function run($command, $cwd, $args = []) {
         $firstline = max($args["firstline"] ?? 1, 1);
@@ -97,65 +97,87 @@ class Subprocess {
         $stdin = $args["stdin"] ?? "";
         $stdinpos = 0;
         $stdinlen = strlen($stdin);
+        $want_stdin = $stdinpos !== $stdinlen;
+        $want_stdout = ($args["stdout"] ?? null) !== false;
+        $want_stderr = ($args["stderr"] ?? null) !== false;
 
         $descriptors = [
-            ["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]
+            $want_stdin ? ["pipe", "r"] : ["file", "/dev/null", "r"],
+            $want_stdout ? ["pipe", "w"] : ["file", "/dev/null", "w"],
+            $want_stderr ? ["pipe", "w"] : ["file", "/dev/null", "w"]
         ];
-        if ($stdinpos !== $stdinlen) {
-            $descriptors[0] = ["pipe", "r"];
-        }
         $cmd = self::args_to_command($command);
         $env = $args["env"] ?? null;
         $proc = proc_open($cmd, $descriptors, $pipes, $cwd, $env);
         if (!$proc) {
             error_log(self::shell_quote_args($command));
         }
-        if ($stdinpos !== $stdinlen) {
+        if ($want_stdin) {
             stream_set_blocking($pipes[0], false);
         }
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
+        if ($want_stdout) {
+            stream_set_blocking($pipes[1], false);
+        }
+        if ($want_stderr) {
+            stream_set_blocking($pipes[2], false);
+        }
         $sp = new Subprocess;
         $sp->command = $command;
         $sp->cwd = $cwd;
         $sp->truncated = false;
 
-        while (!feof($pipes[1]) || !feof($pipes[2])) {
+        while (($stdinpos !== $stdinlen)
+               || ($want_stdout && !feof($pipes[1]))
+               || ($want_stderr && !feof($pipes[2]))) {
             if ($stdinpos !== $stdinlen) {
                 $nw = fwrite($pipes[0], substr($stdin, $stdinpos));
-                if ($nw !== false) {
+                if ($nw === false) {
+                    // child closed stdin; abandon the rest
+                    $stdinpos = $stdinlen;
+                } else {
                     $stdinpos += $nw;
                 }
                 if ($stdinpos === $stdinlen) {
                     fclose($pipes[0]);
                 }
             }
-            $x = fread($pipes[1], 32768);
+            $x = $want_stdout ? fread($pipes[1], 32768) : false;
             if ($x !== false) {
                 $sp->stdout .= $x;
             }
-            $y = fread($pipes[2], 32768);
+            $y = $want_stderr ? fread($pipes[2], 32768) : false;
             if ($y !== false) {
                 $sp->stderr .= $y;
             }
             if (($lines && $sp->handle_lines($firstline, $linecount))
-                || $x === false
-                || $y === false) {
+                || ($want_stdout && $x === false)
+                || ($want_stderr && $y === false)) {
                 break;
             }
-            $r = [$pipes[1], $pipes[2]];
-            $w = $e = [];
+            $r = $w = $e = [];
             if ($stdinpos !== $stdinlen) {
                 $w[] = $pipes[0];
             }
-            stream_select($r, $w, $e, 5);
+            if ($want_stdout) {
+                $r[] = $pipes[1];
+            }
+            if ($want_stderr) {
+                $r[] = $pipes[2];
+            }
+            if (!empty($r) || !empty($w)) {
+                stream_select($r, $w, $e, 5);
+            }
         }
 
         if ($stdinpos !== $stdinlen) {
             fclose($pipes[0]);
         }
-        fclose($pipes[1]);
-        fclose($pipes[2]);
+        if ($want_stdout) {
+            fclose($pipes[1]);
+        }
+        if ($want_stderr) {
+            fclose($pipes[2]);
+        }
         $sp->status = proc_close($proc);
         $sp->ok = $sp->truncated || pcntl_wifexitedwith($sp->status, 0);
         return $sp;

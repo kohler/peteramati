@@ -81,9 +81,16 @@ class BatchProcess {
         return true;
     }
 
-    /** @param resource $f */
+    /** @var list<resource> */
+    static private $devnulls = [];
+
+    /** Close $f and return a /dev/null stream that takes over its file
+     * descriptor. $f itself stays closed, so write to the result instead.
+     * @param resource $f
+     * @return resource */
     static function devnull($f) {
         fclose($f);
-        fopen("/dev/null", "w+");
+        // keep the replacement open, so it holds $f's file descriptor
+        return self::$devnulls[] = fopen("/dev/null", "w+");
     }
 }

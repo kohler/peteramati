@@ -28,9 +28,12 @@ class RepoFetch_Batch {
     private $repos = [];
     /** @var string */
     public $reponame = "<none>";
+    /** @var resource */
+    private $errf;
 
     function __construct(Conf $conf, ?Repository $repo = null) {
         $this->conf = $conf;
+        $this->errf = STDERR;
         if ($repo) {
             $this->repos[] = $repo;
         }
@@ -115,7 +118,7 @@ class RepoFetch_Batch {
             if ($gi->stderr !== "") {
                 $suffix .= $gi->stderr . (str_ends_with($gi->stderr, "\n") ? "" : "\n");
             }
-            fwrite(STDERR, "* " . self::unparse_command($command) . $suffix);
+            fwrite($this->errf, "* " . self::unparse_command($command) . $suffix);
         }
         return $gi;
     }
@@ -153,7 +156,7 @@ class RepoFetch_Batch {
      * @return list<string> */
     private function fetched_branches($out) {
         if ($this->verbose) {
-            fwrite(STDERR, preg_replace('/^(?!\z)/m', "    ", $out));
+            fwrite($this->errf, preg_replace('/^(?!\z)/m', "    ", $out));
         }
         $branches = [];
         foreach (explode("\n", $out) as $line) {
@@ -207,7 +210,7 @@ class RepoFetch_Batch {
             $a["snaphash"] = $this->repo->snaphash;
             $a["heads"] = explode(" ", $this->repo->heads);
         }
-        fwrite(STDERR, "{$ch} {$this->reponame}: " . json_encode(array_merge($a, $m)) . "\n");
+        fwrite($this->errf, "{$ch} {$this->reponame}: " . json_encode(array_merge($a, $m)) . "\n");
     }
 
     /** @param list<string> $branches */
@@ -321,7 +324,7 @@ class RepoFetch_Batch {
             throw new CommandLineException("Cannot create repository");
         }
         if ($this->verbose) {
-            fwrite(STDERR, "* repo{$this->repo->repoid}, {$repodir} {$this->repo->url}\n");
+            fwrite($this->errf, "* repo{$this->repo->repoid}, {$repodir} {$this->repo->url}\n");
         }
 
         // configure remote
@@ -434,8 +437,15 @@ Usage: php batch/repofetch.php [-r REPOID | -u USER | --refresh]")
         $self->verbose = isset($arg["V"]);
         $self->cacheid = $arg["d"] ?? null;
         $self->upgrade = isset($arg["upgrade"]);
-        if (isset($arg["bg"]) && pcntl_fork() > 0) {
-            exit(0);
+        if (isset($arg["bg"])) {
+            if (pcntl_fork() > 0) {
+                exit(0);
+            }
+            // release the caller's output pipes; redirect before reconnecting
+            // so the new database socket can't take fd 1 or 2
+            BatchProcess::devnull(STDOUT);
+            $self->errf = BatchProcess::devnull(STDERR);
+            $conf->reconnect();
         }
         return $self;
     }

@@ -534,8 +534,8 @@ class RunQueue_Batch {
             $mode = isset($arg["p"]) || isset($arg["r"]) ? "add" : "list";
         }
 
-        if (isset($arg["daemon"])) {
-            BatchProcess::daemonize();
+        if (isset($arg["daemon"]) && BatchProcess::daemonize()) {
+            Conf::$main->reconnect();
         }
 
         initialize_psets();

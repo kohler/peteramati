@@ -234,6 +234,25 @@ class Conf {
         self::set_current_time(max(Conf::$now, $advance_past + 1));
     }
 
+    /** @var list<\mysqli> */
+    static private $abandoned_dblinks = [];
+
+    /** Open a fresh database connection. A forked child must call this:
+     * the connection it inherits closes when its parent exits. */
+    function reconnect() {
+        if (!$this->dblink
+            || !($cp = Dbl::parse_connection_params($this->opt))) {
+            return;
+        }
+        // Keep the inherited link referenced: closing it writes to a socket
+        // the parent may have closed, and SIGPIPE would kill this process.
+        $old_dblink = self::$abandoned_dblinks[] = $this->dblink;
+        $this->dblink = $cp->connect();
+        if (Dbl::$default_dblink === $old_dblink) {
+            Dbl::set_default_dblink($this->dblink);
+        }
+    }
+
     /** @return ?\mysqli */
     function contactdb() {
         return null;
