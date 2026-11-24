@@ -14,6 +14,11 @@ class Leaderboard_API {
             return ["error" => "Permission error"];
         }
         $lb = new Leaderboard($pset, $user);
+        // `u` and `commit` select the page's user and commit
+        if (isset($qreq->u) || isset($qreq->commit)) {
+            $commit = $api->hash ? $api->conf->check_api_hash($api->hash, $api) : null;
+            $lb->set_focus($api->user, $commit ? $commit->hash : null);
+        }
         $etag = $lb->etag();
         // always revalidate; the ETag makes that cheap
         header("Cache-Control: private,no-cache");

@@ -204,6 +204,7 @@ class RepositoryPsetInfo {
         }
 
         $this->materialize($conf);
+        $old_bhash = $this->placeholder <= 0 ? $this->gradebhash : null;
         if ($utype === self::UTYPE_ADMIN) {
             $conf->qe("update RepositoryGrade
                 set gradebhash=?, commitat=?,
@@ -240,6 +241,12 @@ class RepositoryPsetInfo {
                 $bhash,
                 $this->repoid, $this->branchid, $this->pset);
             $this->reload($conf);
+        }
+        // leaderboards rank students by their grading commits' metrics
+        if (($this->placeholder <= 0 ? $this->gradebhash : null) !== $old_bhash
+            && ($pset = $conf->pset_by_id($this->pset))
+            && $pset->has_leaderboard()) {
+            Leaderboard::note_change($pset);
         }
     }
 }

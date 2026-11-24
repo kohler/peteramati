@@ -156,12 +156,39 @@ class CommitPsetInfo {
         return $jn ? $jn->$key ?? null : null;
     }
 
-    /** @param ?string $xnotes
-     * @param ?object $jxnotes */
-    function assign_xnotes($xnotes, $jxnotes) {
-        assert(!$this->phantom);
+    /** Store `$jxnotes`, failing if another writer changed `xnotes` first,
+     * or, if `$notesversion` is given, if `notesversion` isn't that. `xnotes`
+     * has no version counter, so the compare-and-swap tests the stored text.
+     * Reloads and returns false on conflict.
+     * @param ?object $jxnotes
+     * @param ?int $notesversion
+     * @return bool */
+    function save_xnotes($jxnotes, Conf $conf, $notesversion = null) {
+        $this->materialize($conf);
+        $xnotes = json_encode_db($jxnotes);
+        if ($xnotes === false) {
+            return false;
+        } else if ($xnotes === "null" || $xnotes === "{}") {
+            $xnotes = null;
+        }
+        if ($xnotes === $this->xnotes) {
+            return true;
+        }
+        $xnotesa = $xnotes !== null && strlen($xnotes) > 1000 ? null : $xnotes;
+        $xnotesb = $xnotes !== null && strlen($xnotes) > 1000 ? $xnotes : null;
+        $result = $conf->qe("update CommitNotes set xnotes=?, xnotesOverflow=?
+                where pset=? and bhash=? and coalesce(xnotesOverflow, xnotes)<=>?
+                and notesversion<=>coalesce(?, notesversion)",
+            $xnotesa, $xnotesb, $this->pset, $this->bhash, $this->xnotes, $notesversion);
+        $ok = $result->affected_rows > 0;
+        $result->close();
+        if (!$ok) {
+            $this->reload($conf);
+            return false;
+        }
         $this->xnotes = $xnotes;
         $this->jxnotes = $jxnotes;
+        return true;
     }
 
 

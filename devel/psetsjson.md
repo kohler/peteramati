@@ -773,16 +773,27 @@ return a map from metric key to number; a `null` value clears the student’s
 recorded metric, and returning `null` records nothing. The run’s output is in
 `$info->run_logger()->output_file($jobid)`. Only declared metrics are stored.
 
-Each completed run records metrics for the student it ran for, on whatever
-commit it ran; a run never overwrites metrics from a run that started later.
-Metrics are kept in the student’s `ContactGrade` extra notes under the
-`leaderboard` key. To recompute metrics from existing runs—for instance,
-after the callback changes or when a leaderboard is added after students have
-run the runner—use `php batch/leaderboard.php refresh`, which uses each
-student’s most recent completed run on their branch. (Run logs record the
-branch and the user the run was for; older logs without a branch match if
-their commit is on the branch.) Leaderboards are read directly from recorded
-metrics, so changes appear immediately.
+Each completed run records metrics twice: for the commit it ran on, in that
+commit’s `CommitNotes` extra notes, and as the most recent metrics of the
+student it ran for, in their `ContactGrade` extra notes (both under the
+`leaderboard` key). A run never overwrites metrics from a run that started
+later.
+
+A student’s leaderboard entry normally shows the metrics recorded for their
+grading commit, so once a grading commit is marked, runs on other commits don’t
+change the student’s ranking. Metrics their grading commit lacks, and all
+metrics of students without a grading commit, come from their most recent
+metrics. On the problem set page for a commit, the page’s student instead sees
+the metrics recorded for that commit, where there are any.
+
+To recompute metrics from existing runs—for instance, after the callback
+changes or when a leaderboard is added after students have run the
+runner—use `php batch/leaderboard.php refresh`, which uses each student’s most
+recent completed run of each commit on their branch, and takes the student’s
+most recent metrics from the newest of those runs. (Run logs record the branch
+and the user the run was for; older logs without a branch match if their commit
+is on the branch.) Leaderboards are read directly from recorded metrics, so
+changes appear immediately.
 
 Students appear on leaderboards under a `leaderboard_name`, a pseudonym such as
 `giraffe-enjoyer` that peteramati assigns automatically and shows to the

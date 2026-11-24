@@ -39,32 +39,38 @@ class Leaderboard_Batch {
         return empty($this->metrics) || in_array($m->key, $this->metrics, true);
     }
 
-    /** Return `$info`'s most recent completed run of `$runner` on the
-     * user's branch. Several users can share a repository on different
-     * branches, and run logs are per repository. Runs record their branch;
-     * for older runs that don't, require the commit to be on the branch.
-     * @return ?RunResponse */
-    private function latest_branch_response(PsetView $info, RunnerConfig $runner) {
+    /** Return `$info`'s most recent completed run of `$runner` for each
+     * commit on the user's branch, oldest first. Several users can share a
+     * repository on different branches, and run logs are per repository.
+     * Runs record their branch; for older runs that don't, require the commit
+     * to be on the branch.
+     * @return list<RunResponse> */
+    private function branch_responses(PsetView $info, RunnerConfig $runner) {
         $branch = $info->branch();
         $commits = null;
+        $rrs = [];
         // responses are newest first
         foreach ($info->run_logger()->completed_responses($runner) as $rr) {
-            if ($rr->branch !== null) {
-                if ($rr->branch === $branch) {
-                    return $rr;
+            if (!$rr->hash || isset($rrs[$rr->hash])) {
+                continue;
+            } else if ($rr->branch !== null) {
+                if ($rr->branch !== $branch) {
+                    continue;
                 }
-            } else if ($rr->hash) {
+            } else {
                 $commits = $commits ?? $info->repo->commits($info->pset, $branch, ".");
-                if (isset($commits[$rr->hash])) {
-                    return $rr;
+                if (!isset($commits[$rr->hash])) {
+                    continue;
                 }
             }
+            $rrs[$rr->hash] = $rr;
         }
-        return null;
+        return array_reverse(array_values($rrs));
     }
 
     /** Recompute metrics from each student's most recent completed run of
-     * each leaderboard's runner on their branch.
+     * each leaderboard's runner on each commit on their branch. The most
+     * recent of those runs supplies the student's most recent metrics.
      * @return int */
     function run_refresh() {
         $viewer = $this->conf->site_contact();
@@ -94,19 +100,20 @@ class Leaderboard_Batch {
                 }
                 $changed = false;
                 foreach ($lbcs as [$lbc, $keys]) {
-                    $rr = $this->latest_branch_response($info, $lbc->runner);
-                    if (!$rr
-                        || !$rr->hash
-                        || !$info->set_hash($rr->hash, false, $sset)) {
-                        if ($rr && $this->verbose) {
-                            fwrite(STDERR, "~{$info->user->username}/{$pset->urlkey}/{$lbc->name}: job {$rr->timestamp} commit " . ($rr->hash ?? "(none)") . " not found\n");
+                    foreach ($this->branch_responses($info, $lbc->runner) as $rr) {
+                        if (!$info->set_hash($rr->hash, false, $sset)) {
+                            if ($this->verbose) {
+                                fwrite(STDERR, "~{$info->user->username}/{$pset->urlkey}/{$lbc->name}: job {$rr->timestamp} commit {$rr->hash} not found\n");
+                            }
+                            continue;
                         }
-                        continue;
-                    }
-                    if (Leaderboard::record($info, $lbc, $rr->timestamp, $keys, true)) {
-                        $changed = true;
-                        if ($this->verbose) {
-                            fwrite(STDERR, "~{$info->user->username}/{$pset->urlkey}/{$lbc->name}: recorded from {$lbc->runner->name} job {$rr->timestamp}\n");
+                        // force: older runs replace stored metrics, and the
+                        // newest run, recorded last, wins the user's metrics
+                        if (Leaderboard::record($info, $lbc, $rr->timestamp, $keys, true)) {
+                            $changed = true;
+                            if ($this->verbose) {
+                                fwrite(STDERR, "~{$info->user->username}/{$pset->urlkey}/{$lbc->name}: recorded from {$lbc->runner->name} job {$rr->timestamp} on " . substr($rr->hash, 0, 7) . "\n");
+                            }
                         }
                     }
                 }

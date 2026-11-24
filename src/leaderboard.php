@@ -42,6 +42,10 @@ class Leaderboard {
     private $_changeat;
     /** @var bool */
     private $_loaded = false;
+    /** @var ?Contact */
+    private $_focus_user;
+    /** @var ?non-empty-string */
+    private $_focus_bhash;
 
     function __construct(Pset $pset, Contact $viewer) {
         $this->pset = $pset;
@@ -49,11 +53,23 @@ class Leaderboard {
         $this->viewer = $viewer;
     }
 
+    /** Show `$user`'s metrics for commit `$hash` where recorded, rather than
+     * their default metrics. The caller checks that the viewer may see
+     * `$user`'s commit.
+     * @param ?non-empty-string $hash */
+    function set_focus(Contact $user, $hash) {
+        assert(!$this->_loaded);
+        $this->_focus_user = $user;
+        $this->_focus_bhash = $hash !== null ? hex2bin($hash) : null;
+    }
+
 
     // Recording
 
     /** Compute and store `$lbc`'s metrics from job `$jobid` of its runner.
      * A job ID is the time the run started, so it also orders the records.
+     * Metrics are stored for the run's commit, if any, and as the user's
+     * most recent metrics.
      * @param int $jobid
      * @param ?list<string> $keys if set, store only these metrics
      * @param bool $force if true, replace stored metrics even if newer
@@ -92,8 +108,13 @@ class Leaderboard {
                 error_log("{$pfx}: leaderboard metric `{$key}` is not a finite number");
             }
         }
-        if (empty($changes)
-            || !$info->update_leaderboard_xnotes($changes, $force ? PHP_INT_MAX : $when)) {
+        if (empty($changes)) {
+            return false;
+        }
+        $mwhen = $force ? PHP_INT_MAX : $when;
+        $cchanged = $info->update_commit_leaderboard_xnotes($changes, $mwhen);
+        $uchanged = $info->update_leaderboard_xnotes($changes, $mwhen);
+        if (!$cchanged && !$uchanged) {
             return false;
         }
         if ((string) $info->user->leaderboard_name === "") {
@@ -103,7 +124,55 @@ class Leaderboard {
         return true;
     }
 
-    /** Clear recorded metrics for `$pset`, or just those in `$keys`.
+    /** Merge metric records into `$pi`'s `leaderboard` extra note. Each
+     * entry in `$changes` is a metric record, or null to clear that metric.
+     * A record is stored only if `$when` is at least as recent as the stored
+     * record's `at`, so runs that complete out of order don't move the
+     * leaderboard backwards.
+     * @param UserPsetInfo|CommitPsetInfo $pi
+     * @param array<string,?object> $changes
+     * @param int $when
+     * @return bool true if anything changed */
+    static function save_records($pi, $changes, $when, Conf $conf) {
+        for ($ntries = 0; $ntries !== 25; ++$ntries) {
+            $lb = ($x = $pi->jxnote("leaderboard")) ? clone $x : (object) [];
+            $n = 0;
+            foreach ($changes as $key => $rec) {
+                $old = $lb->{$key} ?? null;
+                if ($old !== null && ($old->at ?? 0) > $when) {
+                    continue;
+                } else if ($rec !== null && $old == $rec) {
+                    // unchanged (loose comparison: JSON may decode 32.0 as 32)
+                    continue;
+                } else if ($rec === null) {
+                    if ($old === null) {
+                        continue;
+                    }
+                    unset($lb->{$key});
+                } else {
+                    $lb->{$key} = $rec;
+                }
+                ++$n;
+            }
+            if ($n === 0) {
+                return false;
+            }
+            $jx = ($x = $pi->jxnotes()) ? clone $x : (object) [];
+            if (empty(get_object_vars($lb))) {
+                unset($jx->leaderboard);
+            } else {
+                $jx->leaderboard = $lb;
+            }
+            if ($pi->save_xnotes($jx, $conf)) {
+                return true;
+            }
+        }
+        error_log("p{$pi->pset}: leaderboard update failed");
+        return false;
+    }
+
+    /** Clear recorded metrics for `$pset`, or just those in `$keys`, from
+     * users and commits.
      * @param ?list<string> $keys
      * @return int number of students changed */
     static function clear(Pset $pset, $keys = null) {
@@ -115,16 +184,32 @@ class Leaderboard {
         foreach ($keys as $key) {
             $changes[$key] = null;
         }
-        $sset = new StudentSet($pset->conf->root_user(), StudentSet::ALL);
-        $sset->set_pset($pset);
+        $conf = $pset->conf;
+        $pis = [];
+        $result = $conf->qe("select * from ContactGrade
+                where pset=? and coalesce(xnotesOverflow, xnotes) like '%\"leaderboard\"%'",
+            $pset->id);
+        while (($upi = UserPsetInfo::fetch($result))) {
+            $pis[] = $upi;
+        }
+        Dbl::free($result);
+        $nu = count($pis);
+        $result = $conf->qe("select * from CommitNotes
+                where pset=? and coalesce(xnotesOverflow, xnotes) like '%\"leaderboard\"%'",
+            $pset->id);
+        while (($cpi = CommitPsetInfo::fetch($result))) {
+            $pis[] = $cpi;
+        }
+        Dbl::free($result);
         $n = 0;
-        foreach ($sset as $info) {
-            if ($info->leaderboard_jxnote()
-                && $info->update_leaderboard_xnotes($changes, PHP_INT_MAX)) {
-                ++$n;
+        $changed = false;
+        foreach ($pis as $i => $pi) {
+            if (self::save_records($pi, $changes, PHP_INT_MAX, $conf)) {
+                $changed = true;
+                $n += $i < $nu ? 1 : 0;
             }
         }
-        if ($n > 0) {
+        if ($changed) {
             self::note_change($pset);
         }
         return $n;
@@ -133,8 +218,9 @@ class Leaderboard {
 
     // Change tracking
     //
-    // Setting `__leaderboardts.pN` records when `$pset`'s metrics, or the set
-    // of students listed, last changed, with microsecond precision in its
+    // Setting `__leaderboardts.pN` records when `$pset`'s metrics, students'
+    // grading commits, or the set of students listed last changed, with
+    // microsecond precision in its
     // data (`value` holds whole seconds for readability). Every change
     // advances it. The API's ETag includes it, so browsers can reuse
     // responses until something changes, and `shared_data()` memoizes the
@@ -143,9 +229,9 @@ class Leaderboard {
 
     /** Version of `json()`’s format, part of the API’s ETag. Increment it
      * when the format changes, or browsers may keep using stale responses. */
-    const JSON_VERSION = 6;
+    const JSON_VERSION = 7;
     /** Version of the shared data format (see `shared_data()`). */
-    const DATA_VERSION = 1;
+    const DATA_VERSION = 2;
 
     /** The time `$pset`'s leaderboard metrics last changed, as a decimal
      * string with microsecond precision.
@@ -156,8 +242,8 @@ class Leaderboard {
         return $row ? $row[1] ?? (string) $row[0] : "0";
     }
 
-    /** Record that `$pset`'s leaderboard metrics, or the set of students
-     * listed, changed now. */
+    /** Record that `$pset`'s leaderboard metrics, students' grading commits,
+     * or the set of students listed changed now. */
     static function note_change(Pset $pset) {
         $t = microtime(true);
         // the new time is at least 1µs after the old, so it changes even if
@@ -202,7 +288,7 @@ class Leaderboard {
     }
 
     /** The data every viewer's leaderboard is built from: each listed
-     * student's identity and complete leaderboard notes, keyed by contact
+     * student's identity and default leaderboard metrics, keyed by contact
      * ID. It's shared in GroupSettings `__leaderboardc.pN`, tagged with the
      * change time it reflects. The change time always advances, and is read
      * before computing, so data with a matching tag is exactly current.
@@ -228,12 +314,15 @@ class Leaderboard {
     }
 
     /** Compute shared leaderboard data: every enrolled student (not course
-     * staff or dropped) with recorded metrics.
+     * staff or dropped) with recorded metrics. A student's default metrics
+     * come from their grading commit, if they have one and it has recorded
+     * metrics; others are their most recently recorded metrics from any
+     * commit.
      * @return array<int,object> */
     static private function compute(Pset $pset) {
         $conf = $pset->conf;
 
-        // recorded metrics
+        // most recently recorded metrics
         $lbs = [];
         $result = $conf->qe("select cid, coalesce(xnotesOverflow, xnotes) from ContactGrade
                 where pset=? and coalesce(xnotesOverflow, xnotes) like '%\"leaderboard\"%'",
@@ -253,13 +342,18 @@ class Leaderboard {
 
         // enrolled students among them (like `StudentSet::ALL_ENROLLED`)
         $users = [];
-        $result = $conf->qe("select * from ContactInfo
+        $result = $conf->qe("select *, coalesce((select group_concat(type, ' ', pset, ' ', link) from ContactLink where cid=ContactInfo.contactId),'') contactLinks from ContactInfo
                 where contactId?a and roles=0 and not dropped",
             array_keys($lbs));
         while (($u = Contact::fetch($result, $conf))) {
             $users[$u->contactId] = $u;
         }
         Dbl::free($result);
+
+        // grading commits' metrics replace most recent metrics
+        foreach (self::grading_commit_leaderboards($pset, $users) as $cid => $clb) {
+            $lbs[$cid] = self::merge_records($lbs[$cid], $clb);
+        }
 
         // pseudonyms are normally assigned when metrics are recorded; leave
         // out anyone who still lacks one, rather than reveal who they are
@@ -279,16 +373,128 @@ class Leaderboard {
         $data = [];
         foreach ($users as $cid => $u) {
             if ((string) $u->leaderboard_name !== "") {
-                $data[$cid] = (object) [
-                    "name" => $u->leaderboard_name,
-                    "user" => $u->username ? : $u->email,
-                    "anon_user" => $u->anon_username,
-                    "display_name" => Text::name_text($u),
-                    "lb" => $lbs[$cid]
-                ];
+                $data[$cid] = self::user_record($u, $lbs[$cid]);
             }
         }
         return $data;
+    }
+
+    /** Return the metrics recorded on `$users`' grading commits, by contact
+     * ID. Users without grading commits, or whose grading commits have no
+     * recorded metrics, are left out.
+     * @param array<int,Contact> $users
+     * @return array<int,object> */
+    static private function grading_commit_leaderboards(Pset $pset, $users) {
+        if ($pset->gitless || empty($users)) {
+            return [];
+        }
+        $conf = $pset->conf;
+
+        // grading commits (like `PsetView::grading_bhash`)
+        $repoids = $rbcids = [];
+        foreach ($users as $cid => $u) {
+            if (($repoid = $u->link(LINK_REPO, $pset->id))) {
+                $repoids[$repoid] = true;
+                $rbcids["{$repoid},{$u->branchid($pset)}"][] = $cid;
+            }
+        }
+        if (empty($repoids)) {
+            return [];
+        }
+        $gbhashes = [];
+        $result = $conf->qe("select repoid, branchid, gradebhash from RepositoryGrade
+                where pset=? and repoid?a and placeholder<=0 and gradebhash is not null",
+            $pset->id, array_keys($repoids));
+        while (($row = $result->fetch_row())) {
+            foreach ($rbcids["{$row[0]},{$row[1]}"] ?? [] as $cid) {
+                $gbhashes[$cid] = $row[2];
+            }
+        }
+        Dbl::free($result);
+        if (empty($gbhashes)) {
+            return [];
+        }
+
+        // their metrics
+        $clbs = [];
+        $result = $conf->qe("select bhash, coalesce(xnotesOverflow, xnotes) from CommitNotes
+                where pset=? and bhash?a and coalesce(xnotesOverflow, xnotes) like '%\"leaderboard\"%'",
+            $pset->id, array_values(array_unique($gbhashes)));
+        while (($row = $result->fetch_row())) {
+            $jx = json_decode($row[1]);
+            if (is_object($jx) && is_object($jx->leaderboard ?? null)) {
+                $clbs[$row[0]] = $jx->leaderboard;
+            }
+        }
+        Dbl::free($result);
+
+        $lbs = [];
+        foreach ($gbhashes as $cid => $bhash) {
+            if (isset($clbs[$bhash])) {
+                $lbs[$cid] = $clbs[$bhash];
+            }
+        }
+        return $lbs;
+    }
+
+    /** Return the metrics recorded on commit `$bhash`, if any.
+     * @param non-empty-string $bhash
+     * @return ?object */
+    static private function commit_leaderboard(Pset $pset, $bhash) {
+        $row = $pset->conf->fetch_first_row("select coalesce(xnotesOverflow, xnotes) from CommitNotes where pset=? and bhash=?",
+            $pset->id, $bhash);
+        $jx = $row ? json_decode($row[0] ?? "null") : null;
+        return is_object($jx) && is_object($jx->leaderboard ?? null) ? $jx->leaderboard : null;
+    }
+
+    /** Return `$lb` with its metric records replaced by those in `$over`.
+     * @param object $lb
+     * @param object $over
+     * @return object */
+    static private function merge_records($lb, $over) {
+        $lb = clone $lb;
+        foreach (get_object_vars($over) as $key => $rec) {
+            $lb->{$key} = $rec;
+        }
+        return $lb;
+    }
+
+    /** @param object $lb
+     * @return object */
+    static private function user_record(Contact $u, $lb) {
+        return (object) [
+            "name" => $u->leaderboard_name,
+            "user" => $u->username ? : $u->email,
+            "anon_user" => $u->anon_username,
+            "display_name" => Text::name_text($u),
+            "lb" => $lb
+        ];
+    }
+
+    /** Return the focus user's record, `$ur`, with metrics recorded on the
+     * focus commit replacing their defaults. Returns `$ur` if the focus
+     * commit has no recorded metrics, and null if the focus user can't be
+     * listed.
+     * @param ?object $ur
+     * @return ?object */
+    private function focus_record($ur) {
+        $u = $this->_focus_user;
+        $clb = $this->_focus_bhash !== null
+            ? self::commit_leaderboard($this->pset, $this->_focus_bhash)
+            : null;
+        if (!$clb || empty(get_object_vars($clb))) {
+            return $ur;
+        } else if ($ur) {
+            $ur = clone $ur;
+            $ur->lb = self::merge_records($ur->lb, $clb);
+            return $ur;
+        } else if ($u->roles !== 0 || $u->dropped) {
+            return null;
+        }
+        if ((string) $u->leaderboard_name === "") {
+            $u->leaderboard_name = LeaderboardName::assign_one($this->conf, $u->contactId);
+        }
+        return (string) $u->leaderboard_name !== "" ? self::user_record($u, $clb) : null;
     }
 
     /** Load entries for the visible metrics. */
@@ -305,8 +511,17 @@ class Leaderboard {
             return;
         }
         $data = self::shared_data($this->pset, $this->changeat());
+        $urs = [];
         foreach ($data->users as $cidstr => $ur) {
-            $cid = (int) $cidstr;
+            $urs[(int) $cidstr] = $ur;
+        }
+        if ($this->_focus_user) {
+            $fcid = $this->_focus_user->contactId;
+            if (($ur = $this->focus_record($urs[$fcid] ?? null))) {
+                $urs[$fcid] = $ur;
+            }
+        }
+        foreach ($urs as $cid => $ur) {
             foreach ($ms as $key => $m) {
                 $rec = $ur->lb->{$key} ?? null;
                 if (is_object($rec) && is_number($rec->value ?? null)) {
@@ -344,7 +559,9 @@ class Leaderboard {
             $mj[] = $m->json();
         }
         $x = [self::JSON_VERSION, $this->viewer->contactId, $this->viewer->isPC,
-              $this->pset->anonymous, $this->changeat(), $mj];
+              $this->pset->anonymous, $this->changeat(), $mj,
+              $this->_focus_user ? $this->_focus_user->contactId : null,
+              $this->_focus_bhash !== null ? bin2hex($this->_focus_bhash) : null];
         return "\"lb" . md5(json_encode($x)) . "\"";
     }
 
@@ -352,7 +569,8 @@ class Leaderboard {
      * unordered and unranked (the browser ranks them). Student identity is
      * always the leaderboard pseudonym, never the contact ID; course staff
      * additionally get the real user, so they can click through to a
-     * student's pset page.
+     * student's pset page. Entries include their commit and time for course
+     * staff and for the viewer's own entries.
      * @return array<string,mixed> */
     function json() {
         $this->load();
@@ -378,6 +596,7 @@ class Leaderboard {
             }
             $uj[$name] = $j;
         }
+        $fu = $this->_focus_user ? $users[$this->_focus_user->contactId] ?? null : null;
 
         $mj = [];
         foreach ($this->metrics() as $key => $m) {
@@ -385,10 +604,11 @@ class Leaderboard {
             foreach ($this->_entries[$key] as $e) {
                 $x = ["name" => $this->_users[$e->cid]->name,
                       "value" => $e->value, "text" => $m->unparse_value($e->value)];
-                if ($pcview && $e->hash !== null) {
+                $detail = $pcview || $e->cid === $this->viewer->contactId;
+                if ($detail && $e->hash !== null) {
                     $x["commit"] = $e->hash;
                 }
-                if ($pcview && $e->at) {
+                if ($detail && $e->at) {
                     $x["at"] = $e->at;
                 }
                 $ej[] = $x;
@@ -399,11 +619,15 @@ class Leaderboard {
             $mj[] = $m->json() + ["entries" => $ej];
         }
 
-        return [
+        $j = [
             "ok" => true,
             "pset" => $this->pset->urlkey,
             "users" => (object) $uj,
             "metrics" => $mj
         ];
+        if ($fu) {
+            $j["focus"] = $fu->name;
+        }
+        return $j;
     }
 }

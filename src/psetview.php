@@ -753,9 +753,9 @@ class PsetView {
         return $un ? $un->$key ?? null : null;
     }
 
-    /** The user's recorded leaderboard metrics, a map from metric key to
-     * record. Read through `upi`, not `vupi`: metrics track the latest run and
-     * have no version history.
+    /** The user's most recently recorded leaderboard metrics, from any
+     * commit, as a map from metric key to record. Read through `upi`, not
+     * `vupi`: metrics have no version history.
      * @return ?object */
     function leaderboard_jxnote() {
         return $this->upi()->jxnote("leaderboard");
@@ -1250,50 +1250,24 @@ class PsetView {
     }
 
 
-    /** Merge leaderboard metric records into the user's `xnotes`. Each entry in
-     * `$changes` is a metric record, or null to clear that metric. A record is
-     * stored only if `$when` is at least as recent as the stored record's `at`,
-     * so runs that complete out of order don't move the leaderboard backwards.
+    /** Merge leaderboard metric records into the user's `xnotes`, which hold
+     * their most recent metrics from any commit. See
+     * `Leaderboard::save_records`.
      * @param array<string,?object> $changes
      * @param int $when
      * @return bool true if anything changed */
     function update_leaderboard_xnotes($changes, $when) {
-        $upi = $this->upi();
-        for ($ntries = 0; $ntries !== 25; ++$ntries) {
-            $lb = ($x = $upi->jxnote("leaderboard")) ? clone $x : (object) [];
-            $n = 0;
-            foreach ($changes as $key => $rec) {
-                $old = $lb->{$key} ?? null;
-                if ($old !== null && ($old->at ?? 0) > $when) {
-                    continue;
-                } else if ($rec !== null && $old == $rec) {
-                    // unchanged (loose comparison: JSON may decode 32.0 as 32)
-                    continue;
-                } else if ($rec === null) {
-                    if ($old === null) {
-                        continue;
-                    }
-                    unset($lb->{$key});
-                } else {
-                    $lb->{$key} = $rec;
-                }
-                ++$n;
-            }
-            if ($n === 0) {
-                return false;
-            }
-            $jx = ($x = $upi->jxnotes()) ? clone $x : (object) [];
-            if (empty(get_object_vars($lb))) {
-                unset($jx->leaderboard);
-            } else {
-                $jx->leaderboard = $lb;
-            }
-            if ($upi->save_xnotes($jx, $this->conf)) {
-                return true;
-            }
-        }
-        error_log("{$this->pset->key}: ~{$this->user->username}: leaderboard update failed");
-        return false;
+        return Leaderboard::save_records($this->upi(), $changes, $when, $this->conf);
+    }
+
+    /** Merge leaderboard metric records into the current commit's `xnotes`.
+     * See `Leaderboard::save_records`.
+     * @param array<string,?object> $changes
+     * @param int $when
+     * @return bool true if anything changed */
+    function update_commit_leaderboard_xnotes($changes, $when) {
+        $cpi = $this->pset->gitless ? null : $this->cpi();
+        return $cpi && Leaderboard::save_records($cpi, $changes, $when, $this->conf);
     }
 
 
@@ -1331,18 +1305,19 @@ class PsetView {
         $this->update_cpi_xnotes($this->cpi(), $updates);
     }
 
-    /** @param CommitPsetInfo $cpi
+    /** Merge `$updates` into `$cpi`'s `xnotes`, like `update_user_xnotes`.
+     * @param CommitPsetInfo $cpi
      * @param array $updates */
     private function update_cpi_xnotes($cpi, $updates) {
         $cpi->materialize($this->conf);
-        $new_xnotes = json_update($cpi->jxnotes(), $updates);
-        $xnotes = json_encode_db($new_xnotes);
-        $xnotesa = strlen($xnotes) > 1000 ? null : $xnotes;
-        $xnotesb = strlen($xnotes) > 1000 ? $xnotes : null;
-        $result = $this->conf->qe("update CommitNotes set xnotes=?, xnotesOverflow=? where pset=? and bhash=? and notesversion=?",
-            $xnotesa, $xnotesb, $cpi->pset, $cpi->bhash, $cpi->notesversion);
-        Dbl::free($result);
-        $cpi->assign_xnotes($xnotes, $new_xnotes);
+        $nv = $cpi->notesversion;
+        for ($ntries = 0; $ntries !== 25; ++$ntries) {
+            if ($cpi->save_xnotes(json_update($cpi->jxnotes(), $updates), $this->conf, $nv)
+                || $cpi->notesversion !== $nv) {
+                return;
+            }
+        }
+        error_log("{$this->pset->key}: {$cpi->hash}: xnotes update failed");
     }
 
 

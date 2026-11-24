@@ -442,8 +442,11 @@ class PsetRequest {
         }
         $this->_leaderboard_echoed = true;
         echo '<div class="pa-leaderboard" data-pa-pset="',
-            htmlspecialchars($this->pset->urlkey),
-            '" data-pa-self="', htmlspecialchars($this->user->leaderboard_name ?? ""), '"><hr>',
+            htmlspecialchars($this->pset->urlkey);
+        if (!$this->pset->gitless && $this->info->hash()) {
+            echo '" data-pa-commit="', htmlspecialchars($this->info->commit_hash());
+        }
+        echo '" data-pa-self="', htmlspecialchars($this->user->leaderboard_name ?? ""), '"><hr>',
             '<h3 class="pa-leaderboard-title">leaderboard</h3>',
             '<div class="pa-leaderboard-body"></div></div>';
         Ht::stash_script("\$(\".pa-leaderboard\").each(\$pa.leaderboard)");

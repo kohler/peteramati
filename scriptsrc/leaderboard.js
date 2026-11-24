@@ -210,6 +210,9 @@ function render_row(lb, row, sm, is_self, changed) {
                 addClass(td, "pa-leaderboard-changed");
             }
             let title = `rank ${e.rank} of ${m.pa__count}`;
+            if (e.commit) {
+                title += ", commit " + e.commit.substring(0, 7);
+            }
             if (e.at) {
                 title += ", " + strftime("%Y-%m-%d %H:%M", new Date(e.at * 1000));
             }
@@ -223,6 +226,7 @@ function render_row(lb, row, sm, is_self, changed) {
 function render_body(elt, lb, s, changed) {
     // the page’s student: set on the element, or else the viewer
     const self_name = elt.getAttribute("data-pa-self")
+            || lb.focus
             || (Object.values(lb.users).find(u => u.is_viewer) || {}).name,
         showing_all = hasClass(elt, "pa-leaderboard-all"),
         sm = s.key === "name" ? null : metric_by_key(lb, s.key),
@@ -288,10 +292,18 @@ function changed_cells(old, lb) {
     return changed;
 }
 
-/** Load `elt`’s leaderboard. If `fresh`, bypass the browser cache and mark
- * cells that changed since the last load. */
+/** Load `elt`’s leaderboard, showing the page’s user’s metrics for the
+ * page’s commit. If `fresh`, bypass the browser cache and mark cells that
+ * changed since the last load. */
 function load(elt, fresh) {
-    const arg = {pset: elt.getAttribute("data-pa-pset")};
+    const arg = {pset: elt.getAttribute("data-pa-pset")},
+        commit = elt.getAttribute("data-pa-commit");
+    if (siteinfo.uservalue) {
+        arg.u = siteinfo.uservalue;
+    }
+    if (commit) {
+        arg.commit = commit;
+    }
     $.ajax(hoturl("api/leaderboard", arg), {
         type: "GET", cache: !fresh, dataType: "json",
         success: function (d) {
