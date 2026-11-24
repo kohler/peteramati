@@ -1752,6 +1752,7 @@ final class DiffConfig {
         ]);
 
         $d = new DiffConfig;
+        $loc = ["diffs", $match];
         if (isset($j->extension)) {
             $d->extension = Pset::cstr($loc, $j, "extension");
         } else if (isset($j->filename)) {
@@ -1762,7 +1763,7 @@ final class DiffConfig {
                 throw new PsetConfigException("`match` diff format error", ["diffs", $match]);
             }
         }
-        $loc = ["diffs", $d->extension ?? $d->match];
+        $loc = ["diffs", $d->extension ?? $d->filename ?? $d->match];
         $d->title = Pset::cstr($loc, $j, "title");
         $prio = (float) (Pset::cnum($loc, $j, "priority", "match_priority") ?? $priority ?? 0.0);
         $d->priority = $prio;
