@@ -201,11 +201,12 @@ class CodeExport_Batch {
         $hunks = [];
         $hi = -1;
         foreach ($di as $e) {
-            if ($e[0] === "@" || ($hi < 0 && strpos(" -+", $e[0]) !== false)) {
+            $isline = $e[0] === " " || $e[0] === "-" || $e[0] === "+";
+            if ($e[0] === "@" || ($hi < 0 && $isline)) {
                 $hunks[] = [];
                 ++$hi;
             }
-            if ($e[0] === " " || $e[0] === "-" || $e[0] === "+") {
+            if ($isline) {
                 $hunks[$hi][] = $e;
             }
         }

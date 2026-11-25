@@ -186,77 +186,27 @@ class PsetRequest {
         }
     }
 
-    /** @param array|CsvRow $values
-     * @param bool $isauto
-     * @return ?string */
-    function handle_upload_row(PsetView $info, $values, $isauto) {
-        if ($info->is_handout_commit()
-            && !$info->pset->gitless_grades) {
-            return "this is a handout commit";
-        }
-        $grades = [];
-        foreach ($this->pset->grades() as $ge) {
-            if (isset($values[$ge->key])) {
-                $v = $ge->parse_value($values[$ge->key], !$isauto);
-                if (!($v instanceof GradeError)) {
-                    if ($v === false && $isauto) {
-                        $v = null;
-                    }
-                    $grades[$ge->key] = $v;
-                }
-            }
-        }
-        $updates = [($isauto ? "autogrades" : "grades") => $grades];
-        if (isset($values["timestamp"]) && is_numeric($values["timestamp"])) {
-            $timestamp = intval($values["timestamp"]);
-            if ($timestamp >= 1400000000) {
-                $updates["timestamp"] = $timestamp;
-            } else if ($timestamp <= 0) {
-                $updates["timestamp"] = null;
-            }
-        }
-        if (!empty($updates)) {
-            $info->update_grade_notes($updates);
-        }
-        return null;
-    }
-
     /** @param string $text
      * @param string $fname
      * @return bool */
     function handle_upload_file($text, $fname) {
         assert($this->pset->gitless_grades);
+        $import = new GradeCsvImport($this->pset, true);
         $csv = new CsvParser($text);
         $csv->set_header($csv->next_list());
         $errors = [];
         while (($line = $csv->next_row())) {
-            if (($who = $line["email"]) && $who !== "-") {
-                $user = $this->conf->user_by_email($who);
-            } else if (($who = $line["github_username"]) && $who !== "-") {
-                $user = $this->conf->user_by_whatever($who, Conf::USERNAME_GITHUB);
-            } else if (($who = $line["huid"]) && $who !== "-") {
-                $user = $this->conf->user_by_whatever($who, Conf::USERNAME_HUID);
-            } else if (($who = $line["username"]) && $who !== "-") {
-                $user = $this->conf->user_by_whatever($who, Conf::USERNAME_USERNAME);
-            } else if (($who = $line["name"])) {
-                list($first, $last) = Text::split_name($who);
-                $user = $this->conf->user_by_query("firstName like '?s%' and lastName=?", [$first, $last]);
-                if ($user
-                    && $user->firstName != $first
-                    && !str_starts_with($user->firstName, "$first ")) {
-                    $user = null;
-                }
-            } else {
+            list($user, $who) = $import->find_user($line);
+            $pfx = htmlspecialchars($fname) . ":" . $csv->lineno() . ": ";
+            if ($who === "") {
+                continue;
+            } else if (!$user) {
+                $errors[] = $pfx . "unknown user " . htmlspecialchars($who);
                 continue;
             }
-            if ($user) {
-                $info = PsetView::make($this->pset, $user, $this->viewer);
-                $error = $this->handle_upload_row($info, $line, true);
-                if (is_string($error)) {
-                    $errors[] = htmlspecialchars($fname) . ":" . $csv->lineno() . ": no grades set; $error";
-                }
-            } else {
-                $errors[] = htmlspecialchars($fname) . ":" . $csv->lineno() . ": unknown user " . htmlspecialchars($who);
+            $info = PsetView::make($this->pset, $user, $this->viewer);
+            foreach ($import->apply($info, $line) as $error) {
+                $errors[] = $pfx . htmlspecialchars($error);
             }
         }
         if (empty($errors)) {
