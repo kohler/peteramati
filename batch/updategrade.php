@@ -203,6 +203,9 @@ class UpdateGrade_Batch {
             } else if (!$this->test_user($user)) {
                 continue;
             }
+            if (str_starts_with($who, "[anon")) {
+                $user->set_anonymous(true);
+            }
             list($updates, $errors) = $import->row_updates($row);
             if (!empty($errors)) {
                 fwrite(STDERR, "{$pfx}{$who}: " . join("; ", $errors) . "; row skipped\n");
@@ -215,6 +218,36 @@ class UpdateGrade_Batch {
         return $status;
     }
 
+    /** @return string */
+    static private function user_text(Contact $user) {
+        return $user->is_anonymous ? $user->anon_username : $user->email;
+    }
+
+    /** Return the parts of `$new` that differ from `$old`. Objects are
+     * compared key by key; each changed value appears as
+     * `{"old": OLD, "new": NEW}`, and unchanged keys are omitted.
+     * @param mixed $old
+     * @param mixed $new
+     * @return object */
+    static function json_diff($old, $new) {
+        if (($old === null || is_object($old))
+            && ($new === null || is_object($new))
+            && ($old !== null || $new !== null)) {
+            $old = $old ?? (object) [];
+            $new = $new ?? (object) [];
+            $diff = (object) [];
+            foreach (get_object_vars($old) + get_object_vars($new) as $k => $x) {
+                $ov = $old->$k ?? null;
+                $nv = $new->$k ?? null;
+                if (json_encode($ov) !== json_encode($nv)) {
+                    $diff->$k = self::json_diff($ov, $nv);
+                }
+            }
+            return $diff;
+        }
+        return (object) ["old" => $old, "new" => $new];
+    }
+
     /** @param array $updates
      * @return int */
     private function run_one(PsetView $info, $updates) {
@@ -222,11 +255,11 @@ class UpdateGrade_Batch {
             $info->set_hash("none");
         } else if (!$info->set_hash($this->hash, $this->hash !== null)
                    || !$info->hash()) {
-            fwrite(STDERR, "{$this->pset->key}/{$info->user->email}: no commit to grade\n");
+            fwrite(STDERR, "{$this->pset->key}/" . self::user_text($info->user) . ": no commit to grade\n");
             return 1;
         }
 
-        $key = "{$this->pset->key}/{$info->user->email}";
+        $key = "{$this->pset->key}/" . self::user_text($info->user);
         if ($info->hash()) {
             $key .= "/" . substr($info->hash(), 0, 12);
         }
@@ -250,7 +283,7 @@ class UpdateGrade_Batch {
         }
 
         fwrite(STDERR, "{$key}: " . ($this->dry_run ? "would update\n" : "updating\n"));
-        fwrite(STDOUT, json_encode($new, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+        fwrite(STDOUT, json_encode(self::json_diff($old, $new), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
         if (!$this->dry_run) {
             $info->update_grade_notes($updates);
         }
