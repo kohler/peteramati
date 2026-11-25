@@ -77,6 +77,38 @@ GradeClass.add("select", {
         col.className += " gt-el";
         return col;
     },
+    // sort by position in `options`; values not in `options` sort after
+    // those that are, and missing values last
+    make_compare: function (col) {
+        const gidx = col.gidx, rank = new Map;
+        this.options.forEach((opt, i) => {
+            rank.set(String(typeof opt === "object" ? opt.value : opt), i);
+        });
+        function key(v) {
+            if (v === "" || v == null) {
+                return null;
+            }
+            const r = rank.get(String(v));
+            return r != null ? r : rank.size;
+        }
+        return function (a, b) {
+            const ag = a.grades && a.grades[gidx],
+                bg = b.grades && b.grades[gidx],
+                ak = key(ag), bk = key(bg);
+            if (ak === null || bk === null) {
+                if (ak !== null) {
+                    return -1;
+                } else if (bk !== null) {
+                    return 1;
+                }
+            } else if (ak !== bk) {
+                return ak - bk;
+            } else if (ak === rank.size && ag !== bg) {
+                return String(ag).localeCompare(String(bg));
+            }
+            return a._sort_user.localeCompare(b._sort_user);
+        };
+    },
     tcell_width: function (col) {
         let w = 0;
         for (const opt of this.options) {
